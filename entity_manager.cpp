@@ -294,14 +294,15 @@ private:
     EntityTree m_tree;
     std::queue<EntityCreate> m_createQueue;
     std::mutex m_createMutex;
-    std::queue<EntityRemove> m_removeQueue;
-    std::mutex m_removeMutex;
     std::queue<EntityParentChange> m_parentChangeQueue;
     std::mutex m_parentChangeMutex;
+
+	IMessageQueue<EntityRemove>* m_removeQueue = nullptr;
 
 protected:
     Error RegisterImpl(ModuleInterface& a) override {
         a.m_interfaces.Register<IEntityManager>(this);
+		m_removeQueue = a.m_messages.CreateQueue<EntityRemove>().get();
         return {};
     }
     
@@ -320,15 +321,6 @@ protected:
         }
 
         {
-            std::lock_guard lock(m_removeMutex);
-            while (!m_removeQueue.empty()) {
-                auto& req = m_removeQueue.front();
-                m_tree.RemoveEntity(req.m_entity);
-                m_removeQueue.pop();
-            }
-        }
-
-        {
             std::lock_guard lock(m_parentChangeMutex);
             while (!m_parentChangeQueue.empty()) {
                 auto& req = m_parentChangeQueue.front();
@@ -336,6 +328,11 @@ protected:
                 m_parentChangeQueue.pop();
             }
         }
+
+		while (auto msg = m_removeQueue->GetMessage()) {
+			auto& signal = *msg;
+			m_tree.RemoveEntity(signal.m_entity);
+		}
 
         return {};
     }
@@ -357,8 +354,7 @@ public:
     }
 
     void RemoveEntity(entity_t entity) override {
-        std::lock_guard lock(m_removeMutex);
-        m_removeQueue.push({entity});
+        m_removeQueue->SendMessage(EntityRemove{entity});
     }
 
     void SetParent(entity_t entity, entity_t parent = kRoot) override { 

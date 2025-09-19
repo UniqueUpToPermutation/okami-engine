@@ -30,6 +30,23 @@ namespace okami
 		entity_t m_newParent;
 	};
 
+	template <typename T>
+	struct AddComponentSignal {
+		entity_t m_entity;
+		T m_component;
+	};
+
+	template <typename T>
+	struct UpdateComponentSignal {
+		entity_t m_entity;
+		T m_component;
+	};
+
+	template <typename T>
+	struct RemoveComponentSignal {
+		entity_t m_entity;
+	};
+
 	// Forward declarations
 	struct EntityTreeImpl;
 	class EntityTree;

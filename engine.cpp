@@ -48,6 +48,10 @@ entity_t Engine::CreateEntity(entity_t parent) {
     }
 }
 
+void Engine::RemoveEntity(entity_t entity) {
+	m_moduleInterface.m_messages.SendMessage(EntityRemoveSignal{entity});
+}
+
 Engine::~Engine() {
 	Shutdown();
 	google::ShutdownGoogleLogging();
@@ -90,6 +94,48 @@ std::filesystem::path Engine::GetRenderOutputPath(size_t frameIndex) {
 		(std::string{m_params.m_headlessOutputFileStem} + "_" + std::to_string(frameIndex) + ".png");
 }
 
+struct FrameTimeEstimator {
+	size_t m_nextFrame = 0;
+	std::chrono::high_resolution_clock::time_point m_startTime;
+	std::chrono::high_resolution_clock::time_point m_lastFrameTime;
+	double m_nextDelta = 0.0; // Default to 60 FPS
+	double m_frameTimeEstimate = 0.0; // Smoothed estimate of frame time
+	double m_smoothingFactor = 0.1; // Smoothing factor for frame time estimate
+
+	FrameTimeEstimator() {
+		m_startTime = std::chrono::high_resolution_clock::now();
+		m_lastFrameTime = m_startTime;
+	}
+
+	FrameTimeEstimator Step() const {
+		FrameTimeEstimator next = *this;
+
+		auto now = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> deltaTime = now - m_lastFrameTime;
+
+		auto lastFrameEstimate = m_frameTimeEstimate;
+		auto lastError = lastFrameEstimate - deltaTime.count();
+
+		next.m_frameTimeEstimate = m_frameTimeEstimate * (1.0 - m_smoothingFactor) + deltaTime.count() * m_smoothingFactor;
+
+		// Adjust next frame time based on the error we had of our last estimate
+		next.m_nextDelta = m_frameTimeEstimate + lastError;
+
+		next.m_nextFrame++;
+		return next;
+	} 
+
+	Time GetTime() const {
+		auto lastFrameTime = std::chrono::duration<double>(m_lastFrameTime - m_startTime).count();
+		return Time{
+			.m_deltaTime = m_nextDelta,
+			.m_lastFrameTime = lastFrameTime,
+			.m_nextFrameTime = lastFrameTime + m_nextDelta,
+			.m_nextFrame = m_nextFrame
+		};
+	}
+};
+
 void Engine::Run(std::optional<size_t> runFrameCount) {
 	m_shouldExit.store(false);
 
@@ -109,20 +155,18 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 		LOG(INFO) << "Running in headless mode, defaulting to " << *maxFrames << " frames.";
 	}
 
-	size_t frameCount = 0;
+	FrameTimeEstimator timeEstimator;
 
 	while (!m_shouldExit.load()) {
-		auto now = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<double> deltaTime = now - lastTick;
-		std::chrono::duration<double> totalTime = now - beginTick;
+		auto time = timeEstimator.GetTime();
 
-		Time time{
-			.m_deltaTime = deltaTime.count(),
-			.m_totalTime = totalTime.count(),
-			.m_frame = frameCount
-		};
+		// Merge staged changes for this frame
+		m_ioModules.Merge();
+		m_updateModules.Merge();
+		m_renderModules.Merge();
 
 		// Update frame and render
+		// Stage changes for next frame
         m_ioModules.ProcessFrame(time, m_moduleInterface);
 		m_updateModules.ProcessFrame(time, m_moduleInterface);
         m_renderModules.ProcessFrame(time, m_moduleInterface);
@@ -138,16 +182,14 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 			renderer->SaveToFile(outputFile.string());
 		}*/
 
-		frameCount++;
+		timeEstimator = timeEstimator.Step();
 
-		if (maxFrames && frameCount >= *maxFrames) {
+		if (maxFrames && timeEstimator.m_nextFrame >= *maxFrames) {
 			m_shouldExit.store(true);
 		}
 
 		while (m_exitHandler && m_exitHandler->GetMessage()) {
 			m_shouldExit.store(true);
 		}
-
-		lastTick = now;
 	}
 }

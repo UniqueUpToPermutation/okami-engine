@@ -30,6 +30,12 @@ void BGFXTriangleModule::ShutdownImpl(ModuleInterface&) {
 }
 
 Error BGFXTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface&) {
+    if (bgfx::isValid(m_program)) {
+        bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A);
+        bgfx::setVertexCount(3);
+        bgfx::submit(0, m_program);
+    }
+
     return {};
 }
 
@@ -39,4 +45,8 @@ Error BGFXTriangleModule::MergeImpl() {
     
 std::string_view BGFXTriangleModule::GetName() const {
     return "BGFX Triangle Module";
+}
+
+BGFXTriangleModule::BGFXTriangleModule() {
+    m_storage = CreateChild<StorageModule<DummyTriangleComponent>>();
 }

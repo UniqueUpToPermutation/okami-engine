@@ -17,7 +17,7 @@ namespace okami {
     };
 
     template <typename T>
-    class IMessageQueue {
+    class IMessageQueue : public IMessageSink<T> {
     public:
         virtual std::optional<T> GetMessage() = 0;
         virtual ~IMessageQueue() = default;
@@ -25,8 +25,7 @@ namespace okami {
 
     template <typename T>
     class MessageQueue final : 
-        public IMessageQueue<T>,
-        public IMessageSink<T>
+        public IMessageQueue<T>
     {
     public:
         std::optional<T> GetMessage() override {
@@ -110,8 +109,9 @@ namespace okami {
 
     struct Time {
 		double m_deltaTime;
-		double m_totalTime;
-		size_t m_frame;
+        double m_nextFrameTime;
+		double m_lastFrameTime;
+		size_t m_nextFrame;
 	};
 
     class EngineModule {

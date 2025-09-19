@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../module.hpp"
+#include "../storage.hpp"
+#include "../renderer.hpp"
 #include "bgfx_util.hpp"
 
 #include <bx/bx.h>
@@ -11,6 +13,7 @@ namespace okami {
     class BGFXTriangleModule : public EngineModule {
     private:
         AutoHandle<bgfx::ProgramHandle> m_program;
+        StorageModule<DummyTriangleComponent>* m_storage = nullptr;
 
     protected:
         Error RegisterImpl(ModuleInterface&) override;
@@ -21,6 +24,8 @@ namespace okami {
         Error MergeImpl() override;
 
     public:
+        BGFXTriangleModule();
+
         std::string_view GetName() const override;
     };
 }

@@ -11,6 +11,8 @@
 #include "bgfx/bgfx_renderer.hpp"
 #include "glfw/glfw_module.hpp"
 
+#include "renderer.hpp"
+
 using namespace okami;
 
 int main() {
@@ -21,6 +23,10 @@ int main() {
     en.CreateRenderModule<BgfxRendererFactory>();
 
     Error err = en.Startup();
+
+    auto e = en.CreateEntity();
+    en.AddComponent(e, DummyTriangleComponent{});
+
     if (err.IsError()) {
         std::cerr << "Engine startup failed: " << err << std::endl;
         return 1;

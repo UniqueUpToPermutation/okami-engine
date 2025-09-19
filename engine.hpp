@@ -44,6 +44,12 @@ namespace okami {
 		void Shutdown();
 
         entity_t CreateEntity(entity_t parent = kRoot);
+        void RemoveEntity(entity_t entity);
+
+        template <typename T>
+        void AddComponent(entity_t entity, T component) {
+            m_moduleInterface.m_messages.SendMessage(AddComponentSignal<T>{entity, std::move(component)});
+        }
 
         template <typename FactoryT>
         auto CreateIOModule(FactoryT factory = FactoryT{}) {
