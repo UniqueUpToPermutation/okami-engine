@@ -27,6 +27,7 @@ namespace okami {
         virtual Range GetModified() const = 0;
         virtual Range GetAdded() const = 0;
         virtual Range GetRemoved() const = 0;
+        virtual bool IsEmpty() const = 0;
         
         T const& Get(entity_t entity) const {
             if (auto comp = TryGet(entity)) {
@@ -150,6 +151,10 @@ namespace okami {
 
         IComponentView<T>::Range GetRemoved() const override {
             return typename IComponentView<T>::Range{m_removed.cbegin(), m_removed.cend()};
+        }
+
+        bool IsEmpty() const override {
+            return m_storage.empty();
         }
     };
 }

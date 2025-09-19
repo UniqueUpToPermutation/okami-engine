@@ -30,10 +30,12 @@ void BGFXTriangleModule::ShutdownImpl(ModuleInterface&) {
 }
 
 Error BGFXTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface&) {
-    if (bgfx::isValid(m_program)) {
+    if (!m_storage->IsEmpty() && bgfx::isValid(m_program)) {
         bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A);
         bgfx::setVertexCount(3);
-        bgfx::submit(0, m_program);
+        m_storage->ForEach([this](entity_t, DummyTriangleComponent const&) {
+            bgfx::submit(0, m_program);
+        });
     }
 
     return {};

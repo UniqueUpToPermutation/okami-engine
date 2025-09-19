@@ -75,6 +75,8 @@ private:
         bgfx::setViewRect(0, 0, 0, 
             uint16_t(m_lastFramebufferSize.x), uint16_t(m_lastFramebufferSize.y));
         
+        bgfx::touch(0);
+
         m_triangleModule->ProcessFrame(t, a);
 
         // Advance to next frame. Rendering thread will be kicked to
