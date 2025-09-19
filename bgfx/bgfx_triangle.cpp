@@ -1,6 +1,6 @@
 #include "bgfx_triangle.hpp"
 
-#include "../paths.hpp"
+#include "bgfx_util.hpp"
 
 using namespace okami;
 
@@ -9,13 +9,24 @@ Error BGFXTriangleModule::RegisterImpl(ModuleInterface&) {
 }
 
 Error BGFXTriangleModule::StartupImpl(ModuleInterface&) {
-    //GetBGFXShaderPath(""
+    auto vs = LoadBgfxShader("triangle_vs.sc");
+    auto fs = LoadBgfxShader("triangle_fs.sc");
+
+    OKAMI_ERROR_RETURN(vs);
+    OKAMI_ERROR_RETURN(fs);
+
+    auto program = bgfx::createProgram(*vs, *fs, true);
+    if (!bgfx::isValid(program)) {
+        return Error("Failed to create shader program");
+    }
+
+    m_program = AutoHandle(program);
 
     return {};
 }
 
 void BGFXTriangleModule::ShutdownImpl(ModuleInterface&) {
-
+    m_program.Reset();
 }
 
 Error BGFXTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface&) {

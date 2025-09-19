@@ -1,4 +1,5 @@
 #include "bgfx_renderer.hpp"
+#include "bgfx_triangle.hpp"
 
 #include "../config.hpp"
 #include "../renderer.hpp"
@@ -43,6 +44,8 @@ protected:
     // Triangle rendering resources
     bgfx::VertexBufferHandle m_vbh = BGFX_INVALID_HANDLE;
     bgfx::ProgramHandle m_program = BGFX_INVALID_HANDLE;
+
+    BGFXTriangleModule* m_triangleModule = nullptr;
 
     constexpr static bgfx::ViewId kClearView = 0;
 
@@ -117,6 +120,8 @@ private:
         // Set view 0 default viewport.
         bgfx::setViewRect(0, 0, 0, 
             uint16_t(m_lastFramebufferSize.x), uint16_t(m_lastFramebufferSize.y));
+        
+        m_triangleModule->ProcessFrame(t, a);
 
         // Render the triangle
         if (bgfx::isValid(m_vbh)) {
@@ -177,6 +182,11 @@ public:
     entity_t GetActiveCamera() const override {
         return {};
     }   
+
+    BgfxRendererModule() {
+        SetChildrenProcessFrame(false); // Manually process child modules
+        m_triangleModule = CreateChild<BGFXTriangleModule>();
+    }
 };
 
 std::unique_ptr<EngineModule> BgfxRendererFactory::operator()() {

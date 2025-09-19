@@ -44,11 +44,11 @@ static std::filesystem::path FindAssetsPath() {
 }
 
 static std::filesystem::path FindD3D12ShadersPath() {
-    return SearchForPath(std::filesystem::current_path(), "shaders/d3d12");
+    return SearchForPath(std::filesystem::current_path(), "d3d12/shaders");
 }
 
 static std::filesystem::path FindBGFXShadersPath() {
-    return SearchForPath(std::filesystem::current_path(), "shaders/bgfx");
+    return SearchForPath(std::filesystem::current_path(), "bgfx/shaders");
 }
 
 static std::filesystem::path FindTestAssetsPath() {

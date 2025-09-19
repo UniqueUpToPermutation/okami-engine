@@ -15,15 +15,33 @@ namespace okami {
         T m_handle;
     
     public:
-        AutoHandle() : m_handle(BGFX_INVALID_HANDLE) {}
-        explicit AutoHandle(T handle) : m_handle(handle) {}
-        ~AutoHandle() {
+        operator T() const { return m_handle; }
+
+        void Reset(T handle = BGFX_INVALID_HANDLE) {
             if (bgfx::isValid(m_handle)) {
                 bgfx::destroy(m_handle);
             }
+            m_handle = handle;
+        }
+
+        AutoHandle() : m_handle(BGFX_INVALID_HANDLE) {}
+        explicit AutoHandle(T handle) : m_handle(handle) {}
+        ~AutoHandle() {
+            Reset();
         }
         OKAMI_NO_COPY(AutoHandle);
+        
+        inline AutoHandle(AutoHandle&& other) noexcept : m_handle(other.m_handle) {
+            other.m_handle = BGFX_INVALID_HANDLE;
+        }
+        inline AutoHandle& operator=(AutoHandle&& other) noexcept {
+            if (this != &other) {
+                Reset(other.m_handle);
+                other.m_handle = BGFX_INVALID_HANDLE;
+            }
+            return *this;
+        }
     };
 
-    std::optional<AutoHandle<bgfx::ShaderHandle>> LoadBgfxShader(std::filesystem::path path);
+   Expected<AutoHandle<bgfx::ShaderHandle>> LoadBgfxShader(std::filesystem::path path);
 }

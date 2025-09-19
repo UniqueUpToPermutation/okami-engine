@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../module.hpp"
+#include "bgfx_util.hpp"
 
 #include <bx/bx.h>
 #include <bgfx/bgfx.h>
@@ -9,7 +10,7 @@
 namespace okami {
     class BGFXTriangleModule : public EngineModule {
     private:
-        bgfx::ProgramHandle m_program = BGFX_INVALID_HANDLE;
+        AutoHandle<bgfx::ProgramHandle> m_program;
 
     protected:
         Error RegisterImpl(ModuleInterface&) override;
