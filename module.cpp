@@ -75,6 +75,10 @@ Error EngineModule::ProcessFrame(Time const& t, ModuleInterface& a) {
     Error e = ProcessFrameImpl(t, a);
     OKAMI_ERROR_RETURN(e);
 
+    if (!b_children_process_frame) {
+        return {};
+    }
+    
     for (auto& mod : m_submodules) {
         e += mod->ProcessFrame(t, a);
         OKAMI_ERROR_RETURN(e);

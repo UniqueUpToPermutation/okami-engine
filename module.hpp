@@ -120,7 +120,14 @@ namespace okami {
         bool b_started = false;
         bool b_shutdown = false;
 
+        // Sets if children should have their ProcessFrame called automatically
+        bool b_children_process_frame = true;
+
     protected:
+        inline void SetChildrenProcessFrame(bool enable) {
+            b_children_process_frame = enable;
+        }
+
         virtual Error RegisterImpl(ModuleInterface&) = 0;
         virtual Error StartupImpl(ModuleInterface&) = 0;
         virtual void ShutdownImpl(ModuleInterface&) = 0;
