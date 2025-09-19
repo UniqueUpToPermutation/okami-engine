@@ -77,6 +77,7 @@ private:
         
         bgfx::touch(0);
 
+        // Draw any triangles that need to be drawn.
         m_triangleModule->ProcessFrame(t, a);
 
         // Advance to next frame. Rendering thread will be kicked to

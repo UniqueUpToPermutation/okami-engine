@@ -24,6 +24,7 @@ int main() {
 
     Error err = en.Startup();
 
+    // Create scene
     auto e = en.CreateEntity();
     en.AddComponent(e, DummyTriangleComponent{});
 
