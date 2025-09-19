@@ -2,6 +2,8 @@
 
 #include "bgfx_util.hpp"
 
+#include "../transform.hpp"
+
 using namespace okami;
 
 Error BGFXTriangleModule::RegisterImpl(ModuleInterface&) {
@@ -29,11 +31,18 @@ void BGFXTriangleModule::ShutdownImpl(ModuleInterface&) {
     m_program.Reset();
 }
 
-Error BGFXTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface&) {
+Error BGFXTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
+    auto transforms = mi.m_interfaces.Query<IComponentView<Transform>>();
+    if (!transforms) {
+        return Error("No IComponentView<Transform> available in BGFXTriangleModule");
+    }
+
     if (!m_storage->IsEmpty() && bgfx::isValid(m_program)) {
-        bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A);
-        bgfx::setVertexCount(3);
-        m_storage->ForEach([this](entity_t, DummyTriangleComponent const&) {
+        m_storage->ForEach([this, transforms](entity_t e, DummyTriangleComponent const&) {
+            auto transform = glm::transpose(transforms->GetOr(e, Transform::Identity()).AsMatrix());
+            bgfx::setTransform(&transform);
+            bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A);
+            bgfx::setVertexCount(3);
             bgfx::submit(0, m_program);
         });
     }

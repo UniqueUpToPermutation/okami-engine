@@ -23,6 +23,14 @@ namespace okami {
 
         virtual void ForEach(std::function<void(entity_t, T const&)> func) = 0;
         virtual T const* TryGet(entity_t entity) const = 0;
+        
+        T GetOr(entity_t entity, T const& defaultValue) const {
+            if (auto comp = TryGet(entity)) {
+                return *comp;
+            } else {
+                return defaultValue;
+            }
+        }
 
         virtual Range GetModified() const = 0;
         virtual Range GetAdded() const = 0;
@@ -63,6 +71,7 @@ namespace okami {
             m_updateQueue = mi.m_messages.CreateQueue<UpdateComponentSignal<T>>().get();
             m_removeQueue = mi.m_messages.CreateQueue<RemoveComponentSignal<T>>().get();
             m_entityRemoveQueue = mi.m_messages.CreateQueue<EntityRemoveSignal>().get();
+            mi.m_interfaces.Register<IComponentView<T>>(this);
             return {};
         }
 

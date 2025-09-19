@@ -12,6 +12,7 @@
 #include "glfw/glfw_module.hpp"
 
 #include "renderer.hpp"
+#include "transform.hpp"
 
 using namespace okami;
 
@@ -27,6 +28,11 @@ int main() {
     // Create scene
     auto e = en.CreateEntity();
     en.AddComponent(e, DummyTriangleComponent{});
+    en.AddComponent(e, Transform::Translate(0.5f, 0.0f, 0.0f));
+
+    e = en.CreateEntity();
+    en.AddComponent(e, DummyTriangleComponent{});
+    en.AddComponent(e, Transform::Translate(-0.5f, 0.0f, 0.0f));
 
     if (err.IsError()) {
         std::cerr << "Engine startup failed: " << err << std::endl;

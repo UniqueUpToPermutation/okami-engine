@@ -2,6 +2,7 @@
 
 #include "entity_manager.hpp"
 #include "config.hpp"
+#include "physics.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -38,6 +39,7 @@ Engine::Engine(EngineParams params) :
 
     CreateUpdateModule(EntityManagerFactory{});
     CreateUpdateModule(ConfigModuleFactory{});
+	CreateUpdateModule(PhysicsModuleFactory{});
 }
 
 entity_t Engine::CreateEntity(entity_t parent) {

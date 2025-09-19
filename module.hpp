@@ -7,6 +7,7 @@
 #include <mutex>
 
 #include "common.hpp"
+#include "log.hpp"
 
 namespace okami {
     template <typename T>
@@ -64,6 +65,8 @@ namespace okami {
                 auto sink = std::any_cast<std::shared_ptr<IMessageSink<T>>>(it->second);
                 if (sink) {
                     sink->SendMessage(message);
+                } else {
+
                 }
             }
         }
