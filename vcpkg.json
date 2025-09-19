@@ -1,0 +1,28 @@
+{
+  "name": "engine",
+  "version-string": "0.1.0",
+  "dependencies": [
+  { "name": "directx-headers", "platform": "windows" },
+  { "name": "directxtk12", "platform": "windows" },
+    "glfw3",
+    "glog",
+    "gtest",
+    {
+      "name": "imgui",
+      "features": [ "glfw-binding" ]
+    },
+    {
+      "name": "imgui",
+      "features": [ "dx12-binding" ],
+      "platform": "windows"
+    },
+    "tinygltf",
+    "yaml-cpp",
+    "glm",
+    "concurrentqueue",
+    {
+      "name": "bgfx",
+      "features": [ "tools" ]
+    }
+  ]
+}

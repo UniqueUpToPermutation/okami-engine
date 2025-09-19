@@ -1,0 +1,11 @@
+{
+"renderer": {
+	"bufferCount": 2,
+	"syncInterval": 1
+},
+"window" : {
+	"backbufferWidth": 800,
+	"backbufferHeight": 600,
+	"fullscreen": false,
+}
+}
