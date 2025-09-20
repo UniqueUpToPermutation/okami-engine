@@ -4,6 +4,8 @@
 
 #include "../transform.hpp"
 
+#include <bx/math.h>
+
 using namespace okami;
 
 Error BGFXTriangleModule::RegisterImpl(ModuleInterface&) {
@@ -50,8 +52,9 @@ Error BGFXTriangleModule::Pass(Time const& time, ModuleInterface& mi, RenderPass
     }
 
     if (!m_storage->IsEmpty() && bgfx::isValid(m_program)) {
-        m_storage->ForEach([this, transforms](entity_t e, DummyTriangleComponent const&) {
-            auto transform = glm::transpose(transforms->GetOr(e, Transform::Identity()).AsMatrix());
+        m_storage->ForEach([this, time, transforms](entity_t e, DummyTriangleComponent const&) {
+            auto transform = transforms->GetOr(e, Transform::Identity()).AsMatrix();
+
             bgfx::setTransform(&transform);
             bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A);
             bgfx::setVertexCount(3);

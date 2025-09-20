@@ -24,6 +24,7 @@ void main()
         color = vec3(0.0f, 1.0f, 0.0f); // Green
     }
 
-	gl_Position = mul(u_modelViewProj, vec4(position, 1.0) );
+	gl_Position = mul(vec4(position, 1.0), u_modelViewProj);
+    //gl_Position = vec4(position, 1.0);
 	v_color0 = vec4(color, 1.0);
 }

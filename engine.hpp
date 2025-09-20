@@ -71,6 +71,10 @@ namespace okami {
             return m_moduleInterface;
         }
 
+        void AddScript(
+            std::function<void(Time const&, ModuleInterface&)> script, 
+            std::string_view name = "Unnamed Script");
+
 		std::filesystem::path GetRenderOutputPath(size_t frameIndex);
 
 		Engine(EngineParams params = {});

@@ -25,19 +25,23 @@ int main() {
 
     Error err = en.Startup();
 
-    // Create scene
-    auto e = en.CreateEntity();
-    en.AddComponent(e, DummyTriangleComponent{});
-    en.AddComponent(e, Transform::Translate(0.5f, 0.0f, 0.0f));
+    auto e2 = en.CreateEntity();
+    en.AddComponent(e2, DummyTriangleComponent{});
+    en.AddComponent(e2, Transform::Translate(0.0f, 0.0f, 0.0f));
 
-    e = en.CreateEntity();
-    en.AddComponent(e, DummyTriangleComponent{});
-    en.AddComponent(e, Transform::Translate(-0.5f, 0.0f, -0.5f));
+    auto e3 = en.CreateEntity();
+    en.AddComponent(e3, Camera::Identity());
+    en.AddComponent(e3, Transform::Translate(0.5f, 0.0f, 0.0f));
+    en.SetActiveCamera(e3);
 
-    e = en.CreateEntity();
-    en.AddComponent(e, Camera::Identity());
-    en.AddComponent(e, Transform::Translate(0.25f, 0.0f, 0.0f));
-    en.SetActiveCamera(e);
+    en.AddScript([e2](Time const& t, ModuleInterface& mi) {
+        static float angle = 0.0f;
+        angle += t.m_deltaTime;
+
+        mi.m_messages.SendMessage(UpdateComponentSignal<Transform>{
+            e2, Transform::RotateZ(angle)
+        });
+    });
 
     if (err.IsError()) {
         std::cerr << "Engine startup failed: " << err << std::endl;

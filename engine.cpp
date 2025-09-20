@@ -108,8 +108,8 @@ struct FrameTimeEstimator {
 	size_t m_nextFrame = 0;
 	std::chrono::high_resolution_clock::time_point m_startTime;
 	std::chrono::high_resolution_clock::time_point m_lastFrameTime;
-	double m_nextDelta = 0.0; // Default to 60 FPS
-	double m_frameTimeEstimate = 0.0; // Smoothed estimate of frame time
+	double m_nextDelta = 1.0 / 60.0; // Default to 60 FPS
+	double m_frameTimeEstimate = 1.0 / 60.0; // Smoothed estimate of frame time
 	double m_smoothingFactor = 0.1; // Smoothing factor for frame time estimate
 
 	FrameTimeEstimator() {
@@ -124,7 +124,7 @@ struct FrameTimeEstimator {
 		std::chrono::duration<double> deltaTime = now - m_lastFrameTime;
 
 		auto lastFrameEstimate = m_frameTimeEstimate;
-		auto lastError = lastFrameEstimate - deltaTime.count();
+		auto lastError = deltaTime.count() - lastFrameEstimate;
 
 		next.m_frameTimeEstimate = m_frameTimeEstimate * (1.0 - m_smoothingFactor) + deltaTime.count() * m_smoothingFactor;
 
@@ -132,6 +132,7 @@ struct FrameTimeEstimator {
 		next.m_nextDelta = m_frameTimeEstimate + lastError;
 
 		next.m_nextFrame++;
+		next.m_lastFrameTime = now;
 		return next;
 	} 
 
@@ -202,4 +203,37 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 			m_shouldExit.store(true);
 		}
 	}
+}
+
+void Engine::AddScript(
+	std::function<void(Time const&, ModuleInterface&)> script, 
+	std::string_view name) {
+	CreateUpdateModule([script = std::move(script), name = std::string{name}]() {
+		class ScriptModule : public EngineModule {
+		private:
+			std::function<void(Time const&, ModuleInterface&)> m_script;
+			std::string m_name;
+		protected:
+			Error RegisterImpl(ModuleInterface&) override { return {}; }
+			Error StartupImpl(ModuleInterface&) override { return {}; }
+			void ShutdownImpl(ModuleInterface&) override { }
+
+			Error ProcessFrameImpl(Time const& t, ModuleInterface& mi) override {
+				m_script(t, mi);
+				return {};
+			}
+			Error MergeImpl() override { return {}; }
+		public:
+			ScriptModule(
+				std::function<void(Time const&, ModuleInterface&)> script,
+				std::string name)
+				: m_script(std::move(script)), m_name(std::move(name)) {}
+
+			std::string_view GetName() const override {
+				return m_name;
+			}
+		};
+
+		return std::make_unique<ScriptModule>(script, name);
+	})->Startup(m_moduleInterface);
 }

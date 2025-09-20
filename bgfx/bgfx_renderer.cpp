@@ -97,9 +97,7 @@ private:
             true);
         auto viewMat = transformView->GetOr(m_activeCamera.load(), Transform::Identity()).AsMatrix();
         viewMat = glm::inverse(viewMat);
-        projMat = glm::transpose(projMat);
-        viewMat = glm::transpose(viewMat);
-
+        
         bgfx::setViewTransform(0, &viewMat, &projMat);
 
         // Draw any triangles that need to be drawn.
