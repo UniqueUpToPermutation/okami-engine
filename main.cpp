@@ -32,7 +32,12 @@ int main() {
 
     e = en.CreateEntity();
     en.AddComponent(e, DummyTriangleComponent{});
-    en.AddComponent(e, Transform::Translate(-0.5f, 0.0f, 0.0f));
+    en.AddComponent(e, Transform::Translate(-0.5f, 0.0f, -0.5f));
+
+    e = en.CreateEntity();
+    en.AddComponent(e, Camera::Identity());
+    en.AddComponent(e, Transform::Translate(0.25f, 0.0f, 0.0f));
+    en.SetActiveCamera(e);
 
     if (err.IsError()) {
         std::cerr << "Engine startup failed: " << err << std::endl;

@@ -3,6 +3,7 @@
 #include "entity_manager.hpp"
 #include "config.hpp"
 #include "physics.hpp"
+#include "renderer.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -52,6 +53,13 @@ entity_t Engine::CreateEntity(entity_t parent) {
 
 void Engine::RemoveEntity(entity_t entity) {
 	m_moduleInterface.m_messages.SendMessage(EntityRemoveSignal{entity});
+}
+
+void Engine::SetActiveCamera(entity_t e) {
+	auto* renderer = m_moduleInterface.m_interfaces.Query<IRenderer>();
+	if (renderer) {
+		renderer->SetActiveCamera(e);
+	}
 }
 
 Engine::~Engine() {

@@ -3,8 +3,9 @@
 
 #include "../config.hpp"
 #include "../renderer.hpp"
-
-#include "../glfw/glfw_module.hpp"
+#include "../storage.hpp"
+#include "../camera.hpp"
+#include "../transform.hpp"
 
 #include <glog/logging.h>
 
@@ -23,6 +24,9 @@ protected:
     glm::ivec2 m_lastFramebufferSize = {0, 0};
     
     BGFXTriangleModule* m_triangleModule = nullptr;
+    StorageModule<Camera>* m_cameraModule = nullptr;
+
+    std::atomic<entity_t> m_activeCamera = 0;
 
     constexpr static bgfx::ViewId kClearView = 0;
 
@@ -71,20 +75,46 @@ private:
     }
 
     Error ProcessFrameImpl(Time const& t, ModuleInterface& a) override {
+        auto transformView = a.m_interfaces.Query<IComponentView<Transform>>();
+        if (!transformView) {
+            return Error("No IComponentView<Transform> available in BgfxRendererModule");
+        }
+
+        Error e;
+
         // Set view 0 default viewport.
         bgfx::setViewRect(0, 0, 0, 
             uint16_t(m_lastFramebufferSize.x), uint16_t(m_lastFramebufferSize.y));
         
         bgfx::touch(0);
 
+        auto* cameraPtr = m_cameraModule->TryGet(m_activeCamera.load());
+        auto camera = cameraPtr ? *cameraPtr : Camera::Identity();
+
+        auto projMat = camera.GetProjectionMatrix(
+            m_lastFramebufferSize.x, 
+            m_lastFramebufferSize.y, 
+            true);
+        auto viewMat = transformView->GetOr(m_activeCamera.load(), Transform::Identity()).AsMatrix();
+        viewMat = glm::inverse(viewMat);
+        projMat = glm::transpose(projMat);
+        viewMat = glm::transpose(viewMat);
+
+        bgfx::setViewTransform(0, &viewMat, &projMat);
+
         // Draw any triangles that need to be drawn.
-        m_triangleModule->ProcessFrame(t, a);
+        RenderPassInfo info{
+            .m_camera = camera,
+            .m_viewportSize = m_lastFramebufferSize,
+            .m_target = 0
+        };
+        e += m_triangleModule->Pass(t, a, info);
 
         // Advance to next frame. Rendering thread will be kicked to
         // process submitted rendering primitives.
         bgfx::frame();
 
-        return {};
+        return e;
     }
 
     void ShutdownImpl(ModuleInterface&) override {
@@ -109,15 +139,17 @@ public:
     }
 
     void SetActiveCamera(entity_t e) override {
+        m_activeCamera.store(e);
     }
     
     entity_t GetActiveCamera() const override {
-        return {};
+        return m_activeCamera.load();
     }   
 
     BgfxRendererModule() {
         SetChildrenProcessFrame(false); // Manually process child modules
         m_triangleModule = CreateChild<BGFXTriangleModule>();
+        m_cameraModule = CreateChild<StorageModule<Camera>>();
     }
 };
 

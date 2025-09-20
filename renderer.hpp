@@ -6,6 +6,7 @@
 
 #include "engine.hpp"
 #include "config.hpp"
+#include "camera.hpp"
 
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
@@ -110,6 +111,19 @@ namespace okami {
 			OKAMI_CONFIG_FIELD(windowTitle);
 			OKAMI_CONFIG_FIELD(fullscreen);
 		}
+	};
+
+	struct RenderPassInfo {
+		Camera m_camera;
+		glm::ivec2 m_viewportSize;
+		int m_target;
+	};
+
+	class IRenderModule {
+	public:
+		virtual ~IRenderModule() = default;
+
+		virtual Error Pass(Time const& time, ModuleInterface& mi, RenderPassInfo info) = 0;
 	};
 
     class IRenderer {

@@ -45,6 +45,7 @@ namespace okami {
 
         entity_t CreateEntity(entity_t parent = kRoot);
         void RemoveEntity(entity_t entity);
+        void SetActiveCamera(entity_t e);
 
         template <typename T>
         void AddComponent(entity_t entity, T component) {

@@ -32,6 +32,18 @@ void BGFXTriangleModule::ShutdownImpl(ModuleInterface&) {
 }
 
 Error BGFXTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
+    return {};
+}
+
+Error BGFXTriangleModule::MergeImpl() {
+    return {};
+}
+    
+std::string_view BGFXTriangleModule::GetName() const {
+    return "BGFX Triangle Module";
+}
+
+Error BGFXTriangleModule::Pass(Time const& time, ModuleInterface& mi, RenderPassInfo info) {
     auto transforms = mi.m_interfaces.Query<IComponentView<Transform>>();
     if (!transforms) {
         return Error("No IComponentView<Transform> available in BGFXTriangleModule");
@@ -47,15 +59,7 @@ Error BGFXTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
         });
     }
 
-    return {};
-}
-
-Error BGFXTriangleModule::MergeImpl() {
-    return {};
-}
-    
-std::string_view BGFXTriangleModule::GetName() const {
-    return "BGFX Triangle Module";
+    return Error{};
 }
 
 BGFXTriangleModule::BGFXTriangleModule() {

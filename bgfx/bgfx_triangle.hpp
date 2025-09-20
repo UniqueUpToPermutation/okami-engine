@@ -10,7 +10,9 @@
 #include <bgfx/platform.h>
 
 namespace okami {
-    class BGFXTriangleModule : public EngineModule {
+    class BGFXTriangleModule : 
+        public EngineModule,
+        public IRenderModule{
     private:
         AutoHandle<bgfx::ProgramHandle> m_program;
         StorageModule<DummyTriangleComponent>* m_storage = nullptr;
@@ -27,5 +29,6 @@ namespace okami {
         BGFXTriangleModule();
 
         std::string_view GetName() const override;
+        Error Pass(Time const& time, ModuleInterface& mi, RenderPassInfo info) override;
     };
 }
