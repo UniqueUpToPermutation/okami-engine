@@ -13,6 +13,7 @@
 
 #include "renderer.hpp"
 #include "transform.hpp"
+#include "texture.hpp"
 
 using namespace okami;
 
@@ -24,6 +25,8 @@ int main() {
     en.CreateRenderModule<BgfxRendererFactory>();
 
     Error err = en.Startup();
+
+    auto textureHandle = en.LoadResource<Texture>("test.png");
 
     auto e2 = en.CreateEntity();
     en.AddComponent(e2, DummyTriangleComponent{});

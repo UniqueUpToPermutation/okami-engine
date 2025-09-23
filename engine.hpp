@@ -5,6 +5,7 @@
 
 #include "common.hpp"
 #include "module.hpp"
+#include "content.hpp"
 #include "entity_manager.hpp"
 
 namespace okami {
@@ -69,6 +70,24 @@ namespace okami {
 
 		ModuleInterface& GetModuleInterface() {
             return m_moduleInterface;
+        }
+
+        template <ResourceType T>
+        ResHandle<T> LoadResource(const std::filesystem::path& path, typename T::LoadParams params = {}) {
+            auto* cm = m_moduleInterface.m_interfaces.Query<IContentManager<T>>();
+            if (!cm) {
+                throw std::runtime_error("No IContentManager<" + std::string(typeid(T).name()) + "> registered in Engine");
+            }
+            return cm->Load(path, params, m_moduleInterface);
+        }
+
+        template <ResourceType T>
+        ResHandle<T> CreateResource(T&& data) {
+            auto* cm = m_moduleInterface.m_interfaces.Query<IContentManager<T>>();
+            if (!cm) {
+                throw std::runtime_error("No IContentManager<" + std::string(typeid(T).name()) + "> registered in Engine");
+            }
+            return cm->Create(std::move(data));
         }
 
         void AddScript(

@@ -4,6 +4,7 @@
 #include "config.hpp"
 #include "physics.hpp"
 #include "renderer.hpp"
+#include "io.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -41,6 +42,8 @@ Engine::Engine(EngineParams params) :
     CreateUpdateModule(EntityManagerFactory{});
     CreateUpdateModule(ConfigModuleFactory{});
 	CreateUpdateModule(PhysicsModuleFactory{});
+
+	CreateIOModule(TextureIOModuleFactory{});
 }
 
 entity_t Engine::CreateEntity(entity_t parent) {

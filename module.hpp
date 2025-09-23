@@ -32,7 +32,7 @@ namespace okami {
         std::optional<T> GetMessage() override {
             std::lock_guard<std::mutex> lock(m_mtx);
             if (!m_messages.empty()) {
-                T msg = m_messages.front();
+                T msg = std::move(m_messages.front());
                 m_messages.pop();
                 return msg;
             }

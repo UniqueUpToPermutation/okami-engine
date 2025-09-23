@@ -8,11 +8,11 @@
 
 using namespace okami;
 
-Error BGFXTriangleModule::RegisterImpl(ModuleInterface&) {
+Error BgfxTriangleModule::RegisterImpl(ModuleInterface&) {
     return {};
 }
 
-Error BGFXTriangleModule::StartupImpl(ModuleInterface&) {
+Error BgfxTriangleModule::StartupImpl(ModuleInterface&) {
     auto vs = LoadBgfxShader("triangle_vs.sc");
     auto fs = LoadBgfxShader("triangle_fs.sc");
 
@@ -29,23 +29,23 @@ Error BGFXTriangleModule::StartupImpl(ModuleInterface&) {
     return {};
 }
 
-void BGFXTriangleModule::ShutdownImpl(ModuleInterface&) {
+void BgfxTriangleModule::ShutdownImpl(ModuleInterface&) {
     m_program.Reset();
 }
 
-Error BGFXTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
+Error BgfxTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
     return {};
 }
 
-Error BGFXTriangleModule::MergeImpl() {
+Error BgfxTriangleModule::MergeImpl() {
     return {};
 }
     
-std::string_view BGFXTriangleModule::GetName() const {
+std::string_view BgfxTriangleModule::GetName() const {
     return "BGFX Triangle Module";
 }
 
-Error BGFXTriangleModule::Pass(Time const& time, ModuleInterface& mi, RenderPassInfo info) {
+Error BgfxTriangleModule::Pass(Time const& time, ModuleInterface& mi, RenderPassInfo info) {
     auto transforms = mi.m_interfaces.Query<IComponentView<Transform>>();
     if (!transforms) {
         return Error("No IComponentView<Transform> available in BGFXTriangleModule");
@@ -65,6 +65,6 @@ Error BGFXTriangleModule::Pass(Time const& time, ModuleInterface& mi, RenderPass
     return Error{};
 }
 
-BGFXTriangleModule::BGFXTriangleModule() {
+BgfxTriangleModule::BgfxTriangleModule() {
     m_storage = CreateChild<StorageModule<DummyTriangleComponent>>();
 }

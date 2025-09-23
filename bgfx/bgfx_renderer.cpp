@@ -1,5 +1,6 @@
 #include "bgfx_renderer.hpp"
 #include "bgfx_triangle.hpp"
+#include "bgfx_texture_manager.hpp"
 
 #include "../config.hpp"
 #include "../renderer.hpp"
@@ -23,8 +24,10 @@ protected:
     RendererConfig m_config;
     glm::ivec2 m_lastFramebufferSize = {0, 0};
     
-    BGFXTriangleModule* m_triangleModule = nullptr;
     StorageModule<Camera>* m_cameraModule = nullptr;
+
+    BgfxTriangleModule* m_triangleModule = nullptr;
+    BgfxTextureManager* m_textureManager = nullptr;
 
     std::atomic<entity_t> m_activeCamera = 0;
 
@@ -75,6 +78,8 @@ private:
     }
 
     Error ProcessFrameImpl(Time const& t, ModuleInterface& a) override {
+        m_textureManager->ProcessNewResources({});
+        
         auto transformView = a.m_interfaces.Query<IComponentView<Transform>>();
         if (!transformView) {
             return Error("No IComponentView<Transform> available in BgfxRendererModule");
@@ -146,8 +151,9 @@ public:
 
     BgfxRendererModule() {
         SetChildrenProcessFrame(false); // Manually process child modules
-        m_triangleModule = CreateChild<BGFXTriangleModule>();
+        m_triangleModule = CreateChild<BgfxTriangleModule>();
         m_cameraModule = CreateChild<StorageModule<Camera>>();
+        m_textureManager = CreateChild<BgfxTextureManager>();
     }
 };
 

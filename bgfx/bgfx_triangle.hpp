@@ -10,7 +10,7 @@
 #include <bgfx/platform.h>
 
 namespace okami {
-    class BGFXTriangleModule : 
+    class BgfxTriangleModule : 
         public EngineModule,
         public IRenderModule{
     private:
@@ -26,7 +26,7 @@ namespace okami {
         Error MergeImpl() override;
 
     public:
-        BGFXTriangleModule();
+        BgfxTriangleModule();
 
         std::string_view GetName() const override;
         Error Pass(Time const& time, ModuleInterface& mi, RenderPassInfo info) override;
