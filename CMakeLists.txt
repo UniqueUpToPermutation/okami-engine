@@ -466,6 +466,102 @@ if(USE_BGFX AND BGFX_SHADER_FILES)
     endif()
 endif() # USE_BGFX
 
+#==============================================================================
+# KTX Image Compilation System
+#==============================================================================
+
+# Find all image files in assets and test/assets folders
+file(GLOB_RECURSE IMAGE_FILES 
+    "${CMAKE_SOURCE_DIR}/assets/*.png"
+    "${CMAKE_SOURCE_DIR}/assets/*.jpg"
+    "${CMAKE_SOURCE_DIR}/assets/*.jpeg"
+    "${CMAKE_SOURCE_DIR}/assets/*.tga"
+    "${CMAKE_SOURCE_DIR}/assets/*.bmp"
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.png"
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.jpg"
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.jpeg"
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.tga"
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.bmp"
+)
+
+if(IMAGE_FILES)
+    # Find toktx executable from KTX tools
+    find_program(TOKTX_EXECUTABLE
+        NAMES toktx toktx.exe
+        PATHS
+            # vcpkg installed ktx tools
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/tools/ktx"
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/ktx"
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/ktx"
+            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-osx/tools/ktx"
+            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-linux/tools/ktx"
+            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-windows/tools/ktx"
+            # System paths
+            /usr/local/bin
+            /usr/bin
+            /opt/homebrew/bin
+        NO_DEFAULT_PATH
+    )
+
+    if(TOKTX_EXECUTABLE)
+        message(STATUS "Found toktx: ${TOKTX_EXECUTABLE}")
+        
+        # Ensure KTX output directory exists
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/assets)
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/assets)
+        
+        set(ALL_KTX_TEXTURES "")
+        set(KTX_TEXTURE_COUNT 0)
+        
+        # Process each image file and create KTX compilation commands
+        foreach(IMAGE_FILE ${IMAGE_FILES})
+            get_filename_component(IMAGE_NAME ${IMAGE_FILE} NAME_WE)
+            get_filename_component(IMAGE_DIR ${IMAGE_FILE} DIRECTORY)
+            
+            # Determine output path relative to source
+            file(RELATIVE_PATH REL_DIR ${CMAKE_SOURCE_DIR} ${IMAGE_DIR})
+            set(KTX_OUTPUT_DIR "${CMAKE_BINARY_DIR}/${REL_DIR}")
+            set(KTX_OUTPUT_PATH "${KTX_OUTPUT_DIR}/${IMAGE_NAME}.ktx2")
+            
+            list(APPEND ALL_KTX_TEXTURES ${KTX_OUTPUT_PATH})
+            math(EXPR KTX_TEXTURE_COUNT "${KTX_TEXTURE_COUNT} + 1")
+            
+            message(STATUS "Will compile ${IMAGE_NAME} to KTX2")
+            
+            # Add custom command to compile this specific image to KTX2
+            add_custom_command(
+                OUTPUT ${KTX_OUTPUT_PATH}
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${KTX_OUTPUT_DIR}"
+                COMMAND ${TOKTX_EXECUTABLE}
+                    --t2
+                    --genmipmap
+                    --encode uastc
+                    --uastc_quality 2
+                    ${KTX_OUTPUT_PATH}
+                    ${IMAGE_FILE}
+                DEPENDS ${IMAGE_FILE}
+                COMMENT "Compiling image to KTX2: ${IMAGE_NAME}"
+                VERBATIM
+            )
+        endforeach()
+        
+        # Create a custom target that depends on all compiled textures
+        if(ALL_KTX_TEXTURES)
+            add_custom_target(CompileKTXTextures ALL
+                DEPENDS ${ALL_KTX_TEXTURES}
+                COMMENT "Compiling all images to KTX2"
+            )
+            
+            add_dependencies(Engine CompileKTXTextures)
+            message(STATUS "Created CompileKTXTextures target with ${KTX_TEXTURE_COUNT} textures")
+            message(STATUS "Compiled KTX textures will be available in: ${CMAKE_BINARY_DIR}/assets/")
+        endif()
+    else()
+        message(WARNING "toktx executable not found. Image compilation to KTX will be skipped.")
+        message(STATUS "Make sure KTX tools are installed via vcpkg or system package manager.")
+    endif()
+endif()
+
 # Link Engine executable to EngineLib (all dependencies are handled by EngineLib)
 target_link_libraries(Engine PRIVATE EngineLib)
 
@@ -642,6 +738,15 @@ if(USE_BGFX AND ALL_BGFX_COMPILED_SHADERS)
     )
 endif()
 
+# Copy compiled KTX textures to output directory
+if(ALL_KTX_TEXTURES)
+    add_custom_command(
+        TARGET Engine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E echo "KTX textures are available in build directory: ${CMAKE_BINARY_DIR}/assets/"
+        COMMENT "KTX texture files are available in build directory"
+    )
+endif()
+
 # Copy config files for tests as well
 add_custom_command(
     TARGET EngineTests POST_BUILD
@@ -661,6 +766,15 @@ if(USE_BGFX AND ALL_BGFX_COMPILED_SHADERS)
             ${CMAKE_BINARY_DIR}/bgfx/shaders
             $<TARGET_FILE_DIR:EngineTests>/bgfx/shaders
         COMMENT "Copying compiled bgfx shader files to test output directory"
+    )
+endif()
+
+# Copy compiled KTX textures for tests as well
+if(ALL_KTX_TEXTURES)
+    add_custom_command(
+        TARGET EngineTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E echo "KTX textures are available in build directory: ${CMAKE_BINARY_DIR}/assets/ and ${CMAKE_BINARY_DIR}/tests/assets/"
+        COMMENT "KTX texture files are available in build directory"
     )
 endif()
 

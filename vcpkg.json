@@ -23,6 +23,11 @@
     {
       "name": "bgfx",
       "features": [ "tools" ]
+    },
+    "ktx",
+    {
+      "name": "ktx",
+      "features": [ "tools" ]
     }
   ]
 }
