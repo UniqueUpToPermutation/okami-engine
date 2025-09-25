@@ -102,11 +102,6 @@ void Engine::Shutdown() {
     m_ioModules.Shutdown(m_moduleInterface);
 }
 
-std::filesystem::path Engine::GetRenderOutputPath(size_t frameIndex) {
-	return std::filesystem::path("renders/") /
-		(std::string{m_params.m_headlessOutputFileStem} + "_" + std::to_string(frameIndex) + ".png");
-}
-
 struct FrameTimeEstimator {
 	size_t m_nextFrame = 0;
 	std::chrono::high_resolution_clock::time_point m_startTime;
@@ -157,17 +152,6 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 	auto lastTick = beginTick;
 
 	std::optional<size_t> maxFrames = runFrameCount;
-	bool headlessMode = m_params.m_headlessMode;
-
-	/*if (!renderer) {
-		LOG(WARNING) << "No renderer module found, running headless!";
-		headlessMode = true;
-	}*/
-
-	if (headlessMode && !maxFrames) {
-		maxFrames = 1; // Default to 1 frames in headless mode
-		LOG(INFO) << "Running in headless mode, defaulting to " << *maxFrames << " frames.";
-	}
 
 	FrameTimeEstimator timeEstimator;
 
@@ -184,17 +168,6 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
         m_ioModules.ProcessFrame(time, m_moduleInterface);
 		m_updateModules.ProcessFrame(time, m_moduleInterface);
         m_renderModules.ProcessFrame(time, m_moduleInterface);
-
-		/*if (m_params.m_headlessMode && renderer) {
-			if (!std::filesystem::exists("renders")) {
-				std::filesystem::create_directory("renders");
-			}
-
-			auto outputFile = GetRenderOutputPath(frameCount);
-			LOG(INFO) << "Saving headless frame to: " << outputFile;
-
-			renderer->SaveToFile(outputFile.string());
-		}*/
 
 		timeEstimator = timeEstimator.Step();
 

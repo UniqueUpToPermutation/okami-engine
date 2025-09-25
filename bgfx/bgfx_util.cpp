@@ -14,7 +14,7 @@ static std::filesystem::path GetShaderPath(std::filesystem::path path) {
 
     path.replace_extension("");
 
-    switch (bgfx::getRendererType() )
+    switch (bgfx::getRendererType())
 	{
 	case bgfx::RendererType::Noop:
 	case bgfx::RendererType::Direct3D11:

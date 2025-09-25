@@ -152,9 +152,9 @@ namespace okami {
             return result;
         }
 
-        template <typename FactoryT>
-        auto CreateChildFromFactory(FactoryT factory = FactoryT{}) {
-            auto ptr = factory();
+        template <typename FactoryT, typename... TArgs>
+        auto CreateChildFromFactory(FactoryT factory = FactoryT{}, TArgs&&... args) {
+            auto ptr = factory(std::forward<TArgs>(args)...);
             auto result = ptr.get();
             m_submodules.emplace_back(std::move(ptr));
             return result;

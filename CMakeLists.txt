@@ -574,7 +574,7 @@ target_link_libraries(Engine PRIVATE EngineLib)
 file(GLOB ENGINE_LIB_SOURCES CONFIGURE_DEPENDS 
     "*.cpp" "*.hpp" 
     "d3d12/*.cpp" "d3d12/*.hpp" 
-    "bgfx/*.cpp" "bgfx/*.hpp" 
+    "bgfx/*.cpp" "bgfx/*.hpp" "bgfx/*.mm"
     "gles/*.cpp" "gles/*.hpp" 
     "glfw/*.cpp" "glfw/*.hpp"
 )

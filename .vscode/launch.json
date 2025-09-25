@@ -1,0 +1,55 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "HeadlessRendererTest.CreateEngineWithBgfxRenderer",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/build/okami-macos/EngineTests",
+            "args": [
+                "--gtest_filter=HeadlessRendererTest.CreateEngineWithBgfxRenderer"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build Tests"
+        },
+        {
+            "name": "All HeadlessRendererTests",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/build/okami-macos/EngineTests",
+            "args": [
+                "--gtest_filter=HeadlessRendererTest.*"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build Tests"
+        },
+        {
+            "name": "All Tests",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/build/okami-macos/EngineTests",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build Tests"
+        },
+        {
+            "name": "HeadlessRendererTest.CreateEngineWithBgfxRenderer (Debug)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/build/okami-macos/EngineTests",
+            "args": [
+                "--gtest_filter=HeadlessRendererTest.CreateEngineWithBgfxRenderer"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": true,
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build Tests"
+        }
+    ]
+}

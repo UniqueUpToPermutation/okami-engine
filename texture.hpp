@@ -53,9 +53,15 @@ namespace okami {
         TextureLoadParams m_params;
         std::vector<uint8_t> m_data; // Raw texture data
     public:
-
-        Texture(const TextureDesc& info, const TextureLoadParams& params = {}) 
+        inline Texture(const TextureDesc& info, const TextureLoadParams& params = {}) 
             : m_desc(info), m_params(params), m_data(GetTextureSize(info), 0) {}
+        inline Texture(const TextureDesc& info, std::vector<uint8_t>&& data, const TextureLoadParams& params = {}) 
+            : m_desc(info), m_params(params), m_data(std::move(data)) {
+            // Ensure size is correct
+            if (m_data.size() != GetTextureSize(info)) {
+                throw std::runtime_error("Texture data size does not match description");
+            }
+        }
 
         inline const TextureDesc& GetDesc() const { 
             return m_desc; 

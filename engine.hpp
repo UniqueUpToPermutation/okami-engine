@@ -15,8 +15,6 @@ namespace okami {
 		int m_argc = 0;
 		const char** m_argv = nullptr;
 		std::string_view m_configFilePath = "default.yaml";
-		bool m_headlessMode = false;
-		std::string_view m_headlessOutputFileStem = "output";
 		bool m_forceLogToConsole = false;
 	};
 
@@ -53,19 +51,24 @@ namespace okami {
             m_moduleInterface.m_messages.SendMessage(AddComponentSignal<T>{entity, std::move(component)});
         }
 
-        template <typename FactoryT>
-        auto CreateIOModule(FactoryT factory = FactoryT{}) {
-            return m_ioModules.CreateChildFromFactory(factory);
+        template <typename FactoryT, typename... TArgs>
+        auto CreateIOModule(FactoryT factory = FactoryT{}, TArgs&&... args) {
+            return m_ioModules.CreateChildFromFactory(factory, std::forward<TArgs>(args)...);
         }
 
-        template <typename FactoryT>
-        auto CreateUpdateModule(FactoryT factory = FactoryT{}) {
-            return m_updateModules.CreateChildFromFactory(factory);
+        template <typename FactoryT, typename... TArgs>
+        auto CreateUpdateModule(FactoryT factory = FactoryT{}, TArgs&&... args) {
+            return m_updateModules.CreateChildFromFactory(factory, std::forward<TArgs>(args)...);
         }
 
-        template <typename FactoryT>
-        auto CreateRenderModule(FactoryT factory = FactoryT{}) {
-            return m_renderModules.CreateChildFromFactory(factory);
+        template <typename FactoryT, typename... TArgs>
+        auto CreateRenderModule(FactoryT factory = FactoryT{}, TArgs&&... args) {
+            return m_renderModules.CreateChildFromFactory(factory, std::forward<TArgs>(args)...);
+        }
+
+        template <typename T>
+        T* QueryInterface() const {
+            return m_moduleInterface.m_interfaces.Query<T>();
         }
 
 		ModuleInterface& GetModuleInterface() {
