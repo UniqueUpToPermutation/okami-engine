@@ -17,6 +17,7 @@ std::optional<std::filesystem::path> g_exePath = std::nullopt;
 std::optional<std::filesystem::path> g_assetsPath = std::nullopt;
 std::optional<std::filesystem::path> g_shadersPath = std::nullopt;
 std::optional<std::filesystem::path> g_testAssetsPath = std::nullopt;
+std::optional<std::filesystem::path> g_configsPath = std::nullopt;
 
 static std::filesystem::path SearchForPath(const std::filesystem::path& startPath, const std::string& targetDir) {
     // Check current directory for "assets"
@@ -27,7 +28,7 @@ static std::filesystem::path SearchForPath(const std::filesystem::path& startPat
     }
 
     // Go up the directory tree to find "assets"
-    while (currentDir.has_parent_path()) {
+    while (currentDir.has_parent_path() && currentDir != currentDir.root_path()) {
         currentDir = currentDir.parent_path();
         assetsDir = currentDir / targetDir;
         if (std::filesystem::exists(assetsDir) && std::filesystem::is_directory(assetsDir)) {
@@ -53,6 +54,10 @@ static std::filesystem::path FindBGFXShadersPath() {
 
 static std::filesystem::path FindTestAssetsPath() {
     return SearchForPath(std::filesystem::current_path(), "tests/assets");
+}
+
+static std::filesystem::path FindConfigsPath() {
+    return SearchForPath(std::filesystem::current_path(), "config");
 }
 
 static std::filesystem::path FindExecutablePath() {
@@ -129,4 +134,15 @@ std::filesystem::path okami::GetTestAssetsPath() {
 
 std::filesystem::path okami::GetTestAssetPath(const std::filesystem::path& relativePath) {
     return GetTestAssetsPath() / relativePath;
+}
+
+std::filesystem::path okami::GetConfigsPath() {
+    if (!g_configsPath.has_value()) {
+        g_configsPath = FindConfigsPath();
+    }
+    return *g_configsPath;
+}
+
+std::filesystem::path okami::GetConfigPath(const std::filesystem::path& relativePath) {
+    return GetConfigsPath() / relativePath;
 }

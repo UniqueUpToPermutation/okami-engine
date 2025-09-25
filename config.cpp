@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "paths.hpp"
 
 #include <yaml-cpp/yaml.h>
 #include <glog/logging.h>
@@ -7,7 +8,7 @@
 #include <string>
 #include <stack>
 
-#define DEFAULT_PATH "config/default.yaml"
+#define DEFAULT_PATH "default.yaml"
 
 using namespace okami;
 
@@ -255,7 +256,7 @@ protected:
         YAML::Node config;
         
         try {
-            config = YAML::LoadFile(DEFAULT_PATH);
+            config = YAML::LoadFile(GetConfigPath(DEFAULT_PATH));
 		}
 		catch (const YAML::Exception& e) {
 			return Error(std::string("Failed to load config: ") + e.what());

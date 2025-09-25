@@ -16,4 +16,7 @@ namespace okami {
 
 	std::filesystem::path GetTestAssetsPath();
 	std::filesystem::path GetTestAssetPath(const std::filesystem::path& relativePath);
+
+	std::filesystem::path GetConfigsPath();
+	std::filesystem::path GetConfigPath(const std::filesystem::path& relativePath);
 }

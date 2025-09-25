@@ -747,6 +747,49 @@ if(ALL_KTX_TEXTURES)
     )
 endif()
 
+# Copy .glb files and other assets to output directory
+file(GLOB_RECURSE GLB_FILES 
+    "${CMAKE_SOURCE_DIR}/assets/*.glb"
+)
+file(GLOB_RECURSE OTHER_ASSET_FILES 
+    "${CMAKE_SOURCE_DIR}/assets/*.json"
+    "${CMAKE_SOURCE_DIR}/assets/*.xml"
+    "${CMAKE_SOURCE_DIR}/assets/*.txt"
+    "${CMAKE_SOURCE_DIR}/assets/*.bin"
+)
+
+if(GLB_FILES OR OTHER_ASSET_FILES)
+    add_custom_command(
+        TARGET Engine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Engine>/assets
+        COMMENT "Copying asset files to output directory"
+    )
+    
+    # Copy GLB files
+    foreach(GLB_FILE ${GLB_FILES})
+        get_filename_component(GLB_NAME ${GLB_FILE} NAME)
+        add_custom_command(
+            TARGET Engine POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${GLB_FILE}
+                $<TARGET_FILE_DIR:Engine>/assets/${GLB_NAME}
+            COMMENT "Copying ${GLB_NAME} to output directory"
+        )
+    endforeach()
+    
+    # Copy other asset files
+    foreach(ASSET_FILE ${OTHER_ASSET_FILES})
+        get_filename_component(ASSET_NAME ${ASSET_FILE} NAME)
+        add_custom_command(
+            TARGET Engine POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${ASSET_FILE}
+                $<TARGET_FILE_DIR:Engine>/assets/${ASSET_NAME}
+            COMMENT "Copying ${ASSET_NAME} to output directory"
+        )
+    endforeach()
+endif()
+
 # Copy config files for tests as well
 add_custom_command(
     TARGET EngineTests POST_BUILD
@@ -776,6 +819,74 @@ if(ALL_KTX_TEXTURES)
         COMMAND ${CMAKE_COMMAND} -E echo "KTX textures are available in build directory: ${CMAKE_BINARY_DIR}/assets/ and ${CMAKE_BINARY_DIR}/tests/assets/"
         COMMENT "KTX texture files are available in build directory"
     )
+endif()
+
+# Copy .glb files and other assets for tests as well
+file(GLOB_RECURSE TEST_GLB_FILES 
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.glb"
+)
+file(GLOB_RECURSE TEST_OTHER_ASSET_FILES 
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.json"
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.xml"
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.txt"
+    "${CMAKE_SOURCE_DIR}/tests/assets/*.bin"
+)
+
+if(GLB_FILES OR OTHER_ASSET_FILES OR TEST_GLB_FILES OR TEST_OTHER_ASSET_FILES)
+    add_custom_command(
+        TARGET EngineTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/assets
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/tests/assets
+        COMMENT "Copying asset files to test output directory"
+    )
+    
+    # Copy main assets GLB files for tests
+    foreach(GLB_FILE ${GLB_FILES})
+        get_filename_component(GLB_NAME ${GLB_FILE} NAME)
+        add_custom_command(
+            TARGET EngineTests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${GLB_FILE}
+                $<TARGET_FILE_DIR:EngineTests>/assets/${GLB_NAME}
+            COMMENT "Copying ${GLB_NAME} to test output directory"
+        )
+    endforeach()
+    
+    # Copy main assets other files for tests
+    foreach(ASSET_FILE ${OTHER_ASSET_FILES})
+        get_filename_component(ASSET_NAME ${ASSET_FILE} NAME)
+        add_custom_command(
+            TARGET EngineTests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${ASSET_FILE}
+                $<TARGET_FILE_DIR:EngineTests>/assets/${ASSET_NAME}
+            COMMENT "Copying ${ASSET_NAME} to test output directory"
+        )
+    endforeach()
+    
+    # Copy test-specific GLB files
+    foreach(TEST_GLB_FILE ${TEST_GLB_FILES})
+        get_filename_component(TEST_GLB_NAME ${TEST_GLB_FILE} NAME)
+        add_custom_command(
+            TARGET EngineTests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${TEST_GLB_FILE}
+                $<TARGET_FILE_DIR:EngineTests>/tests/assets/${TEST_GLB_NAME}
+            COMMENT "Copying test ${TEST_GLB_NAME} to test output directory"
+        )
+    endforeach()
+    
+    # Copy test-specific other asset files
+    foreach(TEST_ASSET_FILE ${TEST_OTHER_ASSET_FILES})
+        get_filename_component(TEST_ASSET_NAME ${TEST_ASSET_FILE} NAME)
+        add_custom_command(
+            TARGET EngineTests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${TEST_ASSET_FILE}
+                $<TARGET_FILE_DIR:EngineTests>/tests/assets/${TEST_ASSET_NAME}
+            COMMENT "Copying test ${TEST_ASSET_NAME} to test output directory"
+        )
+    endforeach()
 endif()
 
 #==============================================================================
