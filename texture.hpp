@@ -44,7 +44,6 @@ namespace okami {
     uint32_t GetTextureSize(TextureDesc const& info);
 
     struct TextureLoadParams {
-        bool m_generateMips = true;
         bool m_srgb = false;
     };
 
@@ -76,8 +75,11 @@ namespace okami {
 
         static Expected<Texture> FromPNG(const std::filesystem::path& path,
             const TextureLoadParams& params = {});
+        static Expected<Texture> FromKTX2(const std::filesystem::path& path,
+            const TextureLoadParams& params = {});
 
         Error SavePNG(const std::filesystem::path& path) const;
+        Error SaveKTX2(const std::filesystem::path& path) const;
 
         using Desc = TextureDesc;
         using LoadParams = TextureLoadParams;

@@ -43,6 +43,7 @@ find_package(glog CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(unofficial-concurrentqueue CONFIG REQUIRED)
+find_package(Ktx CONFIG REQUIRED)
 
 # bgfx is only needed when bgfx support is enabled
 if(USE_BGFX)
@@ -616,7 +617,17 @@ target_link_libraries(EngineLib PUBLIC
         imgui::imgui
         glog::glog
         yaml-cpp::yaml-cpp
+        KTX::ktx
 )
+
+# Add KTX library
+find_library(KTX_LIBRARY ktx PATHS ${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/lib)
+if(KTX_LIBRARY)
+    target_link_libraries(EngineLib PUBLIC ${KTX_LIBRARY})
+    target_include_directories(EngineLib PUBLIC ${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/include)
+else()
+    message(WARNING "KTX library not found")
+endif()
 
 # Link bgfx libraries when bgfx support is enabled
 if(USE_BGFX)
@@ -830,6 +841,12 @@ file(GLOB_RECURSE TEST_OTHER_ASSET_FILES
     "${CMAKE_SOURCE_DIR}/tests/assets/*.xml"
     "${CMAKE_SOURCE_DIR}/tests/assets/*.txt"
     "${CMAKE_SOURCE_DIR}/tests/assets/*.bin"
+)
+
+# Add specific test PNG files for texture testing
+list(APPEND TEST_OTHER_ASSET_FILES
+    "${CMAKE_SOURCE_DIR}/tests/assets/test.png"
+    "${CMAKE_SOURCE_DIR}/tests/assets/test2.png"
 )
 
 if(GLB_FILES OR OTHER_ASSET_FILES OR TEST_GLB_FILES OR TEST_OTHER_ASSET_FILES)
