@@ -44,6 +44,12 @@ namespace okami {
             m_messages.push(std::move(message));
         }
 
+        void Clear() {
+            std::lock_guard<std::mutex> lock(m_mtx);
+            std::queue<T> empty;
+            std::swap(m_messages, empty);
+        }
+
     private:
         std::mutex m_mtx;
         std::queue<T> m_messages;

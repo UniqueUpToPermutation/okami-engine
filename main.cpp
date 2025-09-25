@@ -26,7 +26,7 @@ int main() {
 
     Error err = en.Startup();
 
-    auto textureHandle = en.LoadResource<Texture>("test.png");
+    auto textureHandle = en.LoadResource<Texture>("test.ktx2");
 
     auto e2 = en.CreateEntity();
     en.AddComponent(e2, DummyTriangleComponent{});

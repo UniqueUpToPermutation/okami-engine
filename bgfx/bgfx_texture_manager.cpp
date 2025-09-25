@@ -43,9 +43,6 @@ namespace okami {
         
         // Create bgfx texture flags
         uint64_t flags = BGFX_TEXTURE_NONE;
-        /*if (params.m_generateMips) {
-            flags |= BGFX_TEXTURE_GENERATE_MIPS;
-        }*/
         if (params.m_srgb) {
             flags |= BGFX_TEXTURE_SRGB;
         }
@@ -53,11 +50,13 @@ namespace okami {
         // Create bgfx memory reference from texture data
         const bgfx::Memory* mem = bgfx::makeRef(textureData.data(), static_cast<uint32_t>(textureData.size()));
         
+        bool has_mips = desc.mipLevels > 1;
+
         // Create the bgfx texture handle
         bgfx::TextureHandle handle = bgfx::createTexture2D(
             static_cast<uint16_t>(desc.width),
             static_cast<uint16_t>(desc.height),
-            false, // TODO: mip map generation
+            has_mips,
             1, // numLayers
             bgfxFormat,
             flags,
@@ -71,9 +70,9 @@ namespace okami {
         
         // Create the BgfxTextureImpl
         BgfxTextureImpl impl;
-        impl.handle = handle;
-        impl.sampler = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
- 
+        impl.handle = AutoHandle(handle);
+        impl.sampler = AutoHandle(bgfx::createUniform("s_tex", bgfx::UniformType::Sampler));
+
         // Return the descriptor and implementation
         return std::make_pair(std::move(desc), std::move(impl));
     }

@@ -159,6 +159,14 @@ namespace okami {
 			return {};
 		}
         void ShutdownImpl(ModuleInterface& mi) override {
+			{
+				std::lock_guard<std::mutex> lock(m_path_mtx);
+				m_path_to_res.clear();
+			}
+
+			m_res_to_impl.clear();
+			m_loaded_queue.reset();
+			m_new_resources.Clear();
 		}
         Error ProcessFrameImpl(Time const&, ModuleInterface& mi) override {
 			return {};
