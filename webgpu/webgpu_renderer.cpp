@@ -45,6 +45,7 @@ protected:
     glm::ivec2 m_lastFramebufferSize = {0, 0};
     
     WebgpuTriangleModule* m_triangleModule = nullptr;
+    StorageModule<Camera>* m_cameraModule = nullptr;
     
 #ifdef __APPLE__
     void* m_metalLayer = nullptr;
@@ -188,10 +189,30 @@ protected:
                
         // Use triangle module to render triangles
         if (m_triangleModule) {
+            // Get active camera
+            auto* cameraPtr = m_cameraModule->TryGet(m_activeCamera.load());
+            auto camera = cameraPtr ? *cameraPtr : Camera::Identity();
+            
+            // Calculate camera matrices
+            auto projMat = camera.GetProjectionMatrix(
+                m_lastFramebufferSize.x,
+                m_lastFramebufferSize.y,
+                true
+            );
+            
+            // Get camera transform and calculate view matrix (inverse of camera transform)
+            auto transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
+            auto cameraTransform = transformView ? 
+                transformView->GetOr(m_activeCamera.load(), Transform::Identity()).AsMatrix() :
+                glm::mat4(1.0f);
+            auto viewMat = glm::inverse(cameraTransform);
+            
             WgpuRenderPassInfo info;
-            info.m_camera = {}; // TODO: Get actual camera from scene
-            info.m_viewportSize = { 800, 600 }; // TODO: Get actual viewport size
-            info.m_info = renderPass; // Store WebGPU render pass encoder in user data
+            info.m_camera = camera;
+            info.m_viewportSize = m_lastFramebufferSize;
+            info.m_info = renderPass;
+            info.m_viewMatrix = viewMat;
+            info.m_projMatrix = projMat;
             Time time = {}; // TODO: Get actual time from frame context
             m_triangleModule->Pass(time, mi, info);
         }
@@ -326,7 +347,7 @@ private:
         if (!m_device || m_params.m_headlessMode) {
             return {};
         }
-        
+
         // Check for window resize
         if (m_windowProvider) {
             auto currentSize = m_windowProvider->GetFramebufferSize();
@@ -368,6 +389,9 @@ public:
         
         // Create triangle module
         m_triangleModule = CreateChild<WebgpuTriangleModule>();
+        
+        // Create camera module
+        m_cameraModule = CreateChild<StorageModule<Camera>>();
     }
 };
 

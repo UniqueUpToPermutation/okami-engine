@@ -526,6 +526,52 @@ if(USE_BGFX AND BGFX_SHADER_FILES)
 endif() # USE_BGFX
 
 #==============================================================================
+# WebGPU Shader Copying System
+#==============================================================================
+
+# Find all WGSL shader files in webgpu/shaders folder
+file(GLOB_RECURSE WEBGPU_SHADER_FILES 
+    "${CMAKE_SOURCE_DIR}/webgpu/shaders/*.wgsl"
+)
+
+if(WEBGPU_SHADER_FILES)
+    # Ensure webgpu shaders output directory exists
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/webgpu/shaders)
+    
+    set(ALL_WEBGPU_COPIED_SHADERS "")
+    
+    # Copy each shader file to the build directory
+    foreach(WEBGPU_SHADER_FILE ${WEBGPU_SHADER_FILES})
+        get_filename_component(SHADER_NAME ${WEBGPU_SHADER_FILE} NAME)
+        set(COPIED_SHADER_PATH "${CMAKE_BINARY_DIR}/webgpu/shaders/${SHADER_NAME}")
+        
+        # Create custom command to copy the shader file
+        add_custom_command(
+            OUTPUT ${COPIED_SHADER_PATH}
+            COMMAND ${CMAKE_COMMAND} -E copy ${WEBGPU_SHADER_FILE} ${COPIED_SHADER_PATH}
+            DEPENDS ${WEBGPU_SHADER_FILE}
+            COMMENT "Copying WebGPU shader: ${SHADER_NAME}"
+        )
+        
+        list(APPEND ALL_WEBGPU_COPIED_SHADERS ${COPIED_SHADER_PATH})
+        message(STATUS "Will copy WebGPU shader: ${SHADER_NAME}")
+    endforeach()
+    
+    # Create a custom target that depends on all copied shaders
+    if(ALL_WEBGPU_COPIED_SHADERS)
+        list(LENGTH ALL_WEBGPU_COPIED_SHADERS WEBGPU_SHADER_COUNT)
+        add_custom_target(CopyWebGPUShaders ALL
+            DEPENDS ${ALL_WEBGPU_COPIED_SHADERS}
+            COMMENT "Copying all WebGPU shaders"
+        )
+        
+        add_dependencies(Engine CopyWebGPUShaders)
+        message(STATUS "Created CopyWebGPUShaders target with ${WEBGPU_SHADER_COUNT} shaders")
+        message(STATUS "Copied WebGPU shaders will be available in: ${CMAKE_BINARY_DIR}/webgpu/shaders/")
+    endif()
+endif()
+
+#==============================================================================
 # KTX Image Compilation System
 #==============================================================================
 

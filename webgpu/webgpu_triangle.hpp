@@ -17,6 +17,11 @@ namespace okami {
         WGPUDevice m_device = nullptr;
         WGPUTextureFormat m_surfaceFormat = WGPUTextureFormat_BGRA8Unorm;
         StorageModule<DummyTriangleComponent>* m_storage = nullptr;
+        
+        // Transform uniform buffer resources
+        WGPUBuffer m_transformBuffer = nullptr;
+        WGPUBindGroup m_transformBindGroup = nullptr;
+        WGPUBindGroupLayout m_transformBindGroupLayout = nullptr;
 
     protected:
         Error RegisterImpl(ModuleInterface&) override;

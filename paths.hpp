@@ -15,6 +15,9 @@ namespace okami {
     std::filesystem::path GetBGFXShadersPath();
 	std::filesystem::path GetBGFXShaderPath(const std::filesystem::path& relativePath);
 
+	std::filesystem::path GetWebGPUShadersPath();
+	std::filesystem::path GetWebGPUShaderPath(const std::filesystem::path& relativePath);
+
 	std::filesystem::path GetTestAssetsPath();
 	std::filesystem::path GetTestAssetPath(const std::filesystem::path& relativePath);
 
