@@ -125,6 +125,10 @@ std::filesystem::path okami::GetExecutablePath() {
     return *g_exePath;
 }
 
+std::filesystem::path okami::GetExecutableRelativePath(const std::filesystem::path& relativePath) {
+    return GetExecutablePath().parent_path() / relativePath;
+}
+
 std::filesystem::path okami::GetTestAssetsPath() {
     if (!g_testAssetsPath.has_value()) {
         g_testAssetsPath = FindTestAssetsPath();

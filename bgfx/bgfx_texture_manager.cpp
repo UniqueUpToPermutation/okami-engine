@@ -76,4 +76,12 @@ namespace okami {
         // Return the descriptor and implementation
         return std::make_pair(std::move(desc), std::move(impl));
     }
+
+    bgfx::TextureHandle BgfxTextureManager::GetBgfxTextureHandle(const ResHandle<Texture>& handle) {
+        BgfxTextureImpl* impl = GetImpl(handle);
+        if (impl) {
+            return impl->handle;
+        }
+        return BGFX_INVALID_HANDLE;
+    }
 }

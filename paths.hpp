@@ -4,6 +4,7 @@
 
 namespace okami {
 	std::filesystem::path GetExecutablePath();
+	std::filesystem::path GetExecutableRelativePath(const std::filesystem::path& relativePath);
 
 	std::filesystem::path GetAssetsPath();
 	std::filesystem::path GetAssetPath(const std::filesystem::path& relativePath);

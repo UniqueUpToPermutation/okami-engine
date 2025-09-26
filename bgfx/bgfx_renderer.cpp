@@ -1,6 +1,7 @@
 #include "bgfx_renderer.hpp"
 #include "bgfx_triangle.hpp"
 #include "bgfx_texture_manager.hpp"
+#include "bgfx_sprite.hpp"
 
 #include "../config.hpp"
 #include "../renderer.hpp"
@@ -8,6 +9,7 @@
 #include "../camera.hpp"
 #include "../transform.hpp"
 #include "../texture.hpp"
+#include "../paths.hpp"
 
 #include <glog/logging.h>
 
@@ -37,6 +39,7 @@ protected:
 
     BgfxTriangleModule* m_triangleModule = nullptr;
     BgfxTextureManager* m_textureManager = nullptr;
+    BgfxSpriteModule* m_spriteModule = nullptr;
 
     std::atomic<entity_t> m_activeCamera = 0;
     size_t m_frameCounter = 0;
@@ -61,7 +64,7 @@ private:
         
         // Call bgfx::renderFrame before bgfx::init to signal to bgfx not to create a render thread.
         // Most graphics APIs must be used on the same thread that created the window.
-        bgfx::renderFrame();
+        //bgfx::renderFrame();
         // Initialize bgfx using the native window handle and window resolution.
         bgfx::Init init;
 
@@ -187,6 +190,7 @@ private:
             .m_target = 0
         };
         e += m_triangleModule->Pass(t, a, info);
+        e += m_spriteModule->Pass(t, a, info);
 
         bgfx::frame();
 
@@ -196,9 +200,10 @@ private:
             bgfx::blit(0, m_headlessReadbackTexture, 0, 0, m_headlessColorTexture, 0, 0, 
                        static_cast<uint16_t>(m_lastFramebufferSize.x), 
                        static_cast<uint16_t>(m_lastFramebufferSize.y));
+
+            std::filesystem::path outputDir = GetExecutablePath().parent_path() / m_params.m_headlessRenderOutputDir;
             
             // Create output directory if it doesn't exist
-            std::filesystem::path outputDir = m_params.m_headlessRenderOutputDir;
             if (!std::filesystem::exists(outputDir)) {
                 std::filesystem::create_directories(outputDir);
             }
@@ -280,6 +285,7 @@ public:
         m_triangleModule = CreateChild<BgfxTriangleModule>();
         m_cameraModule = CreateChild<StorageModule<Camera>>();
         m_textureManager = CreateChild<BgfxTextureManager>();
+        m_spriteModule = CreateChild<BgfxSpriteModule>(m_textureManager);
     }
 };
 

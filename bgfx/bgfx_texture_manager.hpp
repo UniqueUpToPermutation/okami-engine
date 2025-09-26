@@ -16,5 +16,8 @@ namespace okami {
 	class BgfxTextureManager : public ContentModule<Texture, BgfxTextureImpl> {
 	protected:
         Expected<std::pair<Texture::Desc, BgfxTextureImpl>> CreateResource(Texture&& data, std::any userData) override;
+        
+    public:
+        bgfx::TextureHandle GetBgfxTextureHandle(const ResHandle<Texture>& handle);
     };
 }

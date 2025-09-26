@@ -7,6 +7,7 @@
 #include "engine.hpp"
 #include "config.hpp"
 #include "camera.hpp"
+#include "texture.hpp"
 
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
@@ -81,13 +82,13 @@ namespace okami {
 		}
 	};
 
-	/*struct SpriteComponent {
+	struct SpriteComponent {
 		ResHandle<Texture> m_texture;
 		std::optional<glm::vec2> m_origin;
 		std::optional<Rect> m_sourceRect;
 		Color m_color = color::White;
 		int m_layer = 0;
-	};*/
+	};
 
 	struct RendererConfig {
 		int bufferCount = 2;
