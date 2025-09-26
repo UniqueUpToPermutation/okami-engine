@@ -15,7 +15,9 @@ using namespace okami;
 
 std::optional<std::filesystem::path> g_exePath = std::nullopt;
 std::optional<std::filesystem::path> g_assetsPath = std::nullopt;
-std::optional<std::filesystem::path> g_shadersPath = std::nullopt;
+std::optional<std::filesystem::path> g_d3d12ShadersPath = std::nullopt;
+std::optional<std::filesystem::path> g_bgfxShadersPath = std::nullopt;
+std::optional<std::filesystem::path> g_webgpuShadersPath = std::nullopt;
 std::optional<std::filesystem::path> g_testAssetsPath = std::nullopt;
 std::optional<std::filesystem::path> g_configsPath = std::nullopt;
 
@@ -50,6 +52,10 @@ static std::filesystem::path FindD3D12ShadersPath() {
 
 static std::filesystem::path FindBGFXShadersPath() {
     return SearchForPath(std::filesystem::current_path(), "bgfx/shaders");
+}
+
+static std::filesystem::path FindWebGPUShadersPath() {
+    return SearchForPath(std::filesystem::current_path(), "webgpu/shaders");
 }
 
 static std::filesystem::path FindTestAssetsPath() {
@@ -97,10 +103,10 @@ std::filesystem::path okami::GetAssetPath(const std::filesystem::path& relativeP
 }
 
 std::filesystem::path okami::GetD3D12ShadersPath() {
-    if (!g_shadersPath.has_value()) {
-        g_shadersPath = FindD3D12ShadersPath();
+    if (!g_d3d12ShadersPath.has_value()) {
+        g_d3d12ShadersPath = FindD3D12ShadersPath();
     }
-	return *g_shadersPath;
+	return *g_d3d12ShadersPath;
 }
 
 std::filesystem::path okami::GetD3D12ShaderPath(const std::filesystem::path& relativePath) {
@@ -108,14 +114,25 @@ std::filesystem::path okami::GetD3D12ShaderPath(const std::filesystem::path& rel
 }
 
 std::filesystem::path okami::GetBGFXShadersPath() {
-	if (!g_shadersPath.has_value()) {
-        g_shadersPath = FindBGFXShadersPath();
+	if (!g_bgfxShadersPath.has_value()) {
+        g_bgfxShadersPath = FindBGFXShadersPath();
     }
-    return *g_shadersPath;
+    return *g_bgfxShadersPath;
 }
 
 std::filesystem::path okami::GetBGFXShaderPath(const std::filesystem::path& relativePath) {
     return GetBGFXShadersPath() / relativePath;
+}
+
+std::filesystem::path okami::GetWebGPUShadersPath() {
+	if (!g_webgpuShadersPath.has_value()) {
+        g_webgpuShadersPath = FindWebGPUShadersPath();
+    }
+    return *g_webgpuShadersPath;
+}
+
+std::filesystem::path okami::GetWebGPUShaderPath(const std::filesystem::path& relativePath) {
+    return GetWebGPUShadersPath() / relativePath;
 }
 
 std::filesystem::path okami::GetExecutablePath() {
