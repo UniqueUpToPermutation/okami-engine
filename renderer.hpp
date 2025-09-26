@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <atomic>
 #include <memory>
+#include <any>
 
 #include "engine.hpp"
 #include "config.hpp"
@@ -118,6 +119,7 @@ namespace okami {
 		Camera m_camera;
 		glm::ivec2 m_viewportSize;
 		int m_target;
+		std::any m_userData;
 	};
 
 	class IRenderModule {

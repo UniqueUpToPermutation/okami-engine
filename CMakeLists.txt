@@ -141,6 +141,218 @@ set(SHADER_ENTRY_POINTS
     "DSMain:ds"    # Domain Shader (Tessellation)
 )
 
+
+#==============================================================================
+# WebGPU
+#==============================================================================
+# Set up wgpu-native
+set(WGPU_NATIVE_VERSION "v0.19.4.1")
+
+# Download wgpu-native if not present
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/webgpu.h")
+    message(STATUS "Downloading wgpu-native...")
+    if(APPLE)
+        set(WGPU_PLATFORM "macos-x86_64")
+        set(WGPU_ARCHIVE "wgpu-macos-x86_64-release.zip")
+    elseif(WIN32)
+        set(WGPU_PLATFORM "windows-x86_64")
+        set(WGPU_ARCHIVE "wgpu-windows-x86_64-release.zip")
+    else()
+        set(WGPU_PLATFORM "linux-x86_64")
+        set(WGPU_ARCHIVE "wgpu-linux-x86_64-release.zip")
+    endif()
+    
+    file(DOWNLOAD 
+        "https://github.com/gfx-rs/wgpu-native/releases/download/${WGPU_NATIVE_VERSION}/${WGPU_ARCHIVE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}"
+        SHOW_PROGRESS
+    )
+    
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xzf "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    
+    # Move extracted files to wgpu-native directory
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native")
+    file(GLOB WGPU_FILES "${CMAKE_CURRENT_SOURCE_DIR}/webgpu.h" 
+                         "${CMAKE_CURRENT_SOURCE_DIR}/wgpu.h"
+                         "${CMAKE_CURRENT_SOURCE_DIR}/libwgpu_native.*"
+                         "${CMAKE_CURRENT_SOURCE_DIR}/wgpu_native.*"
+                         "${CMAKE_CURRENT_SOURCE_DIR}/commit-sha")
+    foreach(FILE ${WGPU_FILES})
+        get_filename_component(FILENAME ${FILE} NAME)
+        file(RENAME ${FILE} "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/${FILENAME}")
+    endforeach()
+    
+    file(REMOVE "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}")
+endif()
+
+# Include wgpu-native headers from wgpu-native directory
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native)
+
+if(APPLE)
+    set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/libwgpu_native.dylib)
+elseif(WIN32)
+    set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/wgpu_native.lib)
+else()
+    set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/libwgpu_native.so)
+endif()
+
+#==============================================================================
+# bgfx Shader Compilation System
+#==============================================================================
+
+if(USE_BGFX)
+    # Find all bgfx shader files
+    file(GLOB_RECURSE BGFX_SHADER_FILES 
+        "${CMAKE_SOURCE_DIR}/bgfx/shaders/*.sc"
+    )
+
+    # Find shaderc executable once for all shaders
+    find_program(SHADERC_EXECUTABLE
+        NAMES shaderc shaderc.exe
+        PATHS
+            # vcpkg installed bgfx tools
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
+            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
+            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
+            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
+            # Common bgfx installation paths
+            "${CMAKE_SOURCE_DIR}/tools/bin"
+            "${CMAKE_SOURCE_DIR}/bgfx/tools/bin"
+            "${CMAKE_SOURCE_DIR}/../bgfx/tools/bin"
+            "${CMAKE_SOURCE_DIR}/third_party/bgfx/tools/bin"
+            # System paths
+            "/usr/local/bin"
+            "/opt/homebrew/bin"
+            # Environment variable paths
+            "$ENV{BGFX_DIR}/tools/bin"
+            "$ENV{BGFX_ROOT}/tools/bin"
+        DOC "bgfx Shader Compiler (shaderc)"
+    )
+    
+    if(NOT SHADERC_EXECUTABLE)
+        message(WARNING "shaderc not found. bgfx shaders will not be compiled.")
+        message(WARNING "To fix this:")
+        message(WARNING "  1. Install bgfx with tools: vcpkg install bgfx[tools]")
+        message(WARNING "  2. Or set BGFX_DIR environment variable to bgfx installation")
+        message(WARNING "  3. Or place shaderc executable in tools/bin/ directory")
+    else()
+        message(STATUS "Found shaderc: ${SHADERC_EXECUTABLE}")
+    endif()
+
+    # Function to compile bgfx shaders using shaderc
+    function(add_bgfx_shader TARGET_NAME SHADER_FILE SHADER_TYPE PLATFORM)
+        get_filename_component(SHADER_NAME ${SHADER_FILE} NAME_WE)
+        get_filename_component(SHADER_DIR ${SHADER_FILE} DIRECTORY)
+        
+        # Create output path
+        set(COMPILED_SHADER "${CMAKE_BINARY_DIR}/bgfx/shaders/${SHADER_NAME}_${PLATFORM}.bin")
+        
+        # Ensure output directory exists
+        get_filename_component(COMPILED_SHADER_DIR ${COMPILED_SHADER} DIRECTORY)
+        file(MAKE_DIRECTORY ${COMPILED_SHADER_DIR})
+        
+        # Find shaderc executable
+        find_program(SHADERC_EXECUTABLE
+            NAMES shaderc shaderc.exe
+            PATHS
+                # vcpkg installed bgfx tools
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
+                "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
+                "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
+                "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
+                # Common bgfx installation paths
+                "${CMAKE_SOURCE_DIR}/tools/bin"
+                "${CMAKE_SOURCE_DIR}/bgfx/tools/bin"
+                "${CMAKE_SOURCE_DIR}/../bgfx/tools/bin"
+                "${CMAKE_SOURCE_DIR}/third_party/bgfx/tools/bin"
+                # System paths
+                "/usr/local/bin"
+                "/opt/homebrew/bin"
+                # Environment variable paths
+                "$ENV{BGFX_DIR}/tools/bin"
+                "$ENV{BGFX_ROOT}/tools/bin"
+            DOC "bgfx Shader Compiler (shaderc)"
+        )
+        
+        if(NOT SHADERC_EXECUTABLE)
+            message(WARNING "shaderc not found. bgfx shaders will not be compiled.")
+            message(WARNING "To fix this:")
+            message(WARNING "  1. Install bgfx with tools: vcpkg install bgfx[tools]")
+            message(WARNING "  2. Or set BGFX_DIR environment variable to bgfx installation")
+            message(WARNING "  3. Or place shaderc executable in tools/bin/ directory")
+            return()
+        else()
+            message(STATUS "Found shaderc: ${SHADERC_EXECUTABLE}")
+        endif()
+        
+        # Determine profile based on platform and shader type
+        if(PLATFORM STREQUAL "dx11")
+            if(SHADER_TYPE STREQUAL "v")
+                set(PROFILE "vs_5_0")
+            elseif(SHADER_TYPE STREQUAL "f")
+                set(PROFILE "ps_5_0")
+            endif()
+        elseif(PLATFORM STREQUAL "metal")
+            set(PROFILE "metal")
+        elseif(PLATFORM STREQUAL "spirv")
+            if(SHADER_TYPE STREQUAL "v")
+                set(PROFILE "spirv")
+            elseif(SHADER_TYPE STREQUAL "f")
+                set(PROFILE "spirv")
+            endif()
+        else() # OpenGL
+            if(SHADER_TYPE STREQUAL "v")
+                set(PROFILE "120")
+            elseif(SHADER_TYPE STREQUAL "f")
+                set(PROFILE "120")
+            endif()
+        endif()
+        
+        # Add custom command to compile the shader
+        add_custom_command(
+            OUTPUT ${COMPILED_SHADER}
+            COMMAND ${SHADERC_EXECUTABLE}
+                -f ${SHADER_FILE}
+                -o ${COMPILED_SHADER}
+                --type ${SHADER_TYPE}
+                --platform ${PLATFORM}
+                --profile ${PROFILE}
+                -i "${CMAKE_SOURCE_DIR}/bgfx/shaders"
+                -i "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/include/bgfx"
+            DEPENDS ${SHADER_FILE}
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMENT "Compiling bgfx shader: ${SHADER_NAME} (${SHADER_TYPE}/${PLATFORM})"
+            VERBATIM
+        )
+        
+        # Mark shader as generated file (don't add to target sources since we use custom target)
+        set_source_files_properties(${COMPILED_SHADER} PROPERTIES GENERATED TRUE)
+    endfunction()
+
+    # Detect platforms to compile for
+    set(BGFX_PLATFORMS "")
+    if(WIN32)
+        list(APPEND BGFX_PLATFORMS "dx11")
+    endif()
+    if(APPLE)
+        list(APPEND BGFX_PLATFORMS "metal")
+    endif()
+    if(UNIX AND NOT APPLE)
+        list(APPEND BGFX_PLATFORMS "linux")
+    endif()
+    # Always add OpenGL as fallback
+    list(APPEND BGFX_PLATFORMS "opengl")
+
+    set(ALL_BGFX_COMPILED_SHADERS "")
+endif() # USE_BGFX
+
 #==============================================================================
 # Main Engine Executable
 #==============================================================================
@@ -326,6 +538,7 @@ file(GLOB ENGINE_LIB_SOURCES CONFIGURE_DEPENDS
     "d3d12/*.cpp" "d3d12/*.hpp"
     "gles/*.cpp" "gles/*.hpp" 
     "glfw/*.cpp" "glfw/*.hpp"
+    "webgpu/*.cpp" "webgpu/*.hpp" "webgpu/*.mm"
 )
 list(REMOVE_ITEM ENGINE_LIB_SOURCES "${CMAKE_SOURCE_DIR}/main.cpp")
 
@@ -367,6 +580,7 @@ target_link_libraries(EngineLib PUBLIC
         glog::glog
         yaml-cpp::yaml-cpp
         # KTX::ktx  # Temporarily disabled due to vcpkg build issues
+        ${WGPU_LIBRARY}
 )
 
 # Add KTX library
