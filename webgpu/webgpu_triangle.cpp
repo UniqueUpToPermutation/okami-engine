@@ -13,102 +13,7 @@ Error WebgpuTriangleModule::RegisterImpl(ModuleInterface&) {
 }
 
 Error WebgpuTriangleModule::StartupImpl(ModuleInterface&) {
-    // We need the device to be set before we can create the pipeline
-    if (!m_device) {
-        return Error("WebGPU device not set - call SetDevice() first");
-    }
-
-    // First, create the transform bind group layout
-    WGPUBindGroupLayoutEntry bindGroupLayoutEntry = {};
-    bindGroupLayoutEntry.binding = 0;
-    bindGroupLayoutEntry.visibility = WGPUShaderStage_Vertex;
-    bindGroupLayoutEntry.buffer.type = WGPUBufferBindingType_Uniform;
-    bindGroupLayoutEntry.buffer.minBindingSize = sizeof(glm::mat4);
-    
-    WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc = {};
-    bindGroupLayoutDesc.entryCount = 1;
-    bindGroupLayoutDesc.entries = &bindGroupLayoutEntry;
-    
-    m_transformBindGroupLayout = wgpuDeviceCreateBindGroupLayout(m_device, &bindGroupLayoutDesc);
-    
-    // Create the transform uniform buffer
-    WGPUBufferDescriptor bufferDesc = {};
-    bufferDesc.size = sizeof(glm::mat4);
-    bufferDesc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
-    
-    m_transformBuffer = wgpuDeviceCreateBuffer(m_device, &bufferDesc);
-    
-    // Create the bind group
-    WGPUBindGroupEntry bindGroupEntry = {};
-    bindGroupEntry.binding = 0;
-    bindGroupEntry.buffer = m_transformBuffer;
-    bindGroupEntry.size = sizeof(glm::mat4);
-    
-    WGPUBindGroupDescriptor bindGroupDesc = {};
-    bindGroupDesc.layout = m_transformBindGroupLayout;
-    bindGroupDesc.entryCount = 1;
-    bindGroupDesc.entries = &bindGroupEntry;
-    
-    m_transformBindGroup = wgpuDeviceCreateBindGroup(m_device, &bindGroupDesc);
-
-    // Load shader from file
-    std::string shaderSource = LoadShaderFile("triangle.wgsl");
-    if (shaderSource.empty()) {
-        return Error("Failed to load triangle.wgsl shader file");
-    }
-    
-    // Create shader module from loaded WGSL code
-    WGPUShaderModuleWGSLDescriptor wgslDesc = {};
-    wgslDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-    wgslDesc.code = shaderSource.c_str();
-    
-    WGPUShaderModuleDescriptor shaderDesc = {};
-    shaderDesc.nextInChain = &wgslDesc.chain;
-    
-    WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(m_device, &shaderDesc);
-    
-    // Create render pipeline
-    WGPUColorTargetState colorTarget = {};
-    colorTarget.format = m_surfaceFormat;
-    colorTarget.writeMask = WGPUColorWriteMask_All;
-    
-    WGPUFragmentState fragmentState = {};
-    fragmentState.module = shaderModule;
-    fragmentState.entryPoint = "fs_main";
-    fragmentState.targetCount = 1;
-    fragmentState.targets = &colorTarget;
-    
-    WGPUMultisampleState multisampleState = {};
-    multisampleState.count = 1;
-    multisampleState.mask = 0xFFFFFFFF;
-    multisampleState.alphaToCoverageEnabled = false;
-    
-    // Create pipeline layout with the transform bind group layout
-    WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
-    pipelineLayoutDesc.bindGroupLayoutCount = 1;
-    pipelineLayoutDesc.bindGroupLayouts = &m_transformBindGroupLayout;
-    
-    WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(m_device, &pipelineLayoutDesc);
-    
-    WGPURenderPipelineDescriptor pipelineDesc = {};
-    pipelineDesc.layout = pipelineLayout;
-    pipelineDesc.vertex.module = shaderModule;
-    pipelineDesc.vertex.entryPoint = "vs_main";
-    pipelineDesc.fragment = &fragmentState;
-    pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-    pipelineDesc.multisample = multisampleState;
-    
-    m_pipeline = wgpuDeviceCreateRenderPipeline(m_device, &pipelineDesc);
-    
-    // Clean up pipeline layout and shader module
-    wgpuPipelineLayoutRelease(pipelineLayout);
-    wgpuShaderModuleRelease(shaderModule);
-    
-    if (!m_pipeline) {
-        return Error("Failed to create WebGPU triangle render pipeline");
-    }
-    
-    LOG(INFO) << "WebGPU triangle module initialized successfully";
+    // Pipeline will be created lazily in the Pass method when we have access to the device and surface format
     return {};
 }
 
@@ -147,6 +52,103 @@ std::string_view WebgpuTriangleModule::GetName() const {
 }
 
 Error WebgpuTriangleModule::Pass(Time const& time, ModuleInterface& mi, WgpuRenderPassInfo info) {
+    // Get device from render pass info
+    WGPUDevice device = info.m_device;
+    
+    // Initialize pipeline if not already created
+    if (!m_pipeline) {
+        // First, create the transform bind group layout
+        WGPUBindGroupLayoutEntry bindGroupLayoutEntry = {};
+        bindGroupLayoutEntry.binding = 0;
+        bindGroupLayoutEntry.visibility = WGPUShaderStage_Vertex;
+        bindGroupLayoutEntry.buffer.type = WGPUBufferBindingType_Uniform;
+        bindGroupLayoutEntry.buffer.minBindingSize = sizeof(glm::mat4);
+        
+        WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc = {};
+        bindGroupLayoutDesc.entryCount = 1;
+        bindGroupLayoutDesc.entries = &bindGroupLayoutEntry;
+        
+        m_transformBindGroupLayout = wgpuDeviceCreateBindGroupLayout(device, &bindGroupLayoutDesc);
+        
+        // Create the transform uniform buffer
+        WGPUBufferDescriptor bufferDesc = {};
+        bufferDesc.size = sizeof(glm::mat4);
+        bufferDesc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
+        
+        m_transformBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+        
+        // Create the bind group
+        WGPUBindGroupEntry bindGroupEntry = {};
+        bindGroupEntry.binding = 0;
+        bindGroupEntry.buffer = m_transformBuffer;
+        bindGroupEntry.size = sizeof(glm::mat4);
+        
+        WGPUBindGroupDescriptor bindGroupDesc = {};
+        bindGroupDesc.layout = m_transformBindGroupLayout;
+        bindGroupDesc.entryCount = 1;
+        bindGroupDesc.entries = &bindGroupEntry;
+        
+        m_transformBindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
+
+        // Load shader from file
+        std::string shaderSource = LoadShaderFile("triangle.wgsl");
+        if (shaderSource.empty()) {
+            return Error("Failed to load triangle.wgsl shader file");
+        }
+        
+        // Create shader module from loaded WGSL code
+        WGPUShaderModuleWGSLDescriptor wgslDesc = {};
+        wgslDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+        wgslDesc.code = shaderSource.c_str();
+        
+        WGPUShaderModuleDescriptor shaderDesc = {};
+        shaderDesc.nextInChain = &wgslDesc.chain;
+        
+        WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(device, &shaderDesc);
+        
+        // Create render pipeline
+        WGPUColorTargetState colorTarget = {};
+        colorTarget.format = info.m_surfaceFormat;
+        colorTarget.writeMask = WGPUColorWriteMask_All;
+        
+        WGPUFragmentState fragmentState = {};
+        fragmentState.module = shaderModule;
+        fragmentState.entryPoint = "fs_main";
+        fragmentState.targetCount = 1;
+        fragmentState.targets = &colorTarget;
+        
+        WGPUMultisampleState multisampleState = {};
+        multisampleState.count = 1;
+        multisampleState.mask = 0xFFFFFFFF;
+        multisampleState.alphaToCoverageEnabled = false;
+        
+        // Create pipeline layout with the transform bind group layout
+        WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
+        pipelineLayoutDesc.bindGroupLayoutCount = 1;
+        pipelineLayoutDesc.bindGroupLayouts = &m_transformBindGroupLayout;
+        
+        WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
+        
+        WGPURenderPipelineDescriptor pipelineDesc = {};
+        pipelineDesc.layout = pipelineLayout;
+        pipelineDesc.vertex.module = shaderModule;
+        pipelineDesc.vertex.entryPoint = "vs_main";
+        pipelineDesc.fragment = &fragmentState;
+        pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+        pipelineDesc.multisample = multisampleState;
+        
+        m_pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
+        
+        // Clean up pipeline layout and shader module
+        wgpuPipelineLayoutRelease(pipelineLayout);
+        wgpuShaderModuleRelease(shaderModule);
+        
+        if (!m_pipeline) {
+            return Error("Failed to create WebGPU triangle render pipeline");
+        }
+        
+        LOG(INFO) << "WebGPU triangle module initialized successfully";
+    }
     
     auto transforms = mi.m_interfaces.Query<IComponentView<Transform>>();
     if (!transforms) {
@@ -162,14 +164,14 @@ Error WebgpuTriangleModule::Pass(Time const& time, ModuleInterface& mi, WgpuRend
         auto projMat = info.m_projMatrix;
         
         // Render triangles for each entity with DummyTriangleComponent
-        m_storage->ForEach([this, time, transforms, renderPass, projMat, viewMat](entity_t e, DummyTriangleComponent const&) {
+        m_storage->ForEach([this, &info, transforms, renderPass, projMat, viewMat](entity_t e, DummyTriangleComponent const&) {
             auto modelMat = transforms->GetOr(e, Transform::Identity()).AsMatrix();
             
             // Calculate MVP matrix: Projection * View * Model
             auto mvpMatrix = projMat * viewMat * modelMat;
             
-            // Update the transform uniform buffer with the MVP matrix
-            wgpuQueueWriteBuffer(wgpuDeviceGetQueue(m_device), m_transformBuffer, 0, &mvpMatrix, sizeof(glm::mat4));
+            // Update the transform uniform buffer with the MVP matrix using the queue from render pass info
+            wgpuQueueWriteBuffer(info.m_queue, m_transformBuffer, 0, &mvpMatrix, sizeof(glm::mat4));
             
             // Set pipeline and bind group
             wgpuRenderPassEncoderSetPipeline(renderPass, m_pipeline);
@@ -181,9 +183,6 @@ Error WebgpuTriangleModule::Pass(Time const& time, ModuleInterface& mi, WgpuRend
     }
     
     return {};
-}void WebgpuTriangleModule::SetDevice(WGPUDevice device, WGPUTextureFormat surfaceFormat) {
-    m_device = device;
-    m_surfaceFormat = surfaceFormat;
 }
 
 WebgpuTriangleModule::WebgpuTriangleModule() {
