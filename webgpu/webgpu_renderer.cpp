@@ -211,6 +211,9 @@ protected:
             info.m_camera = camera;
             info.m_viewportSize = m_lastFramebufferSize;
             info.m_info = renderPass;
+            info.m_queue = m_queue;
+            info.m_device = m_device;
+            info.m_surfaceFormat = m_surfaceFormat;
             info.m_viewMatrix = viewMat;
             info.m_projMatrix = projMat;
             Time time = {}; // TODO: Get actual time from frame context
@@ -331,13 +334,6 @@ private:
         // Initialize WebGPU
         auto err = InitWebGPU();
         OKAMI_ERROR_RETURN(err);
-        
-        LOG(INFO) << "WebGPU initialized successfully";
-        
-        // Initialize triangle module with device
-        if (m_triangleModule) {
-            m_triangleModule->SetDevice(m_device, m_surfaceFormat);
-        }
         
         LOG(INFO) << "WebGPU renderer startup complete";
         return {};

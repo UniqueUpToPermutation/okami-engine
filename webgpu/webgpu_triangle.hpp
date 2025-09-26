@@ -14,8 +14,6 @@ namespace okami {
         public IWgpuRenderModule {
     private:
         WGPURenderPipeline m_pipeline = nullptr;
-        WGPUDevice m_device = nullptr;
-        WGPUTextureFormat m_surfaceFormat = WGPUTextureFormat_BGRA8Unorm;
         StorageModule<DummyTriangleComponent>* m_storage = nullptr;
         
         // Transform uniform buffer resources
@@ -36,7 +34,5 @@ namespace okami {
 
         std::string_view GetName() const override;
         Error Pass(Time const& time, ModuleInterface& mi, WgpuRenderPassInfo info) override;
-        
-        void SetDevice(WGPUDevice device, WGPUTextureFormat surfaceFormat);
     };
 }

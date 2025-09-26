@@ -11,6 +11,9 @@ namespace okami {
 		Camera m_camera;
 		glm::ivec2 m_viewportSize;
 		WGPURenderPassEncoder m_info;
+		WGPUQueue m_queue;
+		WGPUDevice m_device;
+		WGPUTextureFormat m_surfaceFormat;
 		glm::mat4 m_viewMatrix;
 		glm::mat4 m_projMatrix;
 	};
