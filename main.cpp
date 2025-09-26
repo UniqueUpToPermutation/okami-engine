@@ -9,6 +9,7 @@
 #include "engine.hpp"
 
 #include "bgfx/bgfx_renderer.hpp"
+#include "webgpu/webgpu_renderer.hpp"
 #include "glfw/glfw_module.hpp"
 
 #include "renderer.hpp"
@@ -22,11 +23,11 @@ int main() {
 
     // Register renderer based on compile-time options
     en.CreateRenderModule<GLFWModuleFactory>();
-    en.CreateRenderModule<BgfxRendererFactory>();
+    en.CreateRenderModule<WebgpuRendererFactory>();
 
     Error err = en.Startup();
 
-    auto textureHandle = en.LoadResource<Texture>("test.ktx2");
+    // auto textureHandle = en.LoadResource<Texture>("test.ktx2");
 
     auto e2 = en.CreateEntity();
     en.AddComponent(e2, DummyTriangleComponent{});
