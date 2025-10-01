@@ -14,6 +14,7 @@ namespace okami {
 		WGPUQueue m_queue;
 		WGPUDevice m_device;
 		WGPUTextureFormat m_surfaceFormat;
+		bool m_hasDepthStencil = false;
 		glm::mat4 m_viewMatrix;
 		glm::mat4 m_projMatrix;
 	};
