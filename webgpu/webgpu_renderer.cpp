@@ -40,6 +40,16 @@ protected:
     WGPUDevice m_device = nullptr;
     WGPUQueue m_queue = nullptr;
     WGPUTextureFormat m_surfaceFormat = WGPUTextureFormat_BGRA8Unorm;
+    
+    // Headless rendering resources
+    WGPUTexture m_headlessColorTexture = nullptr;
+    WGPUTextureView m_headlessColorView = nullptr;
+    WGPUTexture m_headlessDepthTexture = nullptr;
+    WGPUTextureView m_headlessDepthView = nullptr;
+    
+    // Windowed depth buffer (to match headless mode)
+    WGPUTexture m_windowedDepthTexture = nullptr;
+    WGPUTextureView m_windowedDepthView = nullptr;
        
     INativeWindowProvider* m_windowProvider = nullptr;
     glm::ivec2 m_lastFramebufferSize = {0, 0};
@@ -113,9 +123,12 @@ protected:
         
         m_queue = wgpuDeviceGetQueue(m_device);
         
-        // Configure surface
+        // Configure surface or create headless textures
         if (m_surface) {
             ConfigureSurface();
+        } else if (m_params.m_headlessMode) {
+            auto err = CreateHeadlessTextures();
+            OKAMI_ERROR_RETURN(err);
         }
         
         return {};
@@ -133,32 +146,194 @@ protected:
         config.presentMode = WGPUPresentMode_Fifo;
         
         wgpuSurfaceConfigure(m_surface, &config);
+        
+        // Create depth buffer for windowed mode (to match headless mode)
+        CreateWindowedDepthBuffer();
     }
     
     void ReconfigureSurface() {
         ConfigureSurface();
     }
-      
-    void RenderFrame(ModuleInterface& mi) {
-        if (!m_surface) return;
+    
+    Error CreateHeadlessTextures() {
+        // Clean up existing headless textures if they exist
+        CleanupHeadlessTextures();
         
-        WGPUSurfaceTexture surfaceTexture;
-        wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture);
-        if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_Success) {
-            LOG(ERROR) << "Failed to get surface texture, status: " << surfaceTexture.status;
+        // Create color texture
+        WGPUTextureDescriptor colorTextureDesc = {};
+        colorTextureDesc.dimension = WGPUTextureDimension_2D;
+        colorTextureDesc.format = m_surfaceFormat;
+        colorTextureDesc.mipLevelCount = 1;
+        colorTextureDesc.sampleCount = 1;
+        colorTextureDesc.size = {
+            static_cast<uint32_t>(m_lastFramebufferSize.x),
+            static_cast<uint32_t>(m_lastFramebufferSize.y),
+            1
+        };
+        colorTextureDesc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
+        colorTextureDesc.viewFormatCount = 0;
+        colorTextureDesc.viewFormats = nullptr;
+        
+        m_headlessColorTexture = wgpuDeviceCreateTexture(m_device, &colorTextureDesc);
+        if (!m_headlessColorTexture) {
+            return Error("Failed to create headless color texture");
+        }
+        
+        // Create color texture view
+        WGPUTextureViewDescriptor colorViewDesc = {};
+        colorViewDesc.format = m_surfaceFormat;
+        colorViewDesc.dimension = WGPUTextureViewDimension_2D;
+        colorViewDesc.baseMipLevel = 0;
+        colorViewDesc.mipLevelCount = 1;
+        colorViewDesc.baseArrayLayer = 0;
+        colorViewDesc.arrayLayerCount = 1;
+        
+        m_headlessColorView = wgpuTextureCreateView(m_headlessColorTexture, &colorViewDesc);
+        if (!m_headlessColorView) {
+            return Error("Failed to create headless color texture view");
+        }
+        
+        // Create depth texture
+        WGPUTextureDescriptor depthTextureDesc = {};
+        depthTextureDesc.dimension = WGPUTextureDimension_2D;
+        depthTextureDesc.format = WGPUTextureFormat_Depth24Plus;
+        depthTextureDesc.mipLevelCount = 1;
+        depthTextureDesc.sampleCount = 1;
+        depthTextureDesc.size = {
+            static_cast<uint32_t>(m_lastFramebufferSize.x),
+            static_cast<uint32_t>(m_lastFramebufferSize.y),
+            1
+        };
+        depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
+        depthTextureDesc.viewFormatCount = 0;
+        depthTextureDesc.viewFormats = nullptr;
+        
+        m_headlessDepthTexture = wgpuDeviceCreateTexture(m_device, &depthTextureDesc);
+        if (!m_headlessDepthTexture) {
+            return Error("Failed to create headless depth texture");
+        }
+        
+        // Create depth texture view
+        WGPUTextureViewDescriptor depthViewDesc = {};
+        depthViewDesc.format = WGPUTextureFormat_Depth24Plus;
+        depthViewDesc.dimension = WGPUTextureViewDimension_2D;
+        depthViewDesc.baseMipLevel = 0;
+        depthViewDesc.mipLevelCount = 1;
+        depthViewDesc.baseArrayLayer = 0;
+        depthViewDesc.arrayLayerCount = 1;
+        
+        m_headlessDepthView = wgpuTextureCreateView(m_headlessDepthTexture, &depthViewDesc);
+        if (!m_headlessDepthView) {
+            return Error("Failed to create headless depth texture view");
+        }
+        
+        LOG(INFO) << "Headless textures created successfully: " << m_lastFramebufferSize.x << "x" << m_lastFramebufferSize.y;
+        return {};
+    }
+    
+    void CleanupHeadlessTextures() {
+        if (m_headlessDepthView) {
+            wgpuTextureViewRelease(m_headlessDepthView);
+            m_headlessDepthView = nullptr;
+        }
+        if (m_headlessDepthTexture) {
+            wgpuTextureRelease(m_headlessDepthTexture);
+            m_headlessDepthTexture = nullptr;
+        }
+        if (m_headlessColorView) {
+            wgpuTextureViewRelease(m_headlessColorView);
+            m_headlessColorView = nullptr;
+        }
+        if (m_headlessColorTexture) {
+            wgpuTextureRelease(m_headlessColorTexture);
+            m_headlessColorTexture = nullptr;
+        }
+    }
+    
+    void CreateWindowedDepthBuffer() {
+        // Clean up existing depth buffer if it exists
+        CleanupWindowedDepthBuffer();
+        
+        // Create depth texture
+        WGPUTextureDescriptor depthTextureDesc = {};
+        depthTextureDesc.dimension = WGPUTextureDimension_2D;
+        depthTextureDesc.format = WGPUTextureFormat_Depth24Plus;
+        depthTextureDesc.mipLevelCount = 1;
+        depthTextureDesc.sampleCount = 1;
+        depthTextureDesc.size = {
+            static_cast<uint32_t>(m_lastFramebufferSize.x),
+            static_cast<uint32_t>(m_lastFramebufferSize.y),
+            1
+        };
+        depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
+        depthTextureDesc.viewFormatCount = 0;
+        depthTextureDesc.viewFormats = nullptr;
+        
+        m_windowedDepthTexture = wgpuDeviceCreateTexture(m_device, &depthTextureDesc);
+        if (!m_windowedDepthTexture) {
+            LOG(ERROR) << "Failed to create windowed depth texture";
             return;
         }
-       
-        WGPUTextureViewDescriptor viewDesc = {};
-        viewDesc.format = m_surfaceFormat;
-        viewDesc.dimension = WGPUTextureViewDimension_2D;
-        viewDesc.baseMipLevel = 0;
-        viewDesc.mipLevelCount = 1;
-        viewDesc.baseArrayLayer = 0;
-        viewDesc.arrayLayerCount = 1;
-        viewDesc.aspect = WGPUTextureAspect_All;
         
-        WGPUTextureView backBuffer = wgpuTextureCreateView(surfaceTexture.texture, &viewDesc);
+        // Create depth texture view
+        WGPUTextureViewDescriptor depthViewDesc = {};
+        depthViewDesc.format = WGPUTextureFormat_Depth24Plus;
+        depthViewDesc.dimension = WGPUTextureViewDimension_2D;
+        depthViewDesc.baseMipLevel = 0;
+        depthViewDesc.mipLevelCount = 1;
+        depthViewDesc.baseArrayLayer = 0;
+        depthViewDesc.arrayLayerCount = 1;
+        
+        m_windowedDepthView = wgpuTextureCreateView(m_windowedDepthTexture, &depthViewDesc);
+        if (!m_windowedDepthView) {
+            LOG(ERROR) << "Failed to create windowed depth texture view";
+            return;
+        }
+        
+        LOG(INFO) << "Windowed depth buffer created successfully: " << m_lastFramebufferSize.x << "x" << m_lastFramebufferSize.y;
+    }
+    
+    void CleanupWindowedDepthBuffer() {
+        if (m_windowedDepthView) {
+            wgpuTextureViewRelease(m_windowedDepthView);
+            m_windowedDepthView = nullptr;
+        }
+        if (m_windowedDepthTexture) {
+            wgpuTextureRelease(m_windowedDepthTexture);
+            m_windowedDepthTexture = nullptr;
+        }
+    }
+      
+    void RenderFrame(ModuleInterface& mi) {
+        WGPUTextureView backBuffer = nullptr;
+        WGPUSurfaceTexture surfaceTexture = {};
+        
+        // Get the appropriate render target
+        if (m_surface) {
+            // Windowed mode - get surface texture
+            wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture);
+            if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_Success) {
+                LOG(ERROR) << "Failed to get surface texture, status: " << surfaceTexture.status;
+                return;
+            }
+           
+            WGPUTextureViewDescriptor viewDesc = {};
+            viewDesc.format = m_surfaceFormat;
+            viewDesc.dimension = WGPUTextureViewDimension_2D;
+            viewDesc.baseMipLevel = 0;
+            viewDesc.mipLevelCount = 1;
+            viewDesc.baseArrayLayer = 0;
+            viewDesc.arrayLayerCount = 1;
+            viewDesc.aspect = WGPUTextureAspect_All;
+            
+            backBuffer = wgpuTextureCreateView(surfaceTexture.texture, &viewDesc);
+        } else if (m_params.m_headlessMode && m_headlessColorView) {
+            // Headless mode - use offscreen texture
+            backBuffer = m_headlessColorView;
+        } else {
+            LOG(ERROR) << "No valid render target available";
+            return;
+        }
        
         WGPURenderPassColorAttachment colorAttachment = {};
         colorAttachment.nextInChain = nullptr;
@@ -166,17 +341,43 @@ protected:
         colorAttachment.resolveTarget = nullptr;
         colorAttachment.loadOp = WGPULoadOp_Clear;
         colorAttachment.storeOp = WGPUStoreOp_Store;
-        colorAttachment.clearValue.r = 0.3f;
-        colorAttachment.clearValue.g = 0.3f;
-        colorAttachment.clearValue.b = 0.3f;
+        colorAttachment.clearValue.r = 0.1f;
+        colorAttachment.clearValue.g = 0.1f;
+        colorAttachment.clearValue.b = 0.1f;
         colorAttachment.clearValue.a = 1.0f;
-                
+        
+        // Setup depth attachment for both windowed and headless modes
+        WGPURenderPassDepthStencilAttachment depthAttachment = {};
         WGPURenderPassDescriptor renderPassDesc = {};
         renderPassDesc.nextInChain = nullptr;
         renderPassDesc.label = nullptr;
         renderPassDesc.colorAttachmentCount = 1;
         renderPassDesc.colorAttachments = &colorAttachment;
-        renderPassDesc.depthStencilAttachment = nullptr;
+        
+        // Always use depth buffer - windowed or headless
+        WGPUTextureView depthView = nullptr;
+        if (m_params.m_headlessMode && m_headlessDepthView) {
+            depthView = m_headlessDepthView;
+        } else if (m_surface && m_windowedDepthView) {
+            depthView = m_windowedDepthView;
+        }
+        
+        if (depthView) {
+            depthAttachment.view = depthView;
+            depthAttachment.depthClearValue = 1.0f;
+            depthAttachment.depthLoadOp = WGPULoadOp_Clear;
+            depthAttachment.depthStoreOp = WGPUStoreOp_Store;
+            depthAttachment.depthReadOnly = false;
+            depthAttachment.stencilClearValue = 0;
+            depthAttachment.stencilLoadOp = WGPULoadOp_Clear;
+            depthAttachment.stencilStoreOp = WGPUStoreOp_Store;
+            depthAttachment.stencilReadOnly = false;
+            renderPassDesc.depthStencilAttachment = &depthAttachment;
+        } else {
+            LOG(WARNING) << "No depth buffer available for rendering";
+            renderPassDesc.depthStencilAttachment = nullptr;
+        }
+        
         renderPassDesc.occlusionQuerySet = nullptr;
         renderPassDesc.timestampWrites = nullptr;
               
@@ -214,6 +415,7 @@ protected:
             info.m_queue = m_queue;
             info.m_device = m_device;
             info.m_surfaceFormat = m_surfaceFormat;
+            info.m_hasDepthStencil = true; // Both windowed and headless modes have depth
             info.m_viewMatrix = viewMat;
             info.m_projMatrix = projMat;
             Time time = {}; // TODO: Get actual time from frame context
@@ -226,15 +428,28 @@ protected:
         WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
         wgpuQueueSubmit(m_queue, 1, &commands);
         
-        wgpuSurfacePresent(m_surface);
+        // Only present if we have a surface (windowed mode)
+        if (m_surface) {
+            wgpuSurfacePresent(m_surface);
+        }
         
         wgpuCommandBufferRelease(commands);
         wgpuCommandEncoderRelease(encoder);
         wgpuRenderPassEncoderRelease(renderPass);
-        wgpuTextureViewRelease(backBuffer);
+        
+        // Only release backBuffer if it's not the headless color view (which we don't own)
+        if (m_surface && backBuffer) {
+            wgpuTextureViewRelease(backBuffer);
+        }
     }
     
     void CleanupWebGPU() {
+        // Clean up headless textures first
+        CleanupHeadlessTextures();
+        
+        // Clean up windowed depth buffer
+        CleanupWindowedDepthBuffer();
+        
         if (m_queue) {
             wgpuQueueRelease(m_queue);
             m_queue = nullptr;
@@ -329,6 +544,11 @@ private:
             return Error("No INativeWindowProvider available for WebGPU initialization");
         }
         
+        // Set default framebuffer size for headless mode
+        if (!m_windowProvider && m_params.m_headlessMode) {
+            m_lastFramebufferSize = {800, 600}; // Default headless size
+        }
+        
         LOG(INFO) << "Window provider: " << (m_windowProvider ? "found" : "headless mode");
         
         // Initialize WebGPU
@@ -340,11 +560,11 @@ private:
     }
 
     Error ProcessFrameImpl(Time const& t, ModuleInterface& a) override {
-        if (!m_device || m_params.m_headlessMode) {
+        if (!m_device) {
             return {};
         }
 
-        // Check for window resize
+        // Check for window resize (only for windowed mode)
         if (m_windowProvider) {
             auto currentSize = m_windowProvider->GetFramebufferSize();
             if (currentSize != m_lastFramebufferSize) {

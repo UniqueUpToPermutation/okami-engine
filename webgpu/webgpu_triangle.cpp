@@ -122,6 +122,22 @@ Error WebgpuTriangleModule::Pass(Time const& time, ModuleInterface& mi, WgpuRend
         multisampleState.mask = 0xFFFFFFFF;
         multisampleState.alphaToCoverageEnabled = false;
         
+        // Configure depth-stencil state - always use depth
+        WGPUDepthStencilState depthStencilState = {};
+        depthStencilState.format = WGPUTextureFormat_Depth24Plus;
+        depthStencilState.depthWriteEnabled = true;
+        depthStencilState.depthCompare = WGPUCompareFunction_Less;
+        depthStencilState.stencilFront.compare = WGPUCompareFunction_Always;
+        depthStencilState.stencilFront.failOp = WGPUStencilOperation_Keep;
+        depthStencilState.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+        depthStencilState.stencilFront.passOp = WGPUStencilOperation_Keep;
+        depthStencilState.stencilBack.compare = WGPUCompareFunction_Always;
+        depthStencilState.stencilBack.failOp = WGPUStencilOperation_Keep;
+        depthStencilState.stencilBack.depthFailOp = WGPUStencilOperation_Keep;
+        depthStencilState.stencilBack.passOp = WGPUStencilOperation_Keep;
+        depthStencilState.stencilReadMask = 0xFFFFFFFF;
+        depthStencilState.stencilWriteMask = 0xFFFFFFFF;
+        
         // Create pipeline layout with the transform bind group layout
         WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
         pipelineLayoutDesc.bindGroupLayoutCount = 1;
@@ -136,6 +152,7 @@ Error WebgpuTriangleModule::Pass(Time const& time, ModuleInterface& mi, WgpuRend
         pipelineDesc.fragment = &fragmentState;
         pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
         pipelineDesc.multisample = multisampleState;
+        pipelineDesc.depthStencil = &depthStencilState;
         
         m_pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
         
