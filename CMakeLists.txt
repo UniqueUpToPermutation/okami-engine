@@ -662,6 +662,13 @@ if(WIN32)
             dxguid
         )
     endif()
+elseif(APPLE)
+    # Add macOS system frameworks required by WebGPU Metal backend
+    target_link_libraries(EngineLib PUBLIC
+        "-framework Metal"
+        "-framework QuartzCore"
+        "-framework Foundation"
+    )
 endif()
 
 # Set include directories for the library
