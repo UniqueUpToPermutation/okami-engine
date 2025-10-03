@@ -2,52 +2,60 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "HeadlessRendererTest.CreateEngineWithBgfxRenderer",
-            "type": "lldb",
+            "name": "HeadlessRendererTest.CreateEngineWithWebGPURenderer",
+            "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/out/build/okami-macos/EngineTests",
+            "program": "${workspaceFolder}/out/build/x64-debug/Debug/EngineTests.exe",
             "args": [
-                "--gtest_filter=HeadlessRendererTest.CreateEngineWithBgfxRenderer"
+                "--gtest_filter=HeadlessRendererTest.CreateEngineWithWebGPURenderer"
             ],
-            "cwd": "${workspaceFolder}",
-            "stopOnEntry": false,
+            "cwd": "${workspaceFolder}/out/build/x64-debug/Debug",
             "console": "integratedTerminal",
             "preLaunchTask": "Build Tests"
         },
         {
             "name": "All HeadlessRendererTests",
-            "type": "lldb",
+            "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/out/build/okami-macos/EngineTests",
+            "program": "${workspaceFolder}/out/build/x64-debug/Debug/EngineTests.exe",
             "args": [
                 "--gtest_filter=HeadlessRendererTest.*"
             ],
-            "cwd": "${workspaceFolder}",
-            "stopOnEntry": false,
+            "cwd": "${workspaceFolder}/out/build/x64-debug/Debug",
             "console": "integratedTerminal",
             "preLaunchTask": "Build Tests"
         },
         {
             "name": "All Tests",
-            "type": "lldb",
+            "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/out/build/okami-macos/EngineTests",
+            "program": "${workspaceFolder}/out/build/x64-debug/Debug/EngineTests.exe",
             "args": [],
-            "cwd": "${workspaceFolder}",
-            "stopOnEntry": false,
+            "cwd": "${workspaceFolder}/out/build/x64-debug/Debug",
             "console": "integratedTerminal",
             "preLaunchTask": "Build Tests"
         },
         {
-            "name": "HeadlessRendererTest.CreateEngineWithBgfxRenderer (Debug)",
-            "type": "lldb",
+            "name": "HeadlessRendererTest.CreateEngineWithWebGPURenderer (Debug)",
+            "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/out/build/okami-macos/EngineTests",
+            "program": "${workspaceFolder}/out/build/x64-debug/Debug/EngineTests.exe",
             "args": [
-                "--gtest_filter=HeadlessRendererTest.CreateEngineWithBgfxRenderer"
+                "--gtest_filter=HeadlessRendererTest.CreateEngineWithWebGPURenderer"
             ],
-            "cwd": "${workspaceFolder}",
-            "stopOnEntry": true,
+            "cwd": "${workspaceFolder}/out/build/x64-debug/Debug",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build Tests"
+        },
+        {
+            "name": "HeadlessRendererTest.WebGPUTriangleRenderingInHeadlessMode (Debug)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/build/x64-debug/Debug/EngineTests.exe",
+            "args": [
+                "--gtest_filter=HeadlessRendererTest.WebGPUTriangleRenderingInHeadlessMode"
+            ],
+            "cwd": "${workspaceFolder}/out/build/x64-debug/Debug",
             "console": "integratedTerminal",
             "preLaunchTask": "Build Tests"
         }

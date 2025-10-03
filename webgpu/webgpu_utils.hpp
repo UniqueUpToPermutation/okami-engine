@@ -26,6 +26,14 @@ namespace okami {
 		virtual Error Pass(Time const& time, ModuleInterface& mi, WgpuRenderPassInfo info) = 0;
 	};
 
+	class IWgpuRenderer {
+	public:
+		virtual ~IWgpuRenderer() = default;
+
+		virtual WGPUDevice GetDevice() const = 0;
+		virtual WGPUTextureFormat GetPreferredSwapchainFormat() const = 0;
+	};
+
 	// Utility function to load WGSL shader files
 	std::string LoadShaderFile(const std::string& filename);
 }

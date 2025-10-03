@@ -23,4 +23,7 @@ namespace okami {
 
 	std::filesystem::path GetConfigsPath();
 	std::filesystem::path GetConfigPath(const std::filesystem::path& relativePath);
+
+	std::filesystem::path GetGoldenImagesPath();
+	std::filesystem::path GetGoldenImagePath(const std::filesystem::path& relativePath);
 }

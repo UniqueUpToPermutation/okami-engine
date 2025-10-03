@@ -16,6 +16,8 @@
 
 #include <cstring>
 #include <filesystem>
+#include <chrono>
+#include <thread>
 
 #include <webgpu.h>
 
@@ -29,15 +31,24 @@ extern "C" void releaseWebGPUMetalLayer(void* layer);
 #include <windows.h>
 #endif
 
+#define WEBGPU_BACKEND_WGPU
+#ifdef WEBGPU_BACKEND_WGPU
+#  include <wgpu.h>
+#endif // WEBGPU_BACKEND_WGPU
+
 using namespace okami;
 
 class WebgpuRendererModule : 
     public EngineModule,
-    public IRenderer {
+    public IRenderer,
+    public IWgpuRenderer {
 protected:
     RendererParams m_params;
     RendererConfig m_config;
     std::atomic<entity_t> m_activeCamera = 0;
+    
+    // Frame counter for headless capture
+    uint32_t m_frameCounter = 0;
     
     WGPUInstance m_instance = nullptr;
     WGPUSurface m_surface = nullptr;
@@ -316,6 +327,172 @@ protected:
             m_windowedDepthTexture = nullptr;
         }
     }
+    
+    Error CaptureHeadlessFrame() {
+        if (!m_params.m_headlessMode || !m_headlessColorTexture) {
+            return {}; // Not in headless mode or no texture to capture
+        }
+        
+        // Create output directory if it doesn't exist
+        std::filesystem::path outputDir = m_params.m_headlessRenderOutputDir;
+        if (!std::filesystem::exists(outputDir)) {
+            std::filesystem::create_directories(outputDir);
+        }
+        
+        // Generate output filename
+        std::filesystem::path outputPath = outputDir / (m_params.m_headlessOutputFileStem + ".png");
+        
+        // Create a buffer to read the texture data
+        uint32_t width = static_cast<uint32_t>(m_lastFramebufferSize.x);
+        uint32_t height = static_cast<uint32_t>(m_lastFramebufferSize.y);
+        uint32_t unalignedBytesPerRow = width * 4; // BGRA8 = 4 bytes per pixel
+        
+        // Align bytesPerRow to COPY_BYTES_PER_ROW_ALIGNMENT (256 bytes)
+        const uint32_t COPY_BYTES_PER_ROW_ALIGNMENT = 256;
+        uint32_t bytesPerRow = ((unalignedBytesPerRow + COPY_BYTES_PER_ROW_ALIGNMENT - 1) / COPY_BYTES_PER_ROW_ALIGNMENT) * COPY_BYTES_PER_ROW_ALIGNMENT;
+        uint32_t bufferSize = bytesPerRow * height;
+        
+        // Create buffer for reading texture data
+        WGPUBufferDescriptor bufferDesc = {};
+        bufferDesc.size = bufferSize;
+        bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead;
+        bufferDesc.mappedAtCreation = false;
+        
+        WGPUBuffer readbackBuffer = wgpuDeviceCreateBuffer(m_device, &bufferDesc);
+        if (!readbackBuffer) {
+            return Error("Failed to create readback buffer for headless capture");
+        }
+        
+        // Create command encoder for the copy operation
+        WGPUCommandEncoderDescriptor encoderDesc = {};
+        WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(m_device, &encoderDesc);
+        
+        // Copy texture to buffer
+        WGPUImageCopyTexture source = {};
+        source.texture = m_headlessColorTexture;
+        source.mipLevel = 0;
+        source.origin = {0, 0, 0};
+        source.aspect = WGPUTextureAspect_All;
+        
+        WGPUImageCopyBuffer destination = {};
+        destination.buffer = readbackBuffer;
+        destination.layout.offset = 0;
+        destination.layout.bytesPerRow = bytesPerRow;
+        destination.layout.rowsPerImage = height;
+        
+        WGPUExtent3D copySize = {width, height, 1};
+        
+        wgpuCommandEncoderCopyTextureToBuffer(encoder, &source, &destination, &copySize);
+        
+        // Submit the copy command and ensure completion
+        WGPUCommandBufferDescriptor cmdDesc = {};
+        WGPUCommandBuffer commands = wgpuCommandEncoderFinish(encoder, &cmdDesc);
+        wgpuQueueSubmit(m_queue, 1, &commands);
+        
+        // Create a simple fence mechanism - submit an empty command buffer to ensure ordering
+        WGPUCommandEncoderDescriptor fenceEncoderDesc = {};
+        WGPUCommandEncoder fenceEncoder = wgpuDeviceCreateCommandEncoder(m_device, &fenceEncoderDesc);
+        WGPUCommandBufferDescriptor fenceCmdDesc = {};
+        WGPUCommandBuffer fenceCommands = wgpuCommandEncoderFinish(fenceEncoder, &fenceCmdDesc);
+        wgpuQueueSubmit(m_queue, 1, &fenceCommands);
+        
+        // Map the buffer for reading (this is synchronous in this implementation)
+        struct MapData {
+            bool done = false;
+            WGPUBufferMapAsyncStatus status = WGPUBufferMapAsyncStatus_Unknown;
+        } mapData;
+        
+        auto mapCallback = [](WGPUBufferMapAsyncStatus status, void* userdata) {
+            auto* data = static_cast<MapData*>(userdata);
+            data->status = status;
+            data->done = true;
+        };
+        
+        wgpuBufferMapAsync(readbackBuffer, WGPUMapMode_Read, 0, bufferSize, mapCallback, &mapData);
+        
+        // Wait for mapping to complete with proper event processing
+        int timeout = 1000; // 1 second timeout
+        while (!mapData.done && timeout > 0) {
+            // Process WebGPU events to handle the async callback
+            #ifdef __EMSCRIPTEN__
+                emscripten_sleep(1);
+            #else
+                wgpuDevicePoll(m_device, true, nullptr);
+            #endif
+            --timeout;
+        }
+        
+        // Clean up fence resources
+        wgpuCommandBufferRelease(fenceCommands);
+        wgpuCommandEncoderRelease(fenceEncoder);
+        
+        if (!mapData.done) {
+            wgpuBufferRelease(readbackBuffer);
+            wgpuCommandBufferRelease(commands);
+            wgpuCommandEncoderRelease(encoder);
+            return Error("Timeout waiting for buffer mapping to complete");
+        }
+        
+        if (mapData.status != WGPUBufferMapAsyncStatus_Success) {
+            wgpuBufferRelease(readbackBuffer);
+            wgpuCommandBufferRelease(commands);
+            wgpuCommandEncoderRelease(encoder);
+            return Error("Failed to map readback buffer");
+        }
+        
+        // Get the mapped data
+        const uint8_t* mappedData = static_cast<const uint8_t*>(wgpuBufferGetConstMappedRange(readbackBuffer, 0, bufferSize));
+        if (!mappedData) {
+            wgpuBufferUnmap(readbackBuffer);
+            wgpuBufferRelease(readbackBuffer);
+            wgpuCommandBufferRelease(commands);
+            wgpuCommandEncoderRelease(encoder);
+            return Error("Failed to get mapped buffer data");
+        }
+        
+        // Convert BGRA to RGBA and create texture
+        std::vector<uint8_t> textureData(width * height * 4); // Final image data without padding
+        
+        for (uint32_t y = 0; y < height; ++y) {
+            for (uint32_t x = 0; x < width; ++x) {
+                uint32_t srcOffset = y * bytesPerRow + x * 4;
+                uint32_t dstOffset = (y * width + x) * 4;
+                
+                // Convert BGRA to RGBA
+                textureData[dstOffset + 0] = mappedData[srcOffset + 2]; // R
+                textureData[dstOffset + 1] = mappedData[srcOffset + 1]; // G
+                textureData[dstOffset + 2] = mappedData[srcOffset + 0]; // B
+                textureData[dstOffset + 3] = mappedData[srcOffset + 3]; // A
+            }
+        }
+        
+        // Create texture description
+        TextureDesc desc;
+        desc.type = TextureType::TEXTURE_2D;
+        desc.format = TextureFormat::RGBA8;
+        desc.width = width;
+        desc.height = height;
+        desc.depth = 1;
+        desc.arraySize = 1;
+        desc.mipLevels = 1;
+        
+        // Create texture and save as PNG
+        Texture texture(desc, std::move(textureData));
+        auto saveResult = texture.SavePNG(outputPath);
+        
+        // Clean up WebGPU resources
+        wgpuBufferUnmap(readbackBuffer);
+        wgpuBufferRelease(readbackBuffer);
+        wgpuCommandBufferRelease(commands);
+        wgpuCommandEncoderRelease(encoder);
+        
+        if (saveResult.IsError()) {
+            return Error("Failed to save PNG: " + saveResult.Str());
+        }
+        
+        LOG(INFO) << "Headless render captured and saved to: " << outputPath;
+        return {};
+    }
       
     void RenderFrame(ModuleInterface& mi) {
         WGPUTextureView backBuffer = nullptr;
@@ -444,6 +621,12 @@ protected:
         // Only present if we have a surface (windowed mode)
         if (m_surface) {
             wgpuSurfacePresent(m_surface);
+        } else if (m_params.m_headlessMode) {
+            // Capture headless render to PNG
+            auto captureResult = CaptureHeadlessFrame();
+            if (captureResult.IsError()) {
+                LOG(ERROR) << "Failed to capture headless frame: " << captureResult.Str();
+            }
         }
         
         wgpuCommandBufferRelease(commands);
@@ -541,9 +724,18 @@ protected:
         return request.device;
     }
 
+    WGPUDevice GetDevice() const override {
+        return m_device;
+    }
+
+    WGPUTextureFormat GetPreferredSwapchainFormat() const override {
+        return m_surfaceFormat;
+    }
+    
 private:
     Error RegisterImpl(ModuleInterface& mi) override {
         mi.m_interfaces.Register<IRenderer>(this);
+        mi.m_interfaces.Register<IWgpuRenderer>(this);
         RegisterConfig<RendererConfig>(mi.m_interfaces, LOG_WRAP(WARNING));
         return {};
     }

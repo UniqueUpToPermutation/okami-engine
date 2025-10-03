@@ -20,6 +20,7 @@ std::optional<std::filesystem::path> g_bgfxShadersPath = std::nullopt;
 std::optional<std::filesystem::path> g_webgpuShadersPath = std::nullopt;
 std::optional<std::filesystem::path> g_testAssetsPath = std::nullopt;
 std::optional<std::filesystem::path> g_configsPath = std::nullopt;
+std::optional<std::filesystem::path> g_goldenImagesPath = std::nullopt;
 
 static std::filesystem::path SearchForPath(
     const std::filesystem::path& startPath, 
@@ -66,6 +67,10 @@ static std::filesystem::path FindTestAssetsPath() {
 
 static std::filesystem::path FindConfigsPath() {
     return SearchForPath(std::filesystem::current_path(), "config");
+}
+
+static std::filesystem::path FindGoldenImagesPath() {
+    return SearchForPath(std::filesystem::current_path(), "tests/golden_images");
 }
 
 static std::filesystem::path FindExecutablePath() {
@@ -168,4 +173,15 @@ std::filesystem::path okami::GetConfigsPath() {
 
 std::filesystem::path okami::GetConfigPath(const std::filesystem::path& relativePath) {
     return GetConfigsPath() / relativePath;
+}
+
+std::filesystem::path okami::GetGoldenImagesPath() {
+    if (!g_goldenImagesPath.has_value()) {
+        g_goldenImagesPath = FindGoldenImagesPath();
+    }
+    return *g_goldenImagesPath;
+}
+
+std::filesystem::path okami::GetGoldenImagePath(const std::filesystem::path& relativePath) {
+    return GetGoldenImagesPath() / relativePath;
 }

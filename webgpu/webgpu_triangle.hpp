@@ -20,6 +20,10 @@ namespace okami {
         WGPUBuffer m_transformBuffer = nullptr;
         WGPUBindGroup m_transformBindGroup = nullptr;
         WGPUBindGroupLayout m_transformBindGroupLayout = nullptr;
+        
+        // Constants for dynamic buffer management
+        static constexpr uint32_t MAX_TRIANGLES = 256;
+        static constexpr uint32_t TRANSFORM_ALIGNMENT = 256; // Required alignment for uniform buffers
 
     protected:
         Error RegisterImpl(ModuleInterface&) override;

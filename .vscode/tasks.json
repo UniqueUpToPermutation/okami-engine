@@ -7,7 +7,7 @@
             "command": "cmake",
             "args": [
                 "--build",
-                "out/build/okami-macos",
+                "out/build/x64-debug",
                 "--target",
                 "EngineTests"
             ],
@@ -24,7 +24,7 @@
                 "clear": false
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile"
             ]
         },
         {
@@ -33,7 +33,7 @@
             "command": "cmake",
             "args": [
                 "--preset",
-                "okami-macos"
+                "x64-debug"
             ],
             "group": {
                 "kind": "build",
@@ -55,7 +55,7 @@
             "command": "cmake",
             "args": [
                 "--build",
-                "out/build/okami-macos"
+                "out/build/x64-debug"
             ],
             "group": {
                 "kind": "build",
@@ -70,7 +70,7 @@
                 "clear": false
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile"
             ]
         }
     ]
