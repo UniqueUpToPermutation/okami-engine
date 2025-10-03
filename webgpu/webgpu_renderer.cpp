@@ -24,6 +24,11 @@ extern "C" void* createMetalLayerForWebGPU(void* nsWindow);
 extern "C" void releaseWebGPUMetalLayer(void* layer);
 #endif
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 using namespace okami;
 
 class WebgpuRendererModule : 
@@ -93,6 +98,14 @@ protected:
             metalDesc.chain.sType = WGPUSType_SurfaceDescriptorFromMetalLayer;
             metalDesc.layer = m_metalLayer;
             surfaceDesc.nextInChain = &metalDesc.chain;
+#elif defined(_WIN32)
+            // Windows: use HWND
+            WGPUSurfaceDescriptorFromWindowsHWND windowsDesc = {};
+            windowsDesc.chain.sType = WGPUSType_SurfaceDescriptorFromWindowsHWND;
+            windowsDesc.chain.next = nullptr;
+            windowsDesc.hinstance = GetModuleHandle(nullptr);
+            windowsDesc.hwnd = nativeHandle;
+            surfaceDesc.nextInChain = &windowsDesc.chain;
 #endif
             
             m_surface = wgpuInstanceCreateSurface(m_instance, &surfaceDesc);

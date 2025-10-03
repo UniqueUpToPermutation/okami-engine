@@ -19,6 +19,7 @@
     "tinygltf",
     "yaml-cpp",
     "glm",
-    "concurrentqueue"
+    "concurrentqueue",
+    "ktx"
   ]
 }

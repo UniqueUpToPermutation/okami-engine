@@ -39,7 +39,7 @@ find_package(glog CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(unofficial-concurrentqueue CONFIG REQUIRED)
-# find_package(Ktx CONFIG REQUIRED)  # Temporarily disabled due to vcpkg build issues
+find_package(Ktx CONFIG REQUIRED)
 
 # DirectX / D3D12 related packages are only needed when USE_D3D12 is enabled.
 if(USE_D3D12)
@@ -636,8 +636,7 @@ target_link_libraries(EngineLib PUBLIC
         imgui::imgui
         glog::glog
         yaml-cpp::yaml-cpp
-        # KTX::ktx  # Temporarily disabled due to vcpkg build issues
-        ${WGPU_LIBRARY}
+        KTX::ktx
         ${WGPU_LIBRARY}
 )
 
