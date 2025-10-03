@@ -364,7 +364,7 @@ add_executable(Engine main.cpp)
 #==============================================================================
 
 # Standalone tool to convert PNG images to KTX2 format with mipmaps
-add_executable(png2ktx png2ktx.cpp lodepng.cpp)
+add_executable(png2ktx tools/png2ktx.cpp lodepng.cpp)
 target_link_libraries(png2ktx PRIVATE KTX::ktx)
 target_include_directories(png2ktx PRIVATE ${CMAKE_SOURCE_DIR})
 
@@ -438,16 +438,18 @@ endif()
 endif() # USE_D3D12
 
 #==============================================================================
-# WebGPU Shader Copying System
+# WGSL Preprocessor Tool
 #==============================================================================
 
-# Find all WGSL shader files in webgpu/shaders folder
-file(GLOB_RECURSE WEBGPU_SHADER_FILES 
-    "${CMAKE_SOURCE_DIR}/webgpu/shaders/*.wgsl"
+# Create the WGSL preprocessor executable
+add_executable(WgslPreprocessor tools/wgsl_preprocessor.cpp)
+set_target_properties(WgslPreprocessor PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
 )
 
 #==============================================================================
-# WebGPU Shader Copying System
+# WebGPU Shader Processing System
 #==============================================================================
 
 # Find all WGSL shader files in webgpu/shaders folder
@@ -459,36 +461,36 @@ if(WEBGPU_SHADER_FILES)
     # Ensure webgpu shaders output directory exists
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/webgpu/shaders)
     
-    set(ALL_WEBGPU_COPIED_SHADERS "")
+    set(ALL_WEBGPU_PROCESSED_SHADERS "")
     
-    # Copy each shader file to the build directory
+    # Process each shader file with the WGSL preprocessor
     foreach(WEBGPU_SHADER_FILE ${WEBGPU_SHADER_FILES})
         get_filename_component(SHADER_NAME ${WEBGPU_SHADER_FILE} NAME)
-        set(COPIED_SHADER_PATH "${CMAKE_BINARY_DIR}/webgpu/shaders/${SHADER_NAME}")
+        set(PROCESSED_SHADER_PATH "${CMAKE_BINARY_DIR}/webgpu/shaders/${SHADER_NAME}")
         
-        # Create custom command to copy the shader file
+        # Create custom command to preprocess the shader file
         add_custom_command(
-            OUTPUT ${COPIED_SHADER_PATH}
-            COMMAND ${CMAKE_COMMAND} -E copy ${WEBGPU_SHADER_FILE} ${COPIED_SHADER_PATH}
-            DEPENDS ${WEBGPU_SHADER_FILE}
-            COMMENT "Copying WebGPU shader: ${SHADER_NAME}"
+            OUTPUT ${PROCESSED_SHADER_PATH}
+            COMMAND WgslPreprocessor ${WEBGPU_SHADER_FILE} ${PROCESSED_SHADER_PATH} "${CMAKE_SOURCE_DIR}/webgpu/shaders"
+            DEPENDS ${WEBGPU_SHADER_FILE} WgslPreprocessor
+            COMMENT "Preprocessing WebGPU shader: ${SHADER_NAME}"
         )
         
-        list(APPEND ALL_WEBGPU_COPIED_SHADERS ${COPIED_SHADER_PATH})
-        message(STATUS "Will copy WebGPU shader: ${SHADER_NAME}")
+        list(APPEND ALL_WEBGPU_PROCESSED_SHADERS ${PROCESSED_SHADER_PATH})
+        message(STATUS "Will preprocess WebGPU shader: ${SHADER_NAME}")
     endforeach()
     
-    # Create a custom target that depends on all copied shaders
-    if(ALL_WEBGPU_COPIED_SHADERS)
-        list(LENGTH ALL_WEBGPU_COPIED_SHADERS WEBGPU_SHADER_COUNT)
-        add_custom_target(CopyWebGPUShaders ALL
-            DEPENDS ${ALL_WEBGPU_COPIED_SHADERS}
-            COMMENT "Copying all WebGPU shaders"
+    # Create a custom target that depends on all processed shaders
+    if(ALL_WEBGPU_PROCESSED_SHADERS)
+        list(LENGTH ALL_WEBGPU_PROCESSED_SHADERS WEBGPU_SHADER_COUNT)
+        add_custom_target(ProcessWebGPUShaders ALL
+            DEPENDS ${ALL_WEBGPU_PROCESSED_SHADERS}
+            COMMENT "Processing all WebGPU shaders"
         )
         
-        add_dependencies(Engine CopyWebGPUShaders)
-        message(STATUS "Created CopyWebGPUShaders target with ${WEBGPU_SHADER_COUNT} shaders")
-        message(STATUS "Copied WebGPU shaders will be available in: ${CMAKE_BINARY_DIR}/webgpu/shaders/")
+        add_dependencies(Engine ProcessWebGPUShaders)
+        message(STATUS "Created ProcessWebGPUShaders target with ${WEBGPU_SHADER_COUNT} shaders")
+        message(STATUS "Processed WebGPU shaders will be available in: ${CMAKE_BINARY_DIR}/webgpu/shaders/")
     endif()
 endif()
 
@@ -583,6 +585,12 @@ file(GLOB ENGINE_LIB_SOURCES CONFIGURE_DEPENDS
     "webgpu/*.cpp" "webgpu/*.hpp" "webgpu/*.mm"
 )
 list(REMOVE_ITEM ENGINE_LIB_SOURCES "${CMAKE_SOURCE_DIR}/main.cpp")
+
+# Remove tool files from engine library sources
+file(GLOB TOOL_SOURCES "tools/*.cpp" "tools/*.hpp")
+foreach(TOOL_FILE ${TOOL_SOURCES})
+    list(REMOVE_ITEM ENGINE_LIB_SOURCES ${TOOL_FILE})
+endforeach()
 
 # Filter library sources based on enabled renderer options
 set(_FILTERED_LIB_SOURCES "")
