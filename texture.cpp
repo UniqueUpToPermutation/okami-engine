@@ -4,6 +4,8 @@
 
 #include <glog/logging.h>
 
+#define USE_KTX
+
 #ifdef USE_KTX
 #include <ktx.h>
 #endif

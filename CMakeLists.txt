@@ -38,7 +38,6 @@ find_package(imgui CONFIG REQUIRED)
 find_package(glog CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
-find_package(unofficial-concurrentqueue CONFIG REQUIRED)
 find_package(Ktx CONFIG REQUIRED)
 
 # DirectX / D3D12 related packages are only needed when USE_D3D12 is enabled.
@@ -746,9 +745,28 @@ endif()
 if(ALL_KTX_TEXTURES)
     add_custom_command(
         TARGET Engine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E echo "KTX textures are available in build directory: ${CMAKE_BINARY_DIR}/assets/"
-        COMMENT "KTX texture files are available in build directory"
+        COMMENT "Copying KTX texture files to Engine output directory"
     )
+    
+    # Copy all generated KTX files to the Engine assets directory
+    foreach(KTX_FILE ${ALL_KTX_TEXTURES})
+        # Get relative path from build directory to determine target location
+        file(RELATIVE_PATH KTX_REL_PATH ${CMAKE_BINARY_DIR} ${KTX_FILE})
+        
+        # Determine target path - main assets go to assets/, test assets stay in tests/
+        if("${KTX_REL_PATH}" MATCHES "^tests/")
+            # Skip test KTX files for Engine target (they'll be handled by EngineTests)
+        else()
+            get_filename_component(KTX_NAME ${KTX_FILE} NAME)
+            add_custom_command(
+                TARGET Engine POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${KTX_FILE}
+                    $<TARGET_FILE_DIR:Engine>/assets/${KTX_NAME}
+                COMMENT "Copying ${KTX_NAME} to Engine output directory"
+            )
+        endif()
+    endforeach()
 endif()
 
 # Copy .glb files and other assets to output directory
@@ -808,9 +826,34 @@ add_custom_command(
 if(ALL_KTX_TEXTURES)
     add_custom_command(
         TARGET EngineTests POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E echo "KTX textures are available in build directory: ${CMAKE_BINARY_DIR}/assets/ and ${CMAKE_BINARY_DIR}/tests/assets/"
-        COMMENT "KTX texture files are available in build directory"
+        COMMENT "Copying KTX texture files to EngineTests output directory"
     )
+    
+    # Copy all generated KTX files to the appropriate EngineTests directories
+    foreach(KTX_FILE ${ALL_KTX_TEXTURES})
+        # Get relative path from build directory to determine target location
+        file(RELATIVE_PATH KTX_REL_PATH ${CMAKE_BINARY_DIR} ${KTX_FILE})
+        get_filename_component(KTX_NAME ${KTX_FILE} NAME)
+        
+        # Determine target path - main assets go to assets/, test assets go to tests/assets/
+        if("${KTX_REL_PATH}" MATCHES "^tests/assets/")
+            add_custom_command(
+                TARGET EngineTests POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${KTX_FILE}
+                    $<TARGET_FILE_DIR:EngineTests>/tests/assets/${KTX_NAME}
+                COMMENT "Copying test ${KTX_NAME} to EngineTests output directory"
+            )
+        elseif("${KTX_REL_PATH}" MATCHES "^assets/")
+            add_custom_command(
+                TARGET EngineTests POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${KTX_FILE}
+                    $<TARGET_FILE_DIR:EngineTests>/assets/${KTX_NAME}
+                COMMENT "Copying ${KTX_NAME} to EngineTests output directory"
+            )
+        endif()
+    endforeach()
 endif()
 
 # Copy .glb files and other assets for tests as well

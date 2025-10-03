@@ -46,13 +46,10 @@ TEST_F(TextureTest, LoadKTX2Test) {
                           << " type=" << static_cast<int>(desc.type) << std::endl;
                 loadedAtLeastOne = true;
             } else {
-                // Note: These files use UASTC compression, so loading may fail
-                // if we haven't implemented decompression yet
-                std::cout << "  Could not load KTX2 file (compressed format): " 
-                          << result.error() << std::endl;
+                EXPECT_TRUE(false) << "Failed to load KTX2 file: " << ktx2Path << " - " << result.error();
             }
         } else {
-            std::cout << "KTX2 test file not found at: " << ktx2Path << std::endl;
+            EXPECT_TRUE(false) << "KTX2 test file not found at: " << ktx2Path;
         }
     }
     

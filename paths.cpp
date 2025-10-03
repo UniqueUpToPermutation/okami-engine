@@ -21,7 +21,9 @@ std::optional<std::filesystem::path> g_webgpuShadersPath = std::nullopt;
 std::optional<std::filesystem::path> g_testAssetsPath = std::nullopt;
 std::optional<std::filesystem::path> g_configsPath = std::nullopt;
 
-static std::filesystem::path SearchForPath(const std::filesystem::path& startPath, const std::string& targetDir) {
+static std::filesystem::path SearchForPath(
+    const std::filesystem::path& startPath, 
+    const std::filesystem::path& targetDir) {
     // Check current directory for "assets"
     std::filesystem::path currentDir = GetExecutablePath().parent_path();
     std::filesystem::path assetsDir = currentDir / targetDir;
