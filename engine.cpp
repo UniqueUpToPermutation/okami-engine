@@ -55,7 +55,7 @@ entity_t Engine::CreateEntity(entity_t parent) {
 }
 
 void Engine::RemoveEntity(entity_t entity) {
-	m_moduleInterface.m_messages.SendMessage(EntityRemoveSignal{entity});
+	m_moduleInterface.m_messages.Send(EntityRemoveSignal{entity});
 }
 
 void Engine::SetActiveCamera(entity_t e) {
@@ -138,8 +138,8 @@ struct FrameTimeEstimator {
 		auto lastFrameTime = std::chrono::duration<double>(m_lastFrameTime - m_startTime).count();
 		return Time{
 			.m_deltaTime = m_nextDelta,
-			.m_lastFrameTime = lastFrameTime,
 			.m_nextFrameTime = lastFrameTime + m_nextDelta,
+			.m_lastFrameTime = lastFrameTime,
 			.m_nextFrame = m_nextFrame
 		};
 	}

@@ -25,7 +25,7 @@ namespace okami {
         Error ProcessFrameImpl(Time const&, ModuleInterface& mi) override {
             while (auto msg = m_load_queue->GetMessage()) {
                 auto result = LoadResource(std::move(*msg));
-                mi.m_messages.SendMessage(std::move(result));
+                mi.m_messages.Send(std::move(result));
             }
 
             return {};

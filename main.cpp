@@ -8,7 +8,6 @@
 #include "module.hpp"
 #include "engine.hpp"
 
-#include "bgfx/bgfx_renderer.hpp"
 #include "glfw/glfw_module.hpp"
 
 #include "renderer.hpp"
@@ -22,7 +21,7 @@ int main() {
 
     // Register renderer based on compile-time options
     en.CreateRenderModule<GLFWModuleFactory>();
-    en.CreateRenderModule<BgfxRendererFactory>();
+    //en.CreateRenderModule<BgfxRendererFactory>();
 
     Error err = en.Startup();
 
@@ -38,11 +37,11 @@ int main() {
     en.SetActiveCamera(e3);
 
     en.AddScript([e2](Time const& t, ModuleInterface& mi) {
-        static float angle = 0.0f;
+        static double angle = 0.0f;
         angle += t.m_deltaTime;
 
-        mi.m_messages.SendMessage(UpdateComponentSignal<Transform>{
-            e2, Transform::RotateZ(angle)
+        mi.m_messages.Send(UpdateComponentSignal<Transform>{
+            e2, Transform::RotateZ(static_cast<float>(angle))
         });
     });
 

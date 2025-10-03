@@ -3,11 +3,15 @@
 #include <fstream>
 
 #include <glog/logging.h>
+
+#ifdef USE_KTX
 #include <ktx.h>
+#endif
 
 #include "texture.hpp"
 #include "lodepng.h"
 
+#ifdef USE_KTX
 // Vulkan format constants (from vulkan_core.h)
 // These values are part of the Vulkan specification and are stable
 namespace VkFormat {
@@ -22,9 +26,11 @@ namespace VkFormat {
     constexpr ktx_uint32_t VK_FORMAT_R32G32B32_SFLOAT = 106;
     constexpr ktx_uint32_t VK_FORMAT_R32G32B32A32_SFLOAT = 109;
 }
+#endif
 
 namespace okami {
 
+#ifdef USE_KTX
 // Helper function to convert TextureFormat to Vulkan format
 ktx_uint32_t TextureFormatToVkFormat(TextureFormat format) {
     switch (format) {
@@ -73,6 +79,7 @@ TextureFormat VkFormatToTextureFormat(ktx_uint32_t vkFormat) {
             return TextureFormat::RGBA8; // Default fallback
     }
 }
+#endif
 
 uint32_t GetChannelCount(TextureFormat format) {
     switch (format) {
@@ -190,6 +197,7 @@ Expected<Texture> Texture::FromPNG(const std::filesystem::path& path,
     return texture;
 }
 
+#ifdef USE_KTX
 Expected<Texture> Texture::FromKTX2(const std::filesystem::path& path,
     const TextureLoadParams& params) {
     // Check if file exists
@@ -278,6 +286,12 @@ Expected<Texture> Texture::FromKTX2(const std::filesystem::path& path,
     
     return texture;
 }
+#else
+Expected<Texture> Texture::FromKTX2(const std::filesystem::path& path,
+    const TextureLoadParams& params) {
+    return std::unexpected(Error("KTX2 support not compiled in"));
+}
+#endif
 
 Error Texture::SavePNG(const std::filesystem::path& path) const {
     // PNG only supports certain formats, so we need to convert
@@ -400,6 +414,7 @@ Error Texture::SavePNG(const std::filesystem::path& path) const {
     return {};
 }
 
+#ifdef USE_KTX
 Error Texture::SaveKTX2(const std::filesystem::path& path) const {
     // Only support certain texture types for KTX2 export
     ktx_uint32_t vkFormat = TextureFormatToVkFormat(m_desc.format);
@@ -459,5 +474,10 @@ Error Texture::SaveKTX2(const std::filesystem::path& path) const {
     
     return {};
 }
+#else
+Error Texture::SaveKTX2(const std::filesystem::path& path) const {
+    return Error("KTX2 support not compiled in");
+}
+#endif
 
 } // namespace okami

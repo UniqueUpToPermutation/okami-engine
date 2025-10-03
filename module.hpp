@@ -5,6 +5,7 @@
 #include <any>
 #include <queue>
 #include <mutex>
+#include <optional>
 
 #include "common.hpp"
 #include "log.hpp"
@@ -13,7 +14,7 @@ namespace okami {
     template <typename T>
     class IMessageSink {
     public:
-        virtual void SendMessage(T message) = 0;
+        virtual void Send(T message) = 0;
         virtual ~IMessageSink() = default;
     };
 
@@ -39,7 +40,7 @@ namespace okami {
             return std::nullopt;
         }
 
-        void SendMessage(T message) override {
+        void Send(T message) override {
             std::lock_guard<std::mutex> lock(m_mtx);
             m_messages.push(std::move(message));
         }
@@ -65,12 +66,12 @@ namespace okami {
         }
 
         template <typename T>
-        void SendMessage(T message) {
+        void Send(T message) {
             auto range = sinks.equal_range(typeid(T));
             for (auto it = range.first; it != range.second; ++it) {
                 auto sink = std::any_cast<std::shared_ptr<IMessageSink<T>>>(it->second);
                 if (sink) {
-                    sink->SendMessage(message);
+                    sink->Send(message);
                 } else {
 
                 }

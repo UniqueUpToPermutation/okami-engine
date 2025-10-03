@@ -354,7 +354,7 @@ public:
     }
 
     void RemoveEntity(entity_t entity) override {
-        m_removeQueue->SendMessage(EntityRemove{entity});
+        m_removeQueue->Send(EntityRemove{entity});
     }
 
     void SetParent(entity_t entity, entity_t parent = kRoot) override { 

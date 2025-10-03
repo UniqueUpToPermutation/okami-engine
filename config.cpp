@@ -256,7 +256,7 @@ protected:
         YAML::Node config;
         
         try {
-            config = YAML::LoadFile(GetConfigPath(DEFAULT_PATH));
+            config = YAML::LoadFile(GetConfigPath(DEFAULT_PATH).string());
 		}
 		catch (const YAML::Exception& e) {
 			return Error(std::string("Failed to load config: ") + e.what());

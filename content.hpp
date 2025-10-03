@@ -5,17 +5,13 @@
 
 #include <filesystem>
 
-// Hash specialization for std::filesystem::path
-namespace std {
-    template <>
-    struct hash<std::filesystem::path> {
+namespace okami {
+	struct PathHash {
         std::size_t operator()(const std::filesystem::path& p) const {
-            return std::hash<std::string>{}(p.string());
+            return std::hash<std::string>{}(std::filesystem::canonical(p).string());
         }
     };
-}
 
-namespace okami {
 	template <typename T>
 	concept ResourceType = requires {
 		typename T::Desc;
@@ -133,7 +129,7 @@ namespace okami {
 		// Maps a file path to a resource pointer
 		// Protected by a mutex because it may be accessed from multiple threads
         std::mutex m_path_mtx;
-        std::unordered_map<std::filesystem::path, Resource<T>*> m_path_to_res;
+        std::unordered_map<std::filesystem::path, Resource<T>*, PathHash> m_path_to_res;
 
 		// Maps a resource pointer to its implementation
 		// Only accessed from the main thread
@@ -255,12 +251,12 @@ namespace okami {
 			impl->m_resource.m_path = path.string();
 			auto res = ResHandle<T>(&impl->m_resource);
 
-			mi.m_messages.SendMessage(LoadResourceMessage<T>{
+			mi.m_messages.Send(LoadResourceMessage<T>{
 				.m_path = path,
 				.m_params = std::move(params),
 				.m_handle = res,
 			});
-			m_new_resources.SendMessage(std::move(impl));
+			m_new_resources.Send(std::move(impl));
 			
 			return res;
 		}
@@ -268,8 +264,8 @@ namespace okami {
         ResHandle<T> Create(T&& data) override {
 			auto impl = std::make_unique<ImplPair>();
 			auto res = ResHandle<T>(&impl->m_resource);
-			m_new_resources.SendMessage(std::move(impl));
-			m_loaded_queue->SendMessage(OnResourceLoadedMessage<T>{
+			m_new_resources.Send(std::move(impl));
+			m_loaded_queue->Send(OnResourceLoadedMessage<T>{
 				.m_data = std::move(data),
 				.m_handle = res,
 			});

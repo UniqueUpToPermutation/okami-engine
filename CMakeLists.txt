@@ -32,10 +32,6 @@ endif()
 option(USE_D3D12 "Enable D3D12 renderer and DirectX dependencies" ${DEFAULT_USE_D3D12})
 message(STATUS "USE_D3D12=${USE_D3D12}")
 
-# bgfx option - enables bgfx cross-platform renderer
-option(USE_BGFX "Enable bgfx cross-platform renderer" ON)
-message(STATUS "USE_BGFX=${USE_BGFX}")
-
 # Find packages via vcpkg
 find_package(glfw3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
@@ -43,12 +39,7 @@ find_package(glog CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(unofficial-concurrentqueue CONFIG REQUIRED)
-find_package(Ktx CONFIG REQUIRED)
-
-# bgfx is only needed when bgfx support is enabled
-if(USE_BGFX)
-    find_package(bgfx CONFIG REQUIRED)
-endif()
+# find_package(Ktx CONFIG REQUIRED)  # Temporarily disabled due to vcpkg build issues
 
 # DirectX / D3D12 related packages are only needed when USE_D3D12 is enabled.
 if(USE_D3D12)
@@ -151,160 +142,6 @@ set(SHADER_ENTRY_POINTS
 )
 
 #==============================================================================
-# bgfx Shader Compilation System
-#==============================================================================
-
-if(USE_BGFX)
-    # Find all bgfx shader files
-    file(GLOB_RECURSE BGFX_SHADER_FILES 
-        "${CMAKE_SOURCE_DIR}/bgfx/shaders/*.sc"
-    )
-
-    # Find shaderc executable once for all shaders
-    find_program(SHADERC_EXECUTABLE
-        NAMES shaderc shaderc.exe
-        PATHS
-            # vcpkg installed bgfx tools
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
-            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
-            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
-            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
-            # Common bgfx installation paths
-            "${CMAKE_SOURCE_DIR}/tools/bin"
-            "${CMAKE_SOURCE_DIR}/bgfx/tools/bin"
-            "${CMAKE_SOURCE_DIR}/../bgfx/tools/bin"
-            "${CMAKE_SOURCE_DIR}/third_party/bgfx/tools/bin"
-            # System paths
-            "/usr/local/bin"
-            "/opt/homebrew/bin"
-            # Environment variable paths
-            "$ENV{BGFX_DIR}/tools/bin"
-            "$ENV{BGFX_ROOT}/tools/bin"
-        DOC "bgfx Shader Compiler (shaderc)"
-    )
-    
-    if(NOT SHADERC_EXECUTABLE)
-        message(WARNING "shaderc not found. bgfx shaders will not be compiled.")
-        message(WARNING "To fix this:")
-        message(WARNING "  1. Install bgfx with tools: vcpkg install bgfx[tools]")
-        message(WARNING "  2. Or set BGFX_DIR environment variable to bgfx installation")
-        message(WARNING "  3. Or place shaderc executable in tools/bin/ directory")
-    else()
-        message(STATUS "Found shaderc: ${SHADERC_EXECUTABLE}")
-    endif()
-
-    # Function to compile bgfx shaders using shaderc
-    function(add_bgfx_shader TARGET_NAME SHADER_FILE SHADER_TYPE PLATFORM)
-        get_filename_component(SHADER_NAME ${SHADER_FILE} NAME_WE)
-        get_filename_component(SHADER_DIR ${SHADER_FILE} DIRECTORY)
-        
-        # Create output path
-        set(COMPILED_SHADER "${CMAKE_BINARY_DIR}/bgfx/shaders/${SHADER_NAME}_${PLATFORM}.bin")
-        
-        # Ensure output directory exists
-        get_filename_component(COMPILED_SHADER_DIR ${COMPILED_SHADER} DIRECTORY)
-        file(MAKE_DIRECTORY ${COMPILED_SHADER_DIR})
-        
-        # Find shaderc executable
-        find_program(SHADERC_EXECUTABLE
-            NAMES shaderc shaderc.exe
-            PATHS
-                # vcpkg installed bgfx tools
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
-                "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
-                "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
-                "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
-                # Common bgfx installation paths
-                "${CMAKE_SOURCE_DIR}/tools/bin"
-                "${CMAKE_SOURCE_DIR}/bgfx/tools/bin"
-                "${CMAKE_SOURCE_DIR}/../bgfx/tools/bin"
-                "${CMAKE_SOURCE_DIR}/third_party/bgfx/tools/bin"
-                # System paths
-                "/usr/local/bin"
-                "/opt/homebrew/bin"
-                # Environment variable paths
-                "$ENV{BGFX_DIR}/tools/bin"
-                "$ENV{BGFX_ROOT}/tools/bin"
-            DOC "bgfx Shader Compiler (shaderc)"
-        )
-        
-        if(NOT SHADERC_EXECUTABLE)
-            message(WARNING "shaderc not found. bgfx shaders will not be compiled.")
-            message(WARNING "To fix this:")
-            message(WARNING "  1. Install bgfx with tools: vcpkg install bgfx[tools]")
-            message(WARNING "  2. Or set BGFX_DIR environment variable to bgfx installation")
-            message(WARNING "  3. Or place shaderc executable in tools/bin/ directory")
-            return()
-        else()
-            message(STATUS "Found shaderc: ${SHADERC_EXECUTABLE}")
-        endif()
-        
-        # Determine profile based on platform and shader type
-        if(PLATFORM STREQUAL "dx11")
-            if(SHADER_TYPE STREQUAL "v")
-                set(PROFILE "vs_5_0")
-            elseif(SHADER_TYPE STREQUAL "f")
-                set(PROFILE "ps_5_0")
-            endif()
-        elseif(PLATFORM STREQUAL "metal")
-            set(PROFILE "metal")
-        elseif(PLATFORM STREQUAL "spirv")
-            if(SHADER_TYPE STREQUAL "v")
-                set(PROFILE "spirv")
-            elseif(SHADER_TYPE STREQUAL "f")
-                set(PROFILE "spirv")
-            endif()
-        else() # OpenGL
-            if(SHADER_TYPE STREQUAL "v")
-                set(PROFILE "120")
-            elseif(SHADER_TYPE STREQUAL "f")
-                set(PROFILE "120")
-            endif()
-        endif()
-        
-        # Add custom command to compile the shader
-        add_custom_command(
-            OUTPUT ${COMPILED_SHADER}
-            COMMAND ${SHADERC_EXECUTABLE}
-                -f ${SHADER_FILE}
-                -o ${COMPILED_SHADER}
-                --type ${SHADER_TYPE}
-                --platform ${PLATFORM}
-                --profile ${PROFILE}
-                -i "${CMAKE_SOURCE_DIR}/bgfx/shaders"
-                -i "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/include/bgfx"
-            DEPENDS ${SHADER_FILE}
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-            COMMENT "Compiling bgfx shader: ${SHADER_NAME} (${SHADER_TYPE}/${PLATFORM})"
-            VERBATIM
-        )
-        
-        # Mark shader as generated file (don't add to target sources since we use custom target)
-        set_source_files_properties(${COMPILED_SHADER} PROPERTIES GENERATED TRUE)
-    endfunction()
-
-    # Detect platforms to compile for
-    set(BGFX_PLATFORMS "")
-    if(WIN32)
-        list(APPEND BGFX_PLATFORMS "dx11")
-    endif()
-    if(APPLE)
-        list(APPEND BGFX_PLATFORMS "metal")
-    endif()
-    if(UNIX AND NOT APPLE)
-        list(APPEND BGFX_PLATFORMS "linux")
-    endif()
-    # Always add OpenGL as fallback
-    list(APPEND BGFX_PLATFORMS "opengl")
-
-    set(ALL_BGFX_COMPILED_SHADERS "")
-endif() # USE_BGFX
-
-#==============================================================================
 # Main Engine Executable
 #==============================================================================
 
@@ -379,93 +216,6 @@ if(ALL_COMPILED_SHADERS)
 endif()
 
 endif() # USE_D3D12
-
-# Process bgfx shader files and compile them
-if(USE_BGFX AND BGFX_SHADER_FILES)
-    # Ensure bgfx shader output directory exists
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bgfx/shaders)
-    
-    set(ALL_BGFX_COMPILED_SHADERS "")
-    set(BGFX_SHADER_COUNT 0)
-    
-    # Process each shader file and create compilation commands
-    foreach(BGFX_SHADER_FILE ${BGFX_SHADER_FILES})
-        get_filename_component(SHADER_NAME ${BGFX_SHADER_FILE} NAME_WE)
-        
-        message(STATUS "Processing bgfx shader file: ${BGFX_SHADER_FILE}")
-        
-        # Determine shader type from filename
-        set(SHADER_TYPE "")
-        if("${SHADER_NAME}" MATCHES "_vs$" OR "${SHADER_NAME}" MATCHES "vertex")
-            set(SHADER_TYPE "v")
-        elseif("${SHADER_NAME}" MATCHES "_fs$" OR "${SHADER_NAME}" MATCHES "fragment")
-            set(SHADER_TYPE "f")
-        elseif("${SHADER_NAME}" MATCHES "_cs$" OR "${SHADER_NAME}" MATCHES "compute")
-            set(SHADER_TYPE "c")
-        elseif("${SHADER_NAME}" MATCHES "\\.def$")
-            # Skip varying definition files
-            continue()
-        endif()
-        
-        if(NOT SHADER_TYPE STREQUAL "")
-            # Compile for each target platform
-            foreach(PLATFORM ${BGFX_PLATFORMS})
-                set(COMPILED_SHADER_PATH "${CMAKE_BINARY_DIR}/bgfx/shaders/${SHADER_NAME}_${PLATFORM}.bin")
-                list(APPEND ALL_BGFX_COMPILED_SHADERS ${COMPILED_SHADER_PATH})
-                math(EXPR BGFX_SHADER_COUNT "${BGFX_SHADER_COUNT} + 1")
-                message(STATUS "  Will compile ${SHADER_NAME} as ${SHADER_TYPE} for ${PLATFORM}")
-                
-                # Determine profile for platform
-                if(PLATFORM STREQUAL "dx11")
-                    if(SHADER_TYPE STREQUAL "v")
-                        set(PROFILE "vs_5_0")
-                    elseif(SHADER_TYPE STREQUAL "f")
-                        set(PROFILE "ps_5_0")
-                    endif()
-                elseif(PLATFORM STREQUAL "metal")
-                    set(PROFILE "metal")
-                elseif(PLATFORM STREQUAL "spirv")
-                    set(PROFILE "spirv")
-                else() # OpenGL
-                    if(SHADER_TYPE STREQUAL "v")
-                        set(PROFILE "120")
-                    elseif(SHADER_TYPE STREQUAL "f")
-                        set(PROFILE "120")
-                    endif()
-                endif()
-                
-                # Add custom command to compile this specific shader
-                add_custom_command(
-                    OUTPUT ${COMPILED_SHADER_PATH}
-                    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bgfx/shaders"
-                    COMMAND ${SHADERC_EXECUTABLE}
-                        -f ${BGFX_SHADER_FILE}
-                        -o ${COMPILED_SHADER_PATH}
-                        --type ${SHADER_TYPE}
-                        --platform ${PLATFORM}
-                        --profile ${PROFILE}
-                        -i "${CMAKE_SOURCE_DIR}/bgfx/shaders"
-                        -i "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/include/bgfx"
-                    DEPENDS ${BGFX_SHADER_FILE}
-                    COMMENT "Compiling bgfx shader: ${SHADER_NAME} (${SHADER_TYPE}/${PLATFORM})"
-                    VERBATIM
-                )
-            endforeach()
-        endif()
-    endforeach()
-    
-    # Create a custom target that depends on all compiled shaders
-    if(ALL_BGFX_COMPILED_SHADERS)
-        add_custom_target(CompileBgfxShaders ALL
-            DEPENDS ${ALL_BGFX_COMPILED_SHADERS}
-            COMMENT "Compiling all bgfx shaders"
-        )
-        
-        add_dependencies(Engine CompileBgfxShaders)
-        message(STATUS "Created CompileBgfxShaders target with ${BGFX_SHADER_COUNT} shaders")
-        message(STATUS "Compiled bgfx shaders will be available in: ${CMAKE_BINARY_DIR}/bgfx/shaders/")
-    endif()
-endif() # USE_BGFX
 
 #==============================================================================
 # KTX Image Compilation System
@@ -573,8 +323,7 @@ target_link_libraries(Engine PRIVATE EngineLib)
 # Create a library with engine sources (excluding main.cpp)
 file(GLOB ENGINE_LIB_SOURCES CONFIGURE_DEPENDS 
     "*.cpp" "*.hpp" 
-    "d3d12/*.cpp" "d3d12/*.hpp" 
-    "bgfx/*.cpp" "bgfx/*.hpp" "bgfx/*.mm"
+    "d3d12/*.cpp" "d3d12/*.hpp"
     "gles/*.cpp" "gles/*.hpp" 
     "glfw/*.cpp" "glfw/*.hpp"
 )
@@ -617,7 +366,7 @@ target_link_libraries(EngineLib PUBLIC
         imgui::imgui
         glog::glog
         yaml-cpp::yaml-cpp
-        KTX::ktx
+        # KTX::ktx  # Temporarily disabled due to vcpkg build issues
 )
 
 # Add KTX library
@@ -627,13 +376,6 @@ if(KTX_LIBRARY)
     target_include_directories(EngineLib PUBLIC ${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/include)
 else()
     message(WARNING "KTX library not found")
-endif()
-
-# Link bgfx libraries when bgfx support is enabled
-if(USE_BGFX)
-    target_link_libraries(EngineLib PUBLIC
-        bgfx::bgfx
-    )
 endif()
 
 if(WIN32)
@@ -651,14 +393,10 @@ endif()
 # Set include directories for the library
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR})
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/d3d12)
-target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/bgfx)
 target_include_directories(EngineLib PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 target_compile_definitions(EngineLib PRIVATE NOMINMAX)
 if(USE_D3D12)
     target_compile_definitions(EngineLib PUBLIC USE_D3D12=1)
-endif()
-if(USE_BGFX)
-    target_compile_definitions(EngineLib PUBLIC USE_BGFX=1)
 endif()
 
 # Silence OpenGL deprecation warnings on macOS
@@ -728,24 +466,12 @@ add_custom_command(
 if(USE_D3D12 AND ALL_COMPILED_SHADERS)
     add_custom_command(
         TARGET Engine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Engine>/shaders
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Engine>/d3d12/shaders
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_BINARY_DIR}/shaders
-            $<TARGET_FILE_DIR:Engine>/shaders
+            ${CMAKE_BINARY_DIR}/d3d12/shaders
+            $<TARGET_FILE_DIR:Engine>/d3d12/shaders
         COMMENT "Copying compiled shaders to output directory"
         DEPENDS CompileShaders
-    )
-endif()
-
-# Copy bgfx compiled shader files to output directory when bgfx is enabled
-if(USE_BGFX AND ALL_BGFX_COMPILED_SHADERS)
-    add_custom_command(
-        TARGET Engine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Engine>/bgfx/shaders
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_BINARY_DIR}/bgfx/shaders
-            $<TARGET_FILE_DIR:Engine>/bgfx/shaders
-        COMMENT "Copying compiled bgfx shader files to output directory"
     )
 endif()
 
@@ -810,18 +536,6 @@ add_custom_command(
         $<TARGET_FILE_DIR:EngineTests>/config/
     COMMENT "Copying config files to test output directory if newer"
 )
-
-# Copy bgfx compiled shader files for tests as well when bgfx is enabled
-if(USE_BGFX AND ALL_BGFX_COMPILED_SHADERS)
-    add_custom_command(
-        TARGET EngineTests POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/bgfx/shaders
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_BINARY_DIR}/bgfx/shaders
-            $<TARGET_FILE_DIR:EngineTests>/bgfx/shaders
-        COMMENT "Copying compiled bgfx shader files to test output directory"
-    )
-endif()
 
 # Copy compiled KTX textures for tests as well
 if(ALL_KTX_TEXTURES)

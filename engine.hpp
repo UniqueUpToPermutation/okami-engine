@@ -48,7 +48,7 @@ namespace okami {
 
         template <typename T>
         void AddComponent(entity_t entity, T component) {
-            m_moduleInterface.m_messages.SendMessage(AddComponentSignal<T>{entity, std::move(component)});
+            m_moduleInterface.m_messages.Send(AddComponentSignal<T>{entity, std::move(component)});
         }
 
         template <typename FactoryT, typename... TArgs>

@@ -96,7 +96,7 @@ protected:
         glfwPollEvents();
 
         if (glfwWindowShouldClose(m_window)) {
-            mi.m_messages.SendMessage(SignalExit{});
+            mi.m_messages.Send(SignalExit{});
         }
 
         return {};
