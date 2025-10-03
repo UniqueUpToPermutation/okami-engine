@@ -37,6 +37,10 @@ int main() {
     en.AddComponent(e3, Transform::Translate(0.5f, 0.0f, 0.0f));
     en.SetActiveCamera(e3);
 
+    auto e4 = en.CreateEntity();
+    en.AddComponent(e4, DummyTriangleComponent{});
+    en.AddComponent(e4, Transform::Translate(0.5f, 0.5f, 0.0f));
+
     en.AddScript([e2](Time const& t, ModuleInterface& mi) {
         static double angle = 0.0f;
         angle += t.m_deltaTime;

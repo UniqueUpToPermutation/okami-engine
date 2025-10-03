@@ -32,7 +32,7 @@ Error WebgpuTriangleModule::StartupImpl(ModuleInterface& mi) {
     bindGroupLayoutDesc.entryCount = 1;
     bindGroupLayoutDesc.entries = &bindGroupLayoutEntry;
     
-    m_transformBindGroupLayout = wgpuDeviceCreateBindGroupLayout(device, &bindGroupLayoutDesc);
+    m_transformBindGroupLayout = WgpuAutoPtr(wgpuDeviceCreateBindGroupLayout(device, &bindGroupLayoutDesc));
     
     // Create the transform uniform buffer - large enough for multiple triangles
     uint32_t transformBufferSize = TRANSFORM_ALIGNMENT * MAX_TRIANGLES;
@@ -40,20 +40,20 @@ Error WebgpuTriangleModule::StartupImpl(ModuleInterface& mi) {
     bufferDesc.size = transformBufferSize;
     bufferDesc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
     
-    m_transformBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+    m_transformBuffer = WgpuAutoPtr(wgpuDeviceCreateBuffer(device, &bufferDesc));
     
     // Create the bind group for dynamic offsets
     WGPUBindGroupEntry bindGroupEntry = {};
     bindGroupEntry.binding = 0;
-    bindGroupEntry.buffer = m_transformBuffer;
+    bindGroupEntry.buffer = m_transformBuffer.get();
     bindGroupEntry.size = sizeof(glm::mat4); // Size of a single transform
     
     WGPUBindGroupDescriptor bindGroupDesc = {};
-    bindGroupDesc.layout = m_transformBindGroupLayout;
+    bindGroupDesc.layout = m_transformBindGroupLayout.get();
     bindGroupDesc.entryCount = 1;
     bindGroupDesc.entries = &bindGroupEntry;
-    
-    m_transformBindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
+
+    m_transformBindGroup = WgpuAutoPtr(wgpuDeviceCreateBindGroup(device, &bindGroupDesc));
 
     // Load shader from file
     std::string shaderSource = LoadShaderFile("triangle.wgsl");
@@ -69,7 +69,7 @@ Error WebgpuTriangleModule::StartupImpl(ModuleInterface& mi) {
     WGPUShaderModuleDescriptor shaderDesc = {};
     shaderDesc.nextInChain = &wgslDesc.chain;
     
-    WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(device, &shaderDesc);
+    WShaderModule shaderModule = WgpuAutoPtr(wgpuDeviceCreateShaderModule(device, &shaderDesc));
     
     // Create render pipeline
     WGPUColorTargetState colorTarget = {};
@@ -77,7 +77,7 @@ Error WebgpuTriangleModule::StartupImpl(ModuleInterface& mi) {
     colorTarget.writeMask = WGPUColorWriteMask_All;
     
     WGPUFragmentState fragmentState = {};
-    fragmentState.module = shaderModule;
+    fragmentState.module = shaderModule.get();
     fragmentState.entryPoint = "fs_main";
     fragmentState.targetCount = 1;
     fragmentState.targets = &colorTarget;
@@ -106,25 +106,21 @@ Error WebgpuTriangleModule::StartupImpl(ModuleInterface& mi) {
     // Create pipeline layout with the transform bind group layout
     WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
     pipelineLayoutDesc.bindGroupLayoutCount = 1;
-    pipelineLayoutDesc.bindGroupLayouts = &m_transformBindGroupLayout;
-    
-    WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
-    
+    pipelineLayoutDesc.bindGroupLayouts = m_transformBindGroupLayout.getPtr();
+
+    WPipelineLayout pipelineLayout = WgpuAutoPtr(wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc));
+
     WGPURenderPipelineDescriptor pipelineDesc = {};
-    pipelineDesc.layout = pipelineLayout;
-    pipelineDesc.vertex.module = shaderModule;
+    pipelineDesc.layout = pipelineLayout.get();
+    pipelineDesc.vertex.module = shaderModule.get();
     pipelineDesc.vertex.entryPoint = "vs_main";
     pipelineDesc.fragment = &fragmentState;
     pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
     pipelineDesc.multisample = multisampleState;
     pipelineDesc.depthStencil = &depthStencilState;
-    
-    m_pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
-    
-    // Clean up pipeline layout and shader module
-    wgpuPipelineLayoutRelease(pipelineLayout);
-    wgpuShaderModuleRelease(shaderModule);
-    
+
+    m_pipeline = WgpuAutoPtr(wgpuDeviceCreateRenderPipeline(device, &pipelineDesc));
+
     if (!m_pipeline) {
         return Error("Failed to create WebGPU triangle render pipeline");
     }
@@ -135,25 +131,10 @@ Error WebgpuTriangleModule::StartupImpl(ModuleInterface& mi) {
 }
 
 void WebgpuTriangleModule::ShutdownImpl(ModuleInterface&) {
-    if (m_transformBindGroup) {
-        wgpuBindGroupRelease(m_transformBindGroup);
-        m_transformBindGroup = nullptr;
-    }
-    
-    if (m_transformBuffer) {
-        wgpuBufferRelease(m_transformBuffer);
-        m_transformBuffer = nullptr;
-    }
-    
-    if (m_transformBindGroupLayout) {
-        wgpuBindGroupLayoutRelease(m_transformBindGroupLayout);
-        m_transformBindGroupLayout = nullptr;
-    }
-    
-    if (m_pipeline) {
-        wgpuRenderPipelineRelease(m_pipeline);
-        m_pipeline = nullptr;
-    }
+    m_transformBindGroup.reset();
+    m_transformBuffer.reset();
+    m_transformBindGroupLayout.reset();
+    m_pipeline.reset();
 }
 
 Error WebgpuTriangleModule::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
@@ -199,18 +180,18 @@ Error WebgpuTriangleModule::Pass(Time const& time, ModuleInterface& mi, WgpuRend
         // Upload all transforms to the buffer in one go
         for (size_t i = 0; i < triangleTransforms.size() && i < MAX_TRIANGLES; ++i) {
             uint32_t offset = static_cast<uint32_t>(i * TRANSFORM_ALIGNMENT);
-            wgpuQueueWriteBuffer(info.m_queue, m_transformBuffer, offset, &triangleTransforms[i].second, sizeof(glm::mat4));
+            wgpuQueueWriteBuffer(info.m_queue, m_transformBuffer.get(), offset, &triangleTransforms[i].second, sizeof(glm::mat4));
         }
         
         // Set pipeline once
-        wgpuRenderPassEncoderSetPipeline(renderPass, m_pipeline);
+        wgpuRenderPassEncoderSetPipeline(renderPass, m_pipeline.get());
         
         // Render each triangle with its dynamic offset
         for (size_t i = 0; i < triangleTransforms.size() && i < MAX_TRIANGLES; ++i) {
             uint32_t dynamicOffset = static_cast<uint32_t>(i * TRANSFORM_ALIGNMENT);
             
             // Bind the group with dynamic offset for this triangle
-            wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_transformBindGroup, 1, &dynamicOffset);
+            wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_transformBindGroup.get(), 1, &dynamicOffset);
             
             // Draw the triangle
             wgpuRenderPassEncoderDraw(renderPass, 3, 1, 0, 0);

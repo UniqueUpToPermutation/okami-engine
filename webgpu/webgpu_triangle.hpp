@@ -13,13 +13,13 @@ namespace okami {
         public EngineModule,
         public IWgpuRenderModule {
     private:
-        WGPURenderPipeline m_pipeline = nullptr;
+        WRenderPipeline m_pipeline;
         StorageModule<DummyTriangleComponent>* m_storage = nullptr;
         
         // Transform uniform buffer resources
-        WGPUBuffer m_transformBuffer = nullptr;
-        WGPUBindGroup m_transformBindGroup = nullptr;
-        WGPUBindGroupLayout m_transformBindGroupLayout = nullptr;
+        WBuffer m_transformBuffer;
+        WBindGroup m_transformBindGroup;
+        WBindGroupLayout m_transformBindGroupLayout;
         
         // Constants for dynamic buffer management
         static constexpr uint32_t MAX_TRIANGLES = 256;
