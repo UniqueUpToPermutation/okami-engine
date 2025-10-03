@@ -360,6 +360,15 @@ endif() # USE_BGFX
 # Engine executable only contains main.cpp and links to EngineLib
 add_executable(Engine main.cpp)
 
+#==============================================================================
+# PNG to KTX2 Converter Tool
+#==============================================================================
+
+# Standalone tool to convert PNG images to KTX2 format with mipmaps
+add_executable(png2ktx png2ktx.cpp lodepng.cpp)
+target_link_libraries(png2ktx PRIVATE KTX::ktx)
+target_include_directories(png2ktx PRIVATE ${CMAKE_SOURCE_DIR})
+
 if(USE_D3D12)
 
 # Process all HLSL files and compile shaders
@@ -503,39 +512,24 @@ file(GLOB_RECURSE IMAGE_FILES
 )
 
 if(IMAGE_FILES)
-    # Find toktx executable from KTX tools
-    find_program(TOKTX_EXECUTABLE
-        NAMES toktx toktx.exe
-        PATHS
-            # vcpkg installed ktx tools
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/tools/ktx"
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/ktx"
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/ktx"
-            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-osx/tools/ktx"
-            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-linux/tools/ktx"
-            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-windows/tools/ktx"
-            # System paths
-            /usr/local/bin
-            /usr/bin
-            /opt/homebrew/bin
-        NO_DEFAULT_PATH
-    )
-
-    if(TOKTX_EXECUTABLE)
-        message(STATUS "Found toktx: ${TOKTX_EXECUTABLE}")
+    # Use our custom png2ktx tool to convert PNG images to KTX2 with mipmaps
+    message(STATUS "Using png2ktx tool for texture conversion")
+    
+    # Ensure KTX output directory exists
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/assets)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/assets)
+    
+    set(ALL_KTX_TEXTURES "")
+    set(KTX_TEXTURE_COUNT 0)
+    
+    # Process each PNG image file and create KTX2 compilation commands
+    foreach(IMAGE_FILE ${IMAGE_FILES})
+        get_filename_component(IMAGE_NAME ${IMAGE_FILE} NAME_WE)
+        get_filename_component(IMAGE_EXT ${IMAGE_FILE} EXT)
+        get_filename_component(IMAGE_DIR ${IMAGE_FILE} DIRECTORY)
         
-        # Ensure KTX output directory exists
-        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/assets)
-        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/assets)
-        
-        set(ALL_KTX_TEXTURES "")
-        set(KTX_TEXTURE_COUNT 0)
-        
-        # Process each image file and create KTX compilation commands
-        foreach(IMAGE_FILE ${IMAGE_FILES})
-            get_filename_component(IMAGE_NAME ${IMAGE_FILE} NAME_WE)
-            get_filename_component(IMAGE_DIR ${IMAGE_FILE} DIRECTORY)
-            
+        # Only process PNG files with png2ktx (it only supports PNG)
+        if(IMAGE_EXT STREQUAL ".png")
             # Determine output path relative to source
             file(RELATIVE_PATH REL_DIR ${CMAKE_SOURCE_DIR} ${IMAGE_DIR})
             set(KTX_OUTPUT_DIR "${CMAKE_BINARY_DIR}/${REL_DIR}")
@@ -544,39 +538,31 @@ if(IMAGE_FILES)
             list(APPEND ALL_KTX_TEXTURES ${KTX_OUTPUT_PATH})
             math(EXPR KTX_TEXTURE_COUNT "${KTX_TEXTURE_COUNT} + 1")
             
-            message(STATUS "Will compile ${IMAGE_NAME} to KTX2")
+            message(STATUS "Will convert ${IMAGE_NAME}.png to KTX2 with mipmaps")
             
-            # Add custom command to compile this specific image to KTX2
+            # Add custom command to convert this PNG to KTX2 with mipmaps
             add_custom_command(
                 OUTPUT ${KTX_OUTPUT_PATH}
                 COMMAND ${CMAKE_COMMAND} -E make_directory "${KTX_OUTPUT_DIR}"
-                COMMAND ${TOKTX_EXECUTABLE}
-                    --t2
-                    --genmipmap
-                    --encode uastc
-                    --uastc_quality 2
-                    ${KTX_OUTPUT_PATH}
-                    ${IMAGE_FILE}
-                DEPENDS ${IMAGE_FILE}
-                COMMENT "Compiling image to KTX2: ${IMAGE_NAME}"
+                COMMAND png2ktx ${IMAGE_FILE} ${KTX_OUTPUT_PATH} --quiet
+                DEPENDS png2ktx ${IMAGE_FILE}
+                COMMENT "Converting PNG to KTX2 with mipmaps: ${IMAGE_NAME}"
                 VERBATIM
             )
-        endforeach()
-        
-        # Create a custom target that depends on all compiled textures
-        if(ALL_KTX_TEXTURES)
-            add_custom_target(CompileKTXTextures ALL
-                DEPENDS ${ALL_KTX_TEXTURES}
-                COMMENT "Compiling all images to KTX2"
-            )
-            
-            add_dependencies(Engine CompileKTXTextures)
-            message(STATUS "Created CompileKTXTextures target with ${KTX_TEXTURE_COUNT} textures")
-            message(STATUS "Compiled KTX textures will be available in: ${CMAKE_BINARY_DIR}/assets/")
         endif()
-    else()
-        message(WARNING "toktx executable not found. Image compilation to KTX will be skipped.")
-        message(STATUS "Make sure KTX tools are installed via vcpkg or system package manager.")
+    endforeach()
+    
+    # Create a custom target that depends on all compiled textures
+    if(ALL_KTX_TEXTURES)
+        add_custom_target(CompileKTXTextures ALL
+            DEPENDS ${ALL_KTX_TEXTURES}
+            COMMENT "Converting all PNG images to KTX2 format"
+        )
+        
+        add_dependencies(Engine CompileKTXTextures)
+        message(STATUS "Created CompileKTXTextures target with ${KTX_TEXTURE_COUNT} PNG textures")
+        message(STATUS "Converted KTX2 textures will be available in: ${CMAKE_BINARY_DIR}/assets/")
+        message(STATUS "Note: png2ktx generates uncompressed RGBA8 textures with full mipmap chains")
     endif()
 endif()
 
