@@ -641,6 +641,16 @@ else()
 endif()
 
 if(WIN32)
+    # Add Windows system libraries required by wgpu-native
+    target_link_libraries(EngineLib PUBLIC
+        d3dcompiler
+        ws2_32
+        userenv
+        ntdll
+        bcrypt
+        opengl32
+    )
+    
     if(USE_D3D12)
         target_link_libraries(EngineLib PUBLIC
             Microsoft::DirectXTK12

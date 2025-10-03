@@ -8,7 +8,6 @@
 #include "module.hpp"
 #include "engine.hpp"
 
-#include "bgfx/bgfx_renderer.hpp"
 #include "webgpu/webgpu_renderer.hpp"
 #include "glfw/glfw_module.hpp"
 
