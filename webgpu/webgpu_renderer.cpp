@@ -1,8 +1,7 @@
-
-
 #include "webgpu_utils.hpp"
 #include "webgpu_renderer.hpp"
 #include "webgpu_triangle.hpp"
+#include "webgpu_texture.hpp"
 
 #include "../config.hpp"
 #include "../renderer.hpp"
@@ -72,7 +71,9 @@ protected:
     
     WebgpuTriangleModule* m_triangleModule = nullptr;
     StorageModule<Camera>* m_cameraModule = nullptr;
-    
+
+    WebGpuTextureModule* m_textureModule = nullptr;
+
 #ifdef __APPLE__
     void* m_metalLayer = nullptr;
 #endif
@@ -586,7 +587,7 @@ protected:
         // Only present if we have a surface (windowed mode)
         if (m_surface) {
             wgpuSurfacePresent(m_surface.get());
-        } else if (m_params.m_headlessMode) {
+        } else if (m_params.m_headlessMode && m_params.m_headlessRenderToFile) {
             // Capture headless render to PNG
             auto captureResult = CaptureHeadlessFrame();
             if (captureResult.IsError()) {
@@ -718,6 +719,13 @@ private:
                 ReconfigureSurface();
             }
         }
+
+        // Upload textures if any new ones were added
+        WebGpuTextureModuleUserData textureUserData{
+            .m_device = m_device.get(),
+            .m_queue = m_queue.get()
+        };
+        m_textureModule->ProcessNewResources(textureUserData);
         
         // Render frame
         RenderFrame(a);
@@ -749,11 +757,9 @@ public:
     WebgpuRendererModule(RendererParams const& params) : m_params(params) {
         SetChildrenProcessFrame(false); // Manually process child modules
         
-        // Create triangle module
         m_triangleModule = CreateChild<WebgpuTriangleModule>();
-        
-        // Create camera module
         m_cameraModule = CreateChild<StorageModule<Camera>>();
+        m_textureModule = CreateChild<WebGpuTextureModule>();
     }
 };
 

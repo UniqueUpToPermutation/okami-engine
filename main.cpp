@@ -20,9 +20,13 @@ using namespace okami;
 int main() {
     Engine en;
 
+    RendererParams params;
+    params.m_headlessMode = true;
+    params.m_headlessRenderToFile = true;
+
     // Register renderer based on compile-time options
-    en.CreateRenderModule<GLFWModuleFactory>();
-    en.CreateRenderModule<WebgpuRendererFactory>();
+    //en.CreateRenderModule<GLFWModuleFactory>();
+    en.CreateRenderModule<WebgpuRendererFactory>({}, params);
 
     Error err = en.Startup();
 
@@ -55,6 +59,6 @@ int main() {
         return 1;
     }
 
-    en.Run();
+    en.Run(1);
     en.Shutdown();
 }

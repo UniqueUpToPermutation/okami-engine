@@ -171,3 +171,33 @@ TEST_F(HeadlessRendererTest, WebGPUTriangleRenderingInHeadlessMode) {
     CompareWithGoldenImage("renders/webgpu_triangle_rendering_in_headless_mode.png", 
                           "webgpu_triangle_rendering_in_headless_mode.png");
 }
+
+TEST_F(HeadlessRendererTest, CreateTexture) {
+    // Create engine
+    Engine engine;
+
+    RendererParams params;
+    params.m_headlessMode = true; // Enable headless mode for testing
+    params.m_headlessRenderToFile = false;
+    
+    // Add modules using factory methods
+    engine.CreateRenderModule<WebgpuRendererFactory>(WebgpuRendererFactory{}, params);
+
+    // Initialize the engine
+    auto initResult = engine.Startup();
+    ASSERT_TRUE(initResult.IsOk()) << "Failed to startup engine: " << initResult;
+
+    auto handle = engine.LoadResource<Texture>(GetTestAssetPath("test.ktx2"));
+
+    engine.AddScript([handle](Time const& t, ModuleInterface& mi) {
+       if (handle.IsLoaded()) {
+           mi.m_messages.Send(SignalExit{});
+       }
+    });
+
+    engine.Run(1000);
+
+    ASSERT_TRUE(handle.IsLoaded()) << "Texture failed to load: " << handle.GetPath();
+    ASSERT_EQ(handle->width, 128);
+    ASSERT_EQ(handle->height, 128);
+}

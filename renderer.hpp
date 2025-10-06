@@ -131,6 +131,7 @@ namespace okami {
 
 	struct RendererParams {
 		bool m_headlessMode = false;
+		bool m_headlessRenderToFile = true;
 		std::string m_headlessOutputFileStem = "output";
 		std::string m_headlessRenderOutputDir = "renders"; 
 	};
