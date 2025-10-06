@@ -14,6 +14,7 @@
 #include "renderer.hpp"
 #include "transform.hpp"
 #include "texture.hpp"
+#include "paths.hpp"
 
 using namespace okami;
 
@@ -21,8 +22,6 @@ int main() {
     Engine en;
 
     RendererParams params;
-    params.m_headlessMode = true;
-    params.m_headlessRenderToFile = true;
 
     // Register renderer based on compile-time options
     //en.CreateRenderModule<GLFWModuleFactory>();
@@ -30,7 +29,7 @@ int main() {
 
     Error err = en.Startup();
 
-    // auto textureHandle = en.LoadResource<Texture>("test.ktx2");
+    auto textureHandle = en.LoadResource<Texture>(GetAssetPath("test.ktx2"));
 
     auto e2 = en.CreateEntity();
     en.AddComponent(e2, DummyTriangleComponent{});

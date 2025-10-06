@@ -8,7 +8,10 @@
 namespace okami {
 	struct PathHash {
         std::size_t operator()(const std::filesystem::path& p) const {
-            return std::hash<std::string>{}(std::filesystem::canonical(p).string());
+            // Use lexically_normal() instead of canonical() to avoid exceptions
+            // when the path doesn't exist. This still normalizes the path
+            // (resolves . and .. components) but doesn't require file system access.
+            return std::hash<std::string>{}(p.lexically_normal().string());
         }
     };
 

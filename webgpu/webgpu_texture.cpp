@@ -72,7 +72,7 @@ Expected<std::pair<typename Texture::Desc, WebGpuTextureImpl>>
     WebGpuTextureModuleUserData sUserData;
     try {
         sUserData = std::any_cast<WebGpuTextureModuleUserData>(userData);
-    } catch (const std::bad_any_cast& e) {
+    } catch (const std::bad_any_cast&) {
         return std::unexpected(Error("Invalid user data type, expected WebGpuTextureModuleUserData"));
     }
     
@@ -171,8 +171,6 @@ Expected<std::pair<typename Texture::Desc, WebGpuTextureImpl>>
         
         wgpuQueueWriteTexture(queue, &imageCopyTexture, textureData.data(), 
                              textureData.size(), &dataLayout, &writeSize);
-        
-        wgpuQueueRelease(queue);
     }
     
     LOG(INFO) << "Created WebGPU texture: " << desc.width << "x" << desc.height 

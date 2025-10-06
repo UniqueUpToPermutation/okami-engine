@@ -14,13 +14,9 @@ using namespace okami;
 class HeadlessRendererTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Create test output directory
-        std::filesystem::create_directories("test_output");
     }
     
     void TearDown() override {
-        // Clean up test files
-        std::filesystem::remove_all("test_output");
     }
     
     // Helper function to compare rendered output with golden image
@@ -87,7 +83,6 @@ TEST_F(HeadlessRendererTest, CreateEngineWithWebGPURenderer) {
     Engine engine;
 
     RendererParams params;
-    params.m_headlessMode = true; // Enable headless mode for testing
     params.m_headlessRenderOutputDir = "renders";
     params.m_headlessOutputFileStem = "create_engine_with_webgpu_renderer";
     
@@ -130,7 +125,6 @@ TEST_F(HeadlessRendererTest, WebGPUTriangleRenderingInHeadlessMode) {
     Engine engine;
 
     RendererParams params;
-    params.m_headlessMode = true; // Enable headless mode for testing
     params.m_headlessRenderOutputDir = "renders";
     params.m_headlessOutputFileStem = "webgpu_triangle_rendering_in_headless_mode";
     
@@ -177,7 +171,6 @@ TEST_F(HeadlessRendererTest, CreateTexture) {
     Engine engine;
 
     RendererParams params;
-    params.m_headlessMode = true; // Enable headless mode for testing
     params.m_headlessRenderToFile = false;
     
     // Add modules using factory methods

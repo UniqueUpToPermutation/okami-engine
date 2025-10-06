@@ -151,7 +151,7 @@ protected:
         // Configure surface or create headless textures
         if (m_surface) {
             ConfigureSurface();
-        } else if (m_params.m_headlessMode) {
+        } else {
             auto err = CreateHeadlessTextures();
             OKAMI_ERROR_RETURN(err);
         }
@@ -174,10 +174,6 @@ protected:
         
         // Create depth buffer for windowed mode (to match headless mode)
         CreateWindowedDepthBuffer();
-    }
-    
-    void ReconfigureSurface() {
-        ConfigureSurface();
     }
     
     Error CreateHeadlessTextures() {
@@ -312,7 +308,7 @@ protected:
     }
     
     Error CaptureHeadlessFrame() {
-        if (!m_params.m_headlessMode || !m_headlessColorTexture) {
+        if (!m_headlessColorTexture) {
             return {}; // Not in headless mode or no texture to capture
         }
         
@@ -483,7 +479,7 @@ protected:
             viewDesc.aspect = WGPUTextureAspect_All;
             
             backBufferView = wgpuTextureCreateView(surfaceTexture.texture, &viewDesc);
-        } else if (m_params.m_headlessMode && m_headlessColorView) {
+        } else if (m_headlessColorView) {
             // Headless mode - use offscreen texture
             backBufferView = m_headlessColorView.get();
         } else {
@@ -512,7 +508,7 @@ protected:
         
         // Always use depth buffer - windowed or headless
         WGPUTextureView depthView = nullptr;
-        if (m_params.m_headlessMode && m_headlessDepthView) {
+        if (m_headlessDepthView) {
             depthView = m_headlessDepthView.get();
         } else if (m_surface && m_windowedDepthView) {
             depthView = m_windowedDepthView.get();
@@ -587,7 +583,7 @@ protected:
         // Only present if we have a surface (windowed mode)
         if (m_surface) {
             wgpuSurfacePresent(m_surface.get());
-        } else if (m_params.m_headlessMode && m_params.m_headlessRenderToFile) {
+        } else if (m_params.m_headlessRenderToFile) {
             // Capture headless render to PNG
             auto captureResult = CaptureHeadlessFrame();
             if (captureResult.IsError()) {
@@ -687,12 +683,9 @@ private:
         
         // Get window provider
         m_windowProvider = a.m_interfaces.Query<INativeWindowProvider>();
-        if (!m_windowProvider && !m_params.m_headlessMode) {
-            return Error("No INativeWindowProvider available for WebGPU initialization");
-        }
         
         // Set default framebuffer size for headless mode
-        if (!m_windowProvider && m_params.m_headlessMode) {
+        if (!m_windowProvider) {
             m_lastFramebufferSize = {800, 600}; // Default headless size
         }
         
@@ -716,7 +709,7 @@ private:
             auto currentSize = m_windowProvider->GetFramebufferSize();
             if (currentSize != m_lastFramebufferSize) {
                 m_lastFramebufferSize = currentSize;
-                ReconfigureSurface();
+                ConfigureSurface();
             }
         }
 

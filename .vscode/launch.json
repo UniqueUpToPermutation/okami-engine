@@ -58,6 +58,16 @@
             "cwd": "${workspaceFolder}/out/build/x64-debug/Debug",
             "console": "integratedTerminal",
             "preLaunchTask": "Build Tests"
+        },
+        {
+            "name": "Engine (Debug)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/build/x64-debug/Debug/Engine.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/out/build/x64-debug/Debug",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build All"
         }
     ]
 }
