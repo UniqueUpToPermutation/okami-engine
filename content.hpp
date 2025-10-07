@@ -147,18 +147,6 @@ namespace okami {
 
 	protected:
 		virtual Expected<std::pair<typename T::Desc, TImpl>> CreateResource(T&& data, std::any userData) = 0;
-		
-		// Protected method to access implementation for derived classes
-		TImpl* GetImpl(const ResHandle<T>& handle) {
-			if (!handle.IsLoaded()) {
-				return nullptr;
-			}
-			auto it = m_res_to_impl.find(handle.Ptr());
-			if (it != m_res_to_impl.end()) {
-				return &it->second->m_impl;
-			}
-			return nullptr;
-		}
 
 		Error RegisterImpl(ModuleInterface& mi) override {
 			mi.m_interfaces.Register<IContentManager<T>>(this);
@@ -187,6 +175,18 @@ namespace okami {
 		}
 
 	public:
+		// Protected method to access implementation for derived classes
+		TImpl* GetImpl(const ResHandle<T>& handle) {
+			if (!handle.IsLoaded()) {
+				return nullptr;
+			}
+			auto it = m_res_to_impl.find(handle.Ptr());
+			if (it != m_res_to_impl.end()) {
+				return &it->second->m_impl;
+			}
+			return nullptr;
+		}
+
 		Error ProcessNewResources(std::any userData) {
 			Error e;
 

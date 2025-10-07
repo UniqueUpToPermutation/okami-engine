@@ -88,7 +88,6 @@ namespace okami {
 		std::optional<glm::vec2> m_origin;
 		std::optional<Rect> m_sourceRect;
 		Color m_color = color::White;
-		int m_layer = 0;
 	};
 
 	struct RendererConfig {

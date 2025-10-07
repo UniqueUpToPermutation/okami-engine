@@ -2,6 +2,7 @@
 #include "webgpu_renderer.hpp"
 #include "webgpu_triangle.hpp"
 #include "webgpu_texture.hpp"
+#include "webgpu_sprite.hpp"
 
 #include "../config.hpp"
 #include "../renderer.hpp"
@@ -70,6 +71,8 @@ protected:
     glm::ivec2 m_lastFramebufferSize = {0, 0};
     
     WebgpuTriangleModule* m_triangleModule = nullptr;
+    WebgpuSpriteModule* m_spriteModule = nullptr;
+
     StorageModule<Camera>* m_cameraModule = nullptr;
 
     WebGpuTextureModule* m_textureModule = nullptr;
@@ -540,38 +543,42 @@ protected:
 
         WRenderPassEncoder renderPass = WgpuAutoPtr(wgpuCommandEncoderBeginRenderPass(encoder.get(), &renderPassDesc));
 
+        // Get active camera
+        auto* cameraPtr = m_cameraModule->TryGet(m_activeCamera.load());
+        auto camera = cameraPtr ? *cameraPtr : Camera::Identity();
+        
+        // Calculate camera matrices
+        auto projMat = camera.GetProjectionMatrix(
+            m_lastFramebufferSize.x,
+            m_lastFramebufferSize.y,
+            true
+        );
+        
+        // Get camera transform and calculate view matrix (inverse of camera transform)
+        auto transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
+        auto cameraTransform = transformView ? 
+            transformView->GetOr(m_activeCamera.load(), Transform::Identity()).AsMatrix() :
+            glm::mat4(1.0f);
+        auto viewMat = glm::inverse(cameraTransform);
+
+        WgpuRenderPassInfo info;
+        info.m_camera = camera;
+        info.m_viewportSize = m_lastFramebufferSize;
+        info.m_info = renderPass.get();
+        info.m_queue = m_queue.get();
+        info.m_device = m_device.get();
+        info.m_surfaceFormat = m_surfaceFormat;
+        info.m_hasDepthStencil = true; // Both windowed and headless modes have depth
+        info.m_viewMatrix = viewMat;
+        info.m_projMatrix = projMat;
+        Time time = {}; // TODO: Get actual time from frame context
+       
         // Use triangle module to render triangles
         if (m_triangleModule) {
-            // Get active camera
-            auto* cameraPtr = m_cameraModule->TryGet(m_activeCamera.load());
-            auto camera = cameraPtr ? *cameraPtr : Camera::Identity();
-            
-            // Calculate camera matrices
-            auto projMat = camera.GetProjectionMatrix(
-                m_lastFramebufferSize.x,
-                m_lastFramebufferSize.y,
-                true
-            );
-            
-            // Get camera transform and calculate view matrix (inverse of camera transform)
-            auto transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
-            auto cameraTransform = transformView ? 
-                transformView->GetOr(m_activeCamera.load(), Transform::Identity()).AsMatrix() :
-                glm::mat4(1.0f);
-            auto viewMat = glm::inverse(cameraTransform);
-            
-            WgpuRenderPassInfo info;
-            info.m_camera = camera;
-            info.m_viewportSize = m_lastFramebufferSize;
-            info.m_info = renderPass.get();
-            info.m_queue = m_queue.get();
-            info.m_device = m_device.get();
-            info.m_surfaceFormat = m_surfaceFormat;
-            info.m_hasDepthStencil = true; // Both windowed and headless modes have depth
-            info.m_viewMatrix = viewMat;
-            info.m_projMatrix = projMat;
-            Time time = {}; // TODO: Get actual time from frame context
             m_triangleModule->Pass(time, mi, info);
+        }
+        if (m_spriteModule) {
+            m_spriteModule->Pass(time, mi, info);
         }
         
         wgpuRenderPassEncoderEnd(renderPass.get());
@@ -753,6 +760,7 @@ public:
         m_triangleModule = CreateChild<WebgpuTriangleModule>();
         m_cameraModule = CreateChild<StorageModule<Camera>>();
         m_textureModule = CreateChild<WebGpuTextureModule>();
+        m_spriteModule = CreateChild<WebgpuSpriteModule>(m_textureModule);
     }
 };
 
