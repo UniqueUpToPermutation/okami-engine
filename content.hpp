@@ -2,19 +2,11 @@
 
 #include "common.hpp"
 #include "module.hpp"
+#include "paths.hpp"
 
 #include <filesystem>
 
 namespace okami {
-	struct PathHash {
-        std::size_t operator()(const std::filesystem::path& p) const {
-            // Use lexically_normal() instead of canonical() to avoid exceptions
-            // when the path doesn't exist. This still normalizes the path
-            // (resolves . and .. components) but doesn't require file system access.
-            return std::hash<std::string>{}(p.lexically_normal().string());
-        }
-    };
-
 	template <typename T>
 	concept ResourceType = requires {
 		typename T::Desc;

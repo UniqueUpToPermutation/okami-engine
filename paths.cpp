@@ -18,6 +18,7 @@ std::optional<std::filesystem::path> g_assetsPath = std::nullopt;
 std::optional<std::filesystem::path> g_d3d12ShadersPath = std::nullopt;
 std::optional<std::filesystem::path> g_bgfxShadersPath = std::nullopt;
 std::optional<std::filesystem::path> g_webgpuShadersPath = std::nullopt;
+std::optional<std::filesystem::path> g_glslShadersPath = std::nullopt;
 std::optional<std::filesystem::path> g_testAssetsPath = std::nullopt;
 std::optional<std::filesystem::path> g_configsPath = std::nullopt;
 std::optional<std::filesystem::path> g_goldenImagesPath = std::nullopt;
@@ -59,6 +60,10 @@ static std::filesystem::path FindBGFXShadersPath() {
 
 static std::filesystem::path FindWebGPUShadersPath() {
     return SearchForPath(std::filesystem::current_path(), "webgpu/shaders");
+}
+
+static std::filesystem::path FindGLSLShadersPath() {
+    return SearchForPath(std::filesystem::current_path(), "ogl/shaders");
 }
 
 static std::filesystem::path FindTestAssetsPath() {
@@ -140,6 +145,17 @@ std::filesystem::path okami::GetWebGPUShadersPath() {
 
 std::filesystem::path okami::GetWebGPUShaderPath(const std::filesystem::path& relativePath) {
     return GetWebGPUShadersPath() / relativePath;
+}
+
+std::filesystem::path okami::GetGLSLShadersPath() {
+    if (!g_glslShadersPath.has_value()) {
+        g_glslShadersPath = FindGLSLShadersPath();
+    }
+    return *g_glslShadersPath;
+}
+
+std::filesystem::path okami::GetGLSLShaderPath(const std::filesystem::path& relativePath) {
+    return GetGLSLShadersPath() / relativePath;
 }
 
 std::filesystem::path okami::GetExecutablePath() {

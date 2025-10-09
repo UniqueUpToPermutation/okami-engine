@@ -6,7 +6,7 @@
 #include <vector>
 #include <regex>
 
-class WgslPreprocessor {
+class ShaderPreprocessor {
 private:
     std::unordered_set<std::string> m_includedFiles;
     std::filesystem::path m_baseDirectory;
@@ -51,7 +51,7 @@ private:
     }
     
     bool processIncludeLine(const std::string& line, const std::filesystem::path& currentDirectory, std::string& result) {
-        // Regex to match #include "filename.wgsl" or #include <filename.wgsl>
+        // Regex to match #include "filename" or #include <filename> (supports .wgsl, .glsl, .vs, .fs, etc.)
         std::regex includeRegex(R"(\s*#include\s+[\"<]([^\"<>]+)[\">]\s*)");
         std::smatch matches;
         
@@ -96,7 +96,7 @@ private:
     }
 
 public:
-    WgslPreprocessor(const std::filesystem::path& baseDirectory) 
+    ShaderPreprocessor(const std::filesystem::path& baseDirectory) 
         : m_baseDirectory(baseDirectory) {}
     
     void preprocessFile(const std::filesystem::path& inputFile, const std::filesystem::path& outputFile) {
@@ -126,11 +126,12 @@ public:
 };
 
 void printUsage(const char* programName) {
-    std::cout << "Usage: " << programName << " <input.wgsl> <output.wgsl> [base_directory]\n";
-    std::cout << "  input.wgsl      - Input WGSL file to preprocess\n";
-    std::cout << "  output.wgsl     - Output file path\n";
+    std::cout << "Usage: " << programName << " <input_shader> <output_shader> [base_directory]\n";
+    std::cout << "  input_shader    - Input shader file to preprocess (.wgsl, .glsl, .vs, .fs, etc.)\n";
+    std::cout << "  output_shader   - Output file path\n";
     std::cout << "  base_directory  - Base directory for resolving includes (optional, defaults to input file directory)\n";
-    std::cout << "\nThe preprocessor resolves #include \"filename.wgsl\" directives recursively.\n";
+    std::cout << "\nThe preprocessor resolves #include \"filename\" directives recursively.\n";
+    std::cout << "Supports WGSL (.wgsl) and GLSL (.glsl, .vs, .fs, etc.) shader files.\n";
     std::cout << "Include files are searched relative to the current file's directory first,\n";
     std::cout << "then relative to the base directory.\n";
 }
@@ -157,7 +158,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        WgslPreprocessor preprocessor(baseDirectory);
+        ShaderPreprocessor preprocessor(baseDirectory);
         preprocessor.preprocessFile(inputFile, outputFile);
         
         return 0;

@@ -21,15 +21,17 @@ static void glfw_errorCallback(int error, const char *description)
     LOG(ERROR) << "GLFW error " << error << ": " << description;
 }
 
-class GLFWModule : 
+class GLFWModule final : 
     public EngineModule,
-    public INativeWindowProvider {
+    public INativeWindowProvider,
+    public IGLProvider {
 private:
     GLFWwindow* m_window = nullptr;
     WindowConfig m_config;
+    bool m_createContext = false;
 
 public:
-    void* GetNativeWindowHandle() override {
+    void* GetNativeWindowHandle() const override {
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
         init.platformData.ndt = glfwGetX11Display();
         return (void*)(uintptr_t)glfwGetX11Window(m_window);
@@ -40,7 +42,7 @@ public:
 #endif
     }
 
-    void* GetNativeDisplayType() override {
+    void* GetNativeDisplayType() const override {
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
         return glfwGetX11Display();
 #else
@@ -48,7 +50,7 @@ public:
 #endif
     }
 
-    glm::ivec2 GetFramebufferSize() override {
+    glm::ivec2 GetFramebufferSize() const override {
         int width, height;
         glfwGetFramebufferSize(m_window, &width, &height);
         return { width, height };
@@ -57,6 +59,7 @@ public:
 protected:
     Error RegisterImpl(ModuleInterface& mi) override {
         mi.m_interfaces.Register<INativeWindowProvider>(this);
+        mi.m_interfaces.Register<IGLProvider>(this);
         RegisterConfig<WindowConfig>(mi.m_interfaces, LOG_WRAP(WARNING));
         return {};
     }
@@ -70,7 +73,14 @@ protected:
             return Error("Failed to initialize GLFW");
         }
 
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        if (m_createContext) {
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        } else {
+            // No context by default - used with WebGPU/Vulkan/DirectX
+            glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        }
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         m_window = glfwCreateWindow(
             m_config.backbufferWidth, 
@@ -78,6 +88,10 @@ protected:
             m_config.windowTitle.c_str(), nullptr, nullptr);
         if (!m_window) {
             return Error("Failed to create GLFW window");
+        }
+
+        if (m_createContext) {
+            glfwMakeContextCurrent(m_window);
         }
 
         return {};
@@ -109,6 +123,22 @@ protected:
 public:
     std::string_view GetName() const override {
         return "GLFW Module";
+    }
+
+    void NotifyNeedGLContext() override {
+        m_createContext = true;
+    }
+
+    GL_GLADloadfunc GetGLLoaderFunction() const override {
+        return glfwGetProcAddress;
+    }
+
+    void SwapBuffers() override {
+        glfwSwapBuffers(m_window);
+    }
+
+    void SetSwapInterval(int interval) override {
+        glfwSwapInterval(interval);
     }
 };
 

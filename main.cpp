@@ -8,7 +8,7 @@
 #include "module.hpp"
 #include "engine.hpp"
 
-#include "webgpu/webgpu_renderer.hpp"
+#include "ogl/ogl_renderer.hpp"
 #include "glfw/glfw_module.hpp"
 
 #include "renderer.hpp"
@@ -24,10 +24,14 @@ int main() {
     RendererParams params;
 
     // Register renderer based on compile-time options
-    //en.CreateRenderModule<GLFWModuleFactory>();
-    en.CreateRenderModule<WebgpuRendererFactory>({}, params);
+    en.CreateRenderModule<GLFWModuleFactory>();
+    en.CreateRenderModule<OGLRendererFactory>({}, params);
 
     Error err = en.Startup();
+    if (err.IsError()) {
+        std::cerr << "Engine startup failed: " << err << std::endl;
+        return 1;
+    }
 
     auto textureHandle = en.LoadResource<Texture>(GetAssetPath("test.ktx2"));
 
@@ -57,11 +61,6 @@ int main() {
         });
     });
 
-    if (err.IsError()) {
-        std::cerr << "Engine startup failed: " << err << std::endl;
-        return 1;
-    }
-
-    en.Run(1);
+    en.Run();
     en.Shutdown();
 }

@@ -38,11 +38,25 @@ namespace okami {
 
 	class INativeWindowProvider {
 	public:
-		virtual void* GetNativeWindowHandle() = 0;
-		virtual void* GetNativeDisplayType() = 0;
-		virtual glm::ivec2 GetFramebufferSize() = 0;
+		virtual void* GetNativeWindowHandle() const = 0;
+		virtual void* GetNativeDisplayType() const = 0;
+		virtual glm::ivec2 GetFramebufferSize() const = 0;
 		
 		virtual ~INativeWindowProvider() = default;
+	};
+
+	typedef void (*GL_GLADapiproc)(void);
+	typedef GL_GLADapiproc (*GL_GLADloadfunc)(const char *name);
+
+	// An interface to provide OpenGL context management
+	class IGLProvider {
+	public:
+		virtual GL_GLADloadfunc GetGLLoaderFunction() const = 0;
+		virtual void NotifyNeedGLContext() = 0;
+		virtual void SwapBuffers() = 0;
+		virtual void SetSwapInterval(int interval) = 0;
+		virtual glm::ivec2 GetFramebufferSize() const = 0;
+		virtual ~IGLProvider() = default;
 	};
 
 	struct DummyTriangleComponent {};

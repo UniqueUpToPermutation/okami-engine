@@ -29,8 +29,14 @@ if(WIN32)
 else()
     set(DEFAULT_USE_D3D12 OFF)
 endif()
+set(DEFAULT_USE_WEBGPU OFF)
+set(DEFAULT_USE_OGL ON)
 option(USE_D3D12 "Enable D3D12 renderer and DirectX dependencies" ${DEFAULT_USE_D3D12})
+option(USE_OGL "Enable OpenGL renderer and dependencies" ${DEFAULT_USE_OGL})
+option(USE_WEBGPU "Enable WebGPU renderer and dependencies" ${DEFAULT_USE_WEBGPU})
 message(STATUS "USE_D3D12=${USE_D3D12}")
+message(STATUS "USE_OGL=${USE_OGL}")
+message(STATUS "USE_WEBGPU=${USE_WEBGPU}")
 
 # Find packages via vcpkg
 find_package(glfw3 CONFIG REQUIRED)
@@ -144,213 +150,62 @@ set(SHADER_ENTRY_POINTS
 #==============================================================================
 # WebGPU
 #==============================================================================
-# Set up wgpu-native
-set(WGPU_NATIVE_VERSION "v0.19.4.1")
 
-# Download wgpu-native if not present
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/webgpu.h")
-    message(STATUS "Downloading wgpu-native...")
-    if(APPLE)
-        set(WGPU_PLATFORM "macos-x86_64")
-        set(WGPU_ARCHIVE "wgpu-macos-x86_64-release.zip")
-    elseif(WIN32)
-        set(WGPU_PLATFORM "windows-x86_64")
-        set(WGPU_ARCHIVE "wgpu-windows-x86_64-release.zip")
-    else()
-        set(WGPU_PLATFORM "linux-x86_64")
-        set(WGPU_ARCHIVE "wgpu-linux-x86_64-release.zip")
-    endif()
-    
-    file(DOWNLOAD 
-        "https://github.com/gfx-rs/wgpu-native/releases/download/${WGPU_NATIVE_VERSION}/${WGPU_ARCHIVE}"
-        "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}"
-        SHOW_PROGRESS
-    )
-    
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -E tar xzf "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}"
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-    
-    # Move extracted files to wgpu-native directory
-    file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native")
-    file(GLOB WGPU_FILES "${CMAKE_CURRENT_SOURCE_DIR}/webgpu.h" 
-                         "${CMAKE_CURRENT_SOURCE_DIR}/wgpu.h"
-                         "${CMAKE_CURRENT_SOURCE_DIR}/libwgpu_native.*"
-                         "${CMAKE_CURRENT_SOURCE_DIR}/wgpu_native.*"
-                         "${CMAKE_CURRENT_SOURCE_DIR}/commit-sha")
-    foreach(FILE ${WGPU_FILES})
-        get_filename_component(FILENAME ${FILE} NAME)
-        file(RENAME ${FILE} "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/${FILENAME}")
-    endforeach()
-    
-    file(REMOVE "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}")
-endif()
+if (USE_WEBGPU)
+    # Set up wgpu-native
+    set(WGPU_NATIVE_VERSION "v0.19.4.1")
 
-# Include wgpu-native headers from wgpu-native directory
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native)
-
-if(APPLE)
-    set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/libwgpu_native.dylib)
-elseif(WIN32)
-    set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/wgpu_native.lib)
-else()
-    set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/libwgpu_native.so)
-endif()
-
-#==============================================================================
-# bgfx Shader Compilation System
-#==============================================================================
-
-if(USE_BGFX)
-    # Find all bgfx shader files
-    file(GLOB_RECURSE BGFX_SHADER_FILES 
-        "${CMAKE_SOURCE_DIR}/bgfx/shaders/*.sc"
-    )
-
-    # Find shaderc executable once for all shaders
-    find_program(SHADERC_EXECUTABLE
-        NAMES shaderc shaderc.exe
-        PATHS
-            # vcpkg installed bgfx tools
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
-            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
-            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
-            "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
-            # Common bgfx installation paths
-            "${CMAKE_SOURCE_DIR}/tools/bin"
-            "${CMAKE_SOURCE_DIR}/bgfx/tools/bin"
-            "${CMAKE_SOURCE_DIR}/../bgfx/tools/bin"
-            "${CMAKE_SOURCE_DIR}/third_party/bgfx/tools/bin"
-            # System paths
-            "/usr/local/bin"
-            "/opt/homebrew/bin"
-            # Environment variable paths
-            "$ENV{BGFX_DIR}/tools/bin"
-            "$ENV{BGFX_ROOT}/tools/bin"
-        DOC "bgfx Shader Compiler (shaderc)"
-    )
-    
-    if(NOT SHADERC_EXECUTABLE)
-        message(WARNING "shaderc not found. bgfx shaders will not be compiled.")
-        message(WARNING "To fix this:")
-        message(WARNING "  1. Install bgfx with tools: vcpkg install bgfx[tools]")
-        message(WARNING "  2. Or set BGFX_DIR environment variable to bgfx installation")
-        message(WARNING "  3. Or place shaderc executable in tools/bin/ directory")
-    else()
-        message(STATUS "Found shaderc: ${SHADERC_EXECUTABLE}")
-    endif()
-
-    # Function to compile bgfx shaders using shaderc
-    function(add_bgfx_shader TARGET_NAME SHADER_FILE SHADER_TYPE PLATFORM)
-        get_filename_component(SHADER_NAME ${SHADER_FILE} NAME_WE)
-        get_filename_component(SHADER_DIR ${SHADER_FILE} DIRECTORY)
-        
-        # Create output path
-        set(COMPILED_SHADER "${CMAKE_BINARY_DIR}/bgfx/shaders/${SHADER_NAME}_${PLATFORM}.bin")
-        
-        # Ensure output directory exists
-        get_filename_component(COMPILED_SHADER_DIR ${COMPILED_SHADER} DIRECTORY)
-        file(MAKE_DIRECTORY ${COMPILED_SHADER_DIR})
-        
-        # Find shaderc executable
-        find_program(SHADERC_EXECUTABLE
-            NAMES shaderc shaderc.exe
-            PATHS
-                # vcpkg installed bgfx tools
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
-                "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-osx/tools/bgfx"
-                "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-linux/tools/bgfx"
-                "${CMAKE_CURRENT_LIST_DIR}/vcpkg_installed/x64-windows/tools/bgfx"
-                # Common bgfx installation paths
-                "${CMAKE_SOURCE_DIR}/tools/bin"
-                "${CMAKE_SOURCE_DIR}/bgfx/tools/bin"
-                "${CMAKE_SOURCE_DIR}/../bgfx/tools/bin"
-                "${CMAKE_SOURCE_DIR}/third_party/bgfx/tools/bin"
-                # System paths
-                "/usr/local/bin"
-                "/opt/homebrew/bin"
-                # Environment variable paths
-                "$ENV{BGFX_DIR}/tools/bin"
-                "$ENV{BGFX_ROOT}/tools/bin"
-            DOC "bgfx Shader Compiler (shaderc)"
-        )
-        
-        if(NOT SHADERC_EXECUTABLE)
-            message(WARNING "shaderc not found. bgfx shaders will not be compiled.")
-            message(WARNING "To fix this:")
-            message(WARNING "  1. Install bgfx with tools: vcpkg install bgfx[tools]")
-            message(WARNING "  2. Or set BGFX_DIR environment variable to bgfx installation")
-            message(WARNING "  3. Or place shaderc executable in tools/bin/ directory")
-            return()
+    # Download wgpu-native if not present
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/webgpu.h")
+        message(STATUS "Downloading wgpu-native...")
+        if(APPLE)
+            set(WGPU_PLATFORM "macos-x86_64")
+            set(WGPU_ARCHIVE "wgpu-macos-x86_64-release.zip")
+        elseif(WIN32)
+            set(WGPU_PLATFORM "windows-x86_64")
+            set(WGPU_ARCHIVE "wgpu-windows-x86_64-release.zip")
         else()
-            message(STATUS "Found shaderc: ${SHADERC_EXECUTABLE}")
+            set(WGPU_PLATFORM "linux-x86_64")
+            set(WGPU_ARCHIVE "wgpu-linux-x86_64-release.zip")
         endif()
         
-        # Determine profile based on platform and shader type
-        if(PLATFORM STREQUAL "dx11")
-            if(SHADER_TYPE STREQUAL "v")
-                set(PROFILE "vs_5_0")
-            elseif(SHADER_TYPE STREQUAL "f")
-                set(PROFILE "ps_5_0")
-            endif()
-        elseif(PLATFORM STREQUAL "metal")
-            set(PROFILE "metal")
-        elseif(PLATFORM STREQUAL "spirv")
-            if(SHADER_TYPE STREQUAL "v")
-                set(PROFILE "spirv")
-            elseif(SHADER_TYPE STREQUAL "f")
-                set(PROFILE "spirv")
-            endif()
-        else() # OpenGL
-            if(SHADER_TYPE STREQUAL "v")
-                set(PROFILE "120")
-            elseif(SHADER_TYPE STREQUAL "f")
-                set(PROFILE "120")
-            endif()
-        endif()
-        
-        # Add custom command to compile the shader
-        add_custom_command(
-            OUTPUT ${COMPILED_SHADER}
-            COMMAND ${SHADERC_EXECUTABLE}
-                -f ${SHADER_FILE}
-                -o ${COMPILED_SHADER}
-                --type ${SHADER_TYPE}
-                --platform ${PLATFORM}
-                --profile ${PROFILE}
-                -i "${CMAKE_SOURCE_DIR}/bgfx/shaders"
-                -i "${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/include/bgfx"
-            DEPENDS ${SHADER_FILE}
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-            COMMENT "Compiling bgfx shader: ${SHADER_NAME} (${SHADER_TYPE}/${PLATFORM})"
-            VERBATIM
+        file(DOWNLOAD 
+            "https://github.com/gfx-rs/wgpu-native/releases/download/${WGPU_NATIVE_VERSION}/${WGPU_ARCHIVE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}"
+            SHOW_PROGRESS
         )
         
-        # Mark shader as generated file (don't add to target sources since we use custom target)
-        set_source_files_properties(${COMPILED_SHADER} PROPERTIES GENERATED TRUE)
-    endfunction()
-
-    # Detect platforms to compile for
-    set(BGFX_PLATFORMS "")
-    if(WIN32)
-        list(APPEND BGFX_PLATFORMS "dx11")
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E tar xzf "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+        
+        # Move extracted files to wgpu-native directory
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native")
+        file(GLOB WGPU_FILES "${CMAKE_CURRENT_SOURCE_DIR}/webgpu.h" 
+                            "${CMAKE_CURRENT_SOURCE_DIR}/wgpu.h"
+                            "${CMAKE_CURRENT_SOURCE_DIR}/libwgpu_native.*"
+                            "${CMAKE_CURRENT_SOURCE_DIR}/wgpu_native.*"
+                            "${CMAKE_CURRENT_SOURCE_DIR}/commit-sha")
+        foreach(FILE ${WGPU_FILES})
+            get_filename_component(FILENAME ${FILE} NAME)
+            file(RENAME ${FILE} "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/${FILENAME}")
+        endforeach()
+        
+        file(REMOVE "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}")
     endif()
+
+    # Include wgpu-native headers from wgpu-native directory
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native)
+
     if(APPLE)
-        list(APPEND BGFX_PLATFORMS "metal")
+        set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/libwgpu_native.dylib)
+    elseif(WIN32)
+        set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/wgpu_native.lib)
+    else()
+        set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/libwgpu_native.so)
     endif()
-    if(UNIX AND NOT APPLE)
-        list(APPEND BGFX_PLATFORMS "linux")
-    endif()
-    # Always add OpenGL as fallback
-    list(APPEND BGFX_PLATFORMS "opengl")
-
-    set(ALL_BGFX_COMPILED_SHADERS "")
-endif() # USE_BGFX
+endif() # USE_WEBGPU
 
 #==============================================================================
 # Main Engine Executable
@@ -369,81 +224,85 @@ target_link_libraries(png2ktx PRIVATE KTX::ktx)
 target_include_directories(png2ktx PRIVATE ${CMAKE_SOURCE_DIR})
 
 if(USE_D3D12)
+    # Process all HLSL files and compile shaders
+    set(ALL_COMPILED_SHADERS "")
 
-# Process all HLSL files and compile shaders
-set(ALL_COMPILED_SHADERS "")
-
-foreach(HLSL_FILE ${HLSL_FILES})
-    get_filename_component(SHADER_NAME ${HLSL_FILE} NAME_WE)
-    get_filename_component(SHADER_DIR ${HLSL_FILE} DIRECTORY)
-    get_filename_component(SHADER_DIR_NAME ${SHADER_DIR} NAME)
-    
-    message(STATUS "Processing HLSL file: ${HLSL_FILE}")
-    
-    # Read shader content to automatically detect entry points
-    file(READ ${HLSL_FILE} SHADER_CONTENT)
-    
-    # Check for each type of entry point in the shader source
-    foreach(ENTRY_POINT_PAIR ${SHADER_ENTRY_POINTS})
-        string(REPLACE ":" ";" ENTRY_PARTS ${ENTRY_POINT_PAIR})
-        list(GET ENTRY_PARTS 0 ENTRY_POINT)
-        list(GET ENTRY_PARTS 1 SHADER_TYPE)
+    foreach(HLSL_FILE ${HLSL_FILES})
+        get_filename_component(SHADER_NAME ${HLSL_FILE} NAME_WE)
+        get_filename_component(SHADER_DIR ${HLSL_FILE} DIRECTORY)
+        get_filename_component(SHADER_DIR_NAME ${SHADER_DIR} NAME)
         
-        # If the entry point function is found in the shader source
-        if("${SHADER_CONTENT}" MATCHES "${ENTRY_POINT}")
-            add_hlsl_shader(Engine ${HLSL_FILE} ${SHADER_TYPE} ${ENTRY_POINT})
-            # Use the same path format as the add_hlsl_shader function
-            set(COMPILED_SHADER_PATH "${CMAKE_BINARY_DIR}/shaders/${SHADER_NAME}_${SHADER_TYPE}.cso")
-            list(APPEND ALL_COMPILED_SHADERS ${COMPILED_SHADER_PATH})
-            message(STATUS "  Found ${ENTRY_POINT} -> will compile as ${SHADER_TYPE}")
-        endif()
-    endforeach()
-    
-    # Additionally, detect compute shaders with custom entry points by looking for [numthreads(...)] attribute
-    string(REGEX MATCHALL "\\[numthreads\\([^)]+\\)\\][^{]*void[ \t\r\n]+([a-zA-Z_][a-zA-Z0-9_]*)" COMPUTE_MATCHES "${SHADER_CONTENT}")
-    foreach(COMPUTE_MATCH ${COMPUTE_MATCHES})
-        # Extract function name from the match
-        string(REGEX REPLACE ".*void[ \t\r\n]+([a-zA-Z_][a-zA-Z0-9_]*)" "\\1" COMPUTE_ENTRY_POINT "${COMPUTE_MATCH}")
+        message(STATUS "Processing HLSL file: ${HLSL_FILE}")
         
-        # Check if this entry point was already processed by the standard entry points
-        set(ALREADY_PROCESSED FALSE)
+        # Read shader content to automatically detect entry points
+        file(READ ${HLSL_FILE} SHADER_CONTENT)
+        
+        # Check for each type of entry point in the shader source
         foreach(ENTRY_POINT_PAIR ${SHADER_ENTRY_POINTS})
             string(REPLACE ":" ";" ENTRY_PARTS ${ENTRY_POINT_PAIR})
-            list(GET ENTRY_PARTS 0 STANDARD_ENTRY_POINT)
-            if("${COMPUTE_ENTRY_POINT}" STREQUAL "${STANDARD_ENTRY_POINT}")
-                set(ALREADY_PROCESSED TRUE)
-                break()
+            list(GET ENTRY_PARTS 0 ENTRY_POINT)
+            list(GET ENTRY_PARTS 1 SHADER_TYPE)
+            
+            # If the entry point function is found in the shader source
+            if("${SHADER_CONTENT}" MATCHES "${ENTRY_POINT}")
+                add_hlsl_shader(Engine ${HLSL_FILE} ${SHADER_TYPE} ${ENTRY_POINT})
+                # Use the same path format as the add_hlsl_shader function
+                set(COMPILED_SHADER_PATH "${CMAKE_BINARY_DIR}/shaders/${SHADER_NAME}_${SHADER_TYPE}.cso")
+                list(APPEND ALL_COMPILED_SHADERS ${COMPILED_SHADER_PATH})
+                message(STATUS "  Found ${ENTRY_POINT} -> will compile as ${SHADER_TYPE}")
             endif()
         endforeach()
         
-        # If not already processed, add it as a compute shader
-        if(NOT ALREADY_PROCESSED)
-            add_hlsl_shader(Engine ${HLSL_FILE} cs ${COMPUTE_ENTRY_POINT})
-            set(COMPILED_SHADER_PATH "${CMAKE_BINARY_DIR}/shaders/${SHADER_NAME}_cs_${COMPUTE_ENTRY_POINT}.cso")
-            list(APPEND ALL_COMPILED_SHADERS ${COMPILED_SHADER_PATH})
-            message(STATUS "  Found compute shader ${COMPUTE_ENTRY_POINT} -> will compile as cs")
-        endif()
+        # Additionally, detect compute shaders with custom entry points by looking for [numthreads(...)] attribute
+        string(REGEX MATCHALL "\\[numthreads\\([^)]+\\)\\][^{]*void[ \t\r\n]+([a-zA-Z_][a-zA-Z0-9_]*)" COMPUTE_MATCHES "${SHADER_CONTENT}")
+        foreach(COMPUTE_MATCH ${COMPUTE_MATCHES})
+            # Extract function name from the match
+            string(REGEX REPLACE ".*void[ \t\r\n]+([a-zA-Z_][a-zA-Z0-9_]*)" "\\1" COMPUTE_ENTRY_POINT "${COMPUTE_MATCH}")
+            
+            # Check if this entry point was already processed by the standard entry points
+            set(ALREADY_PROCESSED FALSE)
+            foreach(ENTRY_POINT_PAIR ${SHADER_ENTRY_POINTS})
+                string(REPLACE ":" ";" ENTRY_PARTS ${ENTRY_POINT_PAIR})
+                list(GET ENTRY_PARTS 0 STANDARD_ENTRY_POINT)
+                if("${COMPUTE_ENTRY_POINT}" STREQUAL "${STANDARD_ENTRY_POINT}")
+                    set(ALREADY_PROCESSED TRUE)
+                    break()
+                endif()
+            endforeach()
+            
+            # If not already processed, add it as a compute shader
+            if(NOT ALREADY_PROCESSED)
+                add_hlsl_shader(Engine ${HLSL_FILE} cs ${COMPUTE_ENTRY_POINT})
+                set(COMPILED_SHADER_PATH "${CMAKE_BINARY_DIR}/shaders/${SHADER_NAME}_cs_${COMPUTE_ENTRY_POINT}.cso")
+                list(APPEND ALL_COMPILED_SHADERS ${COMPILED_SHADER_PATH})
+                message(STATUS "  Found compute shader ${COMPUTE_ENTRY_POINT} -> will compile as cs")
+            endif()
+        endforeach()
     endforeach()
-endforeach()
 
-# Create a custom target that depends on all compiled shaders
-if(ALL_COMPILED_SHADERS)
-    list(LENGTH ALL_COMPILED_SHADERS SHADER_COUNT)
-    add_custom_target(CompileShaders ALL DEPENDS ${ALL_COMPILED_SHADERS})
-    add_dependencies(Engine CompileShaders)
-    message(STATUS "Created CompileShaders target with ${SHADER_COUNT} shaders")
-    message(STATUS "Compiled shaders will be available in: ${CMAKE_BINARY_DIR}/shaders/")
-endif()
+    # Create a custom target that depends on all compiled shaders
+    if(ALL_COMPILED_SHADERS)
+        list(LENGTH ALL_COMPILED_SHADERS SHADER_COUNT)
+        add_custom_target(CompileShaders ALL DEPENDS ${ALL_COMPILED_SHADERS})
+        add_dependencies(Engine CompileShaders)
+        message(STATUS "Created CompileShaders target with ${SHADER_COUNT} shaders")
+        message(STATUS "Compiled shaders will be available in: ${CMAKE_BINARY_DIR}/shaders/")
+    endif()
 
 endif() # USE_D3D12
 
+if(USE_OGL)
+
+
+endif() # USE_OGL
+
 #==============================================================================
-# WGSL Preprocessor Tool
+# Shader Preprocessor Tool (WGSL and GLSL)
 #==============================================================================
 
-# Create the WGSL preprocessor executable
-add_executable(WgslPreprocessor tools/wgsl_preprocessor.cpp)
-set_target_properties(WgslPreprocessor PROPERTIES
+# Create the shader preprocessor executable
+add_executable(ShaderPreprocessor tools/shader_preprocessor.cpp)
+set_target_properties(ShaderPreprocessor PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
 )
@@ -452,47 +311,103 @@ set_target_properties(WgslPreprocessor PROPERTIES
 # WebGPU Shader Processing System
 #==============================================================================
 
-# Find all WGSL shader files in webgpu/shaders folder
-file(GLOB_RECURSE WEBGPU_SHADER_FILES 
-    "${CMAKE_SOURCE_DIR}/webgpu/shaders/*.wgsl"
-)
+if (USE_WEBGPU)
+    # Find all WGSL shader files in webgpu/shaders folder
+    file(GLOB_RECURSE WEBGPU_SHADER_FILES 
+        "${CMAKE_SOURCE_DIR}/webgpu/shaders/*.wgsl"
+    )
 
-if(WEBGPU_SHADER_FILES)
-    # Ensure webgpu shaders output directory exists
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/webgpu/shaders)
-    
-    set(ALL_WEBGPU_PROCESSED_SHADERS "")
-    
-    # Process each shader file with the WGSL preprocessor
-    foreach(WEBGPU_SHADER_FILE ${WEBGPU_SHADER_FILES})
-        get_filename_component(SHADER_NAME ${WEBGPU_SHADER_FILE} NAME)
-        set(PROCESSED_SHADER_PATH "${CMAKE_BINARY_DIR}/webgpu/shaders/${SHADER_NAME}")
+    if(WEBGPU_SHADER_FILES)
+        # Ensure webgpu shaders output directory exists
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/webgpu/shaders)
         
-        # Create custom command to preprocess the shader file
-        add_custom_command(
-            OUTPUT ${PROCESSED_SHADER_PATH}
-            COMMAND WgslPreprocessor ${WEBGPU_SHADER_FILE} ${PROCESSED_SHADER_PATH} "${CMAKE_SOURCE_DIR}/webgpu/shaders"
-            DEPENDS ${WEBGPU_SHADER_FILE} WgslPreprocessor
-            COMMENT "Preprocessing WebGPU shader: ${SHADER_NAME}"
-        )
+        set(ALL_WEBGPU_PROCESSED_SHADERS "")
         
-        list(APPEND ALL_WEBGPU_PROCESSED_SHADERS ${PROCESSED_SHADER_PATH})
-        message(STATUS "Will preprocess WebGPU shader: ${SHADER_NAME}")
-    endforeach()
-    
-    # Create a custom target that depends on all processed shaders
-    if(ALL_WEBGPU_PROCESSED_SHADERS)
-        list(LENGTH ALL_WEBGPU_PROCESSED_SHADERS WEBGPU_SHADER_COUNT)
-        add_custom_target(ProcessWebGPUShaders ALL
-            DEPENDS ${ALL_WEBGPU_PROCESSED_SHADERS}
-            COMMENT "Processing all WebGPU shaders"
-        )
+        # Process each shader file with the WGSL preprocessor
+        foreach(WEBGPU_SHADER_FILE ${WEBGPU_SHADER_FILES})
+            get_filename_component(SHADER_NAME ${WEBGPU_SHADER_FILE} NAME)
+            set(PROCESSED_SHADER_PATH "${CMAKE_BINARY_DIR}/webgpu/shaders/${SHADER_NAME}")
+            
+            # Create custom command to preprocess the shader file
+            add_custom_command(
+                OUTPUT ${PROCESSED_SHADER_PATH}
+                COMMAND ShaderPreprocessor ${WEBGPU_SHADER_FILE} ${PROCESSED_SHADER_PATH} "${CMAKE_SOURCE_DIR}/webgpu/shaders"
+                DEPENDS ${WEBGPU_SHADER_FILE} ShaderPreprocessor
+                COMMENT "Preprocessing WebGPU shader: ${SHADER_NAME}"
+            )
+            
+            list(APPEND ALL_WEBGPU_PROCESSED_SHADERS ${PROCESSED_SHADER_PATH})
+            message(STATUS "Will preprocess WebGPU shader: ${SHADER_NAME}")
+        endforeach()
         
-        add_dependencies(Engine ProcessWebGPUShaders)
-        message(STATUS "Created ProcessWebGPUShaders target with ${WEBGPU_SHADER_COUNT} shaders")
-        message(STATUS "Processed WebGPU shaders will be available in: ${CMAKE_BINARY_DIR}/webgpu/shaders/")
+        # Create a custom target that depends on all processed shaders
+        if(ALL_WEBGPU_PROCESSED_SHADERS)
+            list(LENGTH ALL_WEBGPU_PROCESSED_SHADERS WEBGPU_SHADER_COUNT)
+            add_custom_target(ProcessWebGPUShaders ALL
+                DEPENDS ${ALL_WEBGPU_PROCESSED_SHADERS}
+                COMMENT "Processing all WebGPU shaders"
+            )
+            
+            add_dependencies(Engine ProcessWebGPUShaders)
+            message(STATUS "Created ProcessWebGPUShaders target with ${WEBGPU_SHADER_COUNT} shaders")
+            message(STATUS "Processed WebGPU shaders will be available in: ${CMAKE_BINARY_DIR}/webgpu/shaders/")
+        endif()
     endif()
-endif()
+
+endif() # USE_WEBGPU
+
+#==============================================================================
+# OpenGL Shader Processing System
+#==============================================================================
+
+if (USE_OGL)
+    # Find all GLSL shader files in ogl/shaders folder
+    file(GLOB_RECURSE OGL_SHADER_FILES 
+        "${CMAKE_SOURCE_DIR}/ogl/shaders/*.glsl"
+        "${CMAKE_SOURCE_DIR}/ogl/shaders/*.vs"
+        "${CMAKE_SOURCE_DIR}/ogl/shaders/*.fs"
+        "${CMAKE_SOURCE_DIR}/ogl/shaders/*.vert"
+        "${CMAKE_SOURCE_DIR}/ogl/shaders/*.frag"
+    )
+
+    if(OGL_SHADER_FILES)
+        # Ensure ogl shaders output directory exists
+        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/ogl/shaders)
+        
+        set(ALL_OGL_PROCESSED_SHADERS "")
+        
+        # Process each shader file with the shader preprocessor
+        foreach(OGL_SHADER_FILE ${OGL_SHADER_FILES})
+            get_filename_component(SHADER_NAME ${OGL_SHADER_FILE} NAME)
+            set(PROCESSED_SHADER_PATH "${CMAKE_BINARY_DIR}/ogl/shaders/${SHADER_NAME}")
+            
+            # Create custom command to preprocess the shader file
+            add_custom_command(
+                OUTPUT ${PROCESSED_SHADER_PATH}
+                COMMAND ShaderPreprocessor ${OGL_SHADER_FILE} ${PROCESSED_SHADER_PATH} "${CMAKE_SOURCE_DIR}/ogl/shaders"
+                DEPENDS ${OGL_SHADER_FILE} ShaderPreprocessor
+                COMMENT "Preprocessing OpenGL shader: ${SHADER_NAME}"
+            )
+            
+            list(APPEND ALL_OGL_PROCESSED_SHADERS ${PROCESSED_SHADER_PATH})
+            message(STATUS "Will preprocess OpenGL shader: ${SHADER_NAME}")
+        endforeach()
+        
+        # Create a custom target that depends on all processed shaders
+        if(ALL_OGL_PROCESSED_SHADERS)
+            list(LENGTH ALL_OGL_PROCESSED_SHADERS OGL_SHADER_COUNT)
+            add_custom_target(ProcessOpenGLShaders ALL
+                DEPENDS ${ALL_OGL_PROCESSED_SHADERS}
+                COMMENT "Processing all OpenGL shaders"
+            )
+            
+            add_dependencies(Engine ProcessOpenGLShaders)
+            message(STATUS "Created ProcessOpenGLShaders target with ${OGL_SHADER_COUNT} shaders")
+            message(STATUS "Processed OpenGL shaders will be available in: ${CMAKE_BINARY_DIR}/ogl/shaders/")
+        endif()
+    endif()
+
+endif() # USE_OGL
 
 #==============================================================================
 # KTX Image Compilation System
@@ -580,7 +495,8 @@ target_link_libraries(Engine PRIVATE EngineLib)
 file(GLOB ENGINE_LIB_SOURCES CONFIGURE_DEPENDS 
     "*.cpp" "*.hpp" 
     "d3d12/*.cpp" "d3d12/*.hpp"
-    "gles/*.cpp" "gles/*.hpp" 
+    "ogl/*.cpp" "ogl/*.hpp"
+    "ogl/glad/*.c" "ogl/glad/*.h"
     "glfw/*.cpp" "glfw/*.hpp"
     "webgpu/*.cpp" "webgpu/*.hpp" "webgpu/*.mm"
 )
@@ -607,9 +523,9 @@ foreach(_src IN LISTS ENGINE_LIB_SOURCES)
     endif()
     
     # Check GLES files
-    if(NOT USE_GLES)
-        if("${_src}" MATCHES "/gles/" OR "${_fname}" MATCHES "^gles_")
-            message(STATUS "Excluding GLES lib source from build: ${_src}")
+    if(NOT USE_OGL)
+        if("${_src}" MATCHES "/ogl/" OR "${_fname}" MATCHES "^ogl_")
+            message(STATUS "Excluding OGL lib source from build: ${_src}")
             set(_exclude_file TRUE)
         endif()
     endif()
@@ -643,15 +559,17 @@ else()
 endif()
 
 if(WIN32)
-    # Add Windows system libraries required by wgpu-native
-    target_link_libraries(EngineLib PUBLIC
-        d3dcompiler
-        ws2_32
-        userenv
-        ntdll
-        bcrypt
-        opengl32
-    )
+    if (USE_WEBGPU)
+        # Add Windows system libraries required by wgpu-native
+        target_link_libraries(EngineLib PUBLIC
+            d3dcompiler
+            ws2_32
+            userenv
+            ntdll
+            bcrypt
+            opengl32
+        )
+    endif()
     
     if(USE_D3D12)
         target_link_libraries(EngineLib PUBLIC
@@ -674,6 +592,7 @@ endif()
 # Set include directories for the library
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR})
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/d3d12)
+target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/ogl)
 target_include_directories(EngineLib PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 target_compile_definitions(EngineLib PRIVATE NOMINMAX)
 if(USE_D3D12)

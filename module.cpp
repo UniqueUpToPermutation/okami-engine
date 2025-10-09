@@ -59,9 +59,11 @@ Error EngineModule::Startup(ModuleInterface& a) {
     Error e = StartupImpl(a);
     OKAMI_ERROR_RETURN(e);
 
-    for (auto& mod : m_submodules) {
-        e += mod->Startup(a);
-        OKAMI_ERROR_RETURN(e);
+    if (b_children_process_startup) {
+        for (auto& mod : m_submodules) {
+            e += mod->Startup(a);
+            OKAMI_ERROR_RETURN(e);
+        }
     }
 
     b_started = true;
