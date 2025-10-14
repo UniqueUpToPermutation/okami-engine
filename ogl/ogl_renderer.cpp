@@ -1,6 +1,8 @@
 #include "ogl_renderer.hpp"
 #include "ogl_utils.hpp"
 #include "ogl_triangle.hpp"
+#include "ogl_texture.hpp"
+#include "ogl_sprite.hpp"
 
 #include "../config.hpp"
 #include "../storage.hpp"
@@ -25,6 +27,8 @@ private:
     std::unique_ptr<IGLShaderCache> m_shaderCache;
 
     OGLTriangleRenderer* m_triangleRenderer = nullptr;
+    OGLTextureManager* m_textureManager = nullptr;
+    OGLSpriteRenderer* m_spriteRenderer = nullptr;
 
     StorageModule<Camera>* m_cameraStorage = nullptr;
     IComponentView<Transform>* m_transformView = nullptr;
@@ -70,6 +74,9 @@ protected:
     }
 
     Error ProcessFrameImpl(Time const&, ModuleInterface&) override {
+        // Upload textures
+        m_textureManager->ProcessNewResources({});
+
         m_shaderCache.reset();
 
         glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
@@ -101,6 +108,7 @@ protected:
         };
 
         m_triangleRenderer->Pass(pass);
+        m_spriteRenderer->Pass(pass);
 
         m_glProvider->SwapBuffers();
 
@@ -119,6 +127,8 @@ public:
         
         m_cameraStorage = CreateChild<StorageModule<Camera>>();
         m_triangleRenderer = CreateChild<OGLTriangleRenderer>();
+        m_textureManager = CreateChild<OGLTextureManager>();
+        m_spriteRenderer = CreateChild<OGLSpriteRenderer>(m_textureManager);
     }
 
     std::string_view GetName() const override {

@@ -71,13 +71,11 @@ namespace okami {
             return m_params;
         }
 
-        inline const std::span<uint8_t const> GetData() const {
-            return std::span(m_data);
-        }
+        size_t GetMipOffset(int mipLevel) const;
+        size_t GetMipSize(int mipLevel) const;
 
-        inline const std::span<uint8_t> GetData() {
-            return std::span(m_data);
-        }
+        const std::span<uint8_t const> GetData(int mipLevel = 0) const;
+        std::span<uint8_t> GetData(int mipLevel = 0);
 
         static Expected<Texture> FromPNG(const std::filesystem::path& path,
             const TextureLoadParams& params = {});

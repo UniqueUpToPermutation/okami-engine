@@ -252,3 +252,11 @@ GLint okami::GetUniformLocation(GLProgram const& program, const char* name, Erro
     }
     return location;
 }
+
+Error okami::GetGlError() {
+    GLenum errorCode = glGetError();
+    if (errorCode != GL_NO_ERROR) {
+        return Error("OpenGL error: " + GetGLErrorString(errorCode));
+    }
+    return {};
+}

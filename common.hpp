@@ -34,7 +34,10 @@
 #define OKAMI_DEFER(x) auto OKAMI_DEFER_##__LINE__ = okami::ScopeGuard([&]() { x; })
 
 #define OKAMI_ERROR_RETURN(x) if (!x) { return okami::MakeError(std::move(x)); }
-#define OKAMI_UNEXPECTED_RETURN(x) if (!x) { return std::unexpected(okami::MakeError(std::move(x))); }
+#define OKAMI_UNEXPECTED_RETURN(x) \
+{ \
+	auto tmp = x; if (!tmp) { return std::unexpected(okami::MakeError(std::move(tmp))); } \
+}
 
 namespace okami {
 	struct Error {

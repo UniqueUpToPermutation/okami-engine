@@ -476,6 +476,58 @@ Error Texture::SaveKTX2(const std::filesystem::path& path) const {
     
     return {};
 }
+
+size_t Texture::GetMipOffset(int mipLevel) const {
+    if (mipLevel >= m_desc.mipLevels) {
+        throw std::out_of_range("Invalid mip level");
+    }
+
+    size_t offset = 0;
+    for (int i = 0; i < mipLevel; ++i) {
+        offset += GetMipSize(i);
+    }
+    return offset;
+}
+
+size_t Texture::GetMipSize(int mipLevel) const {
+    if (mipLevel >= m_desc.mipLevels) {
+        throw std::out_of_range("Invalid mip level");
+    }
+
+    uint32_t mipWidth = std::max(1u, m_desc.width >> mipLevel);
+    uint32_t mipHeight = std::max(1u, m_desc.height >> mipLevel);
+    uint32_t mipDepth = (m_desc.type == TextureType::TEXTURE_3D) ? std::max(1u, m_desc.depth >> mipLevel) : 1;
+    uint32_t arraySize = (m_desc.type == TextureType::TEXTURE_2D_ARRAY || m_desc.type == TextureType::TEXTURE_CUBE) ? m_desc.arraySize : 1;
+
+    return mipWidth * mipHeight * mipDepth * arraySize * GetPixelStride(m_desc.format);
+}
+
+const std::span<uint8_t const> Texture::GetData(int mipLevel) const {
+    // Validate mip level
+    if (mipLevel >= m_desc.mipLevels) {
+        throw std::out_of_range("Invalid mip level");
+    }
+
+    // Calculate offset and size for the specified mip level
+    size_t offset = GetMipOffset(mipLevel);
+    size_t size = GetMipSize(mipLevel);
+
+    return std::span(m_data).subspan(offset, size);
+}
+
+std::span<uint8_t> Texture::GetData(int mipLevel) {
+    // Validate mip level
+    if (mipLevel >= m_desc.mipLevels) {
+        throw std::out_of_range("Invalid mip level");
+    }
+
+    // Calculate offset and size for the specified mip level
+    size_t offset = GetMipOffset(mipLevel);
+    size_t size = GetMipSize(mipLevel);
+
+    return std::span(m_data).subspan(offset, size);
+}
+
 #else
 Error Texture::SaveKTX2(const std::filesystem::path& path) const {
     return Error("KTX2 support not compiled in");

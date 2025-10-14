@@ -1,5 +1,7 @@
 {
     "files.associations": {
+        "*.fs": "glsl",
+        "*.gs": "glsl",
         "optional": "cpp",
         "vector": "cpp",
         "__bit_reference": "cpp",
@@ -106,6 +108,7 @@
         "xstring": "cpp",
         "xtr1common": "cpp",
         "xtree": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "*.glsl": "cpp"
     }
 }

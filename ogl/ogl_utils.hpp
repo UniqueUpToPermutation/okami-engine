@@ -73,6 +73,8 @@ namespace okami {
             }
             id_ = new_id;
         }
+
+        GLuint* ptr() { return &id_; }
         
         operator bool() const { return id_ != 0; }
         operator GLuint() const { return id_; }
@@ -151,4 +153,7 @@ namespace okami {
     Expected<GLProgram> CreateProgram(ProgramShaderPaths const& shaderPaths, IGLShaderCache& cache);
 
     GLint GetUniformLocation(GLProgram const& program, const char* name, Error& error);
+    Error GetGlError();
+
+
 }

@@ -56,6 +56,12 @@ private:
         std::smatch matches;
         
         if (std::regex_match(line, matches, includeRegex)) {
+            // Check if the line contains "// Preprocessor: Ignore"
+            if (line.find("// Preprocessor: Ignore") != std::string::npos) {
+                // Skip processing this include, just add the line as-is
+                result += line + "\n";
+                return true; // Line was processed (but ignored)
+            }
             std::string includeFile = matches[1].str();
             
             // Resolve the include path relative to the current file's directory

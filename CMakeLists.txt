@@ -366,6 +366,8 @@ if (USE_OGL)
         "${CMAKE_SOURCE_DIR}/ogl/shaders/*.glsl"
         "${CMAKE_SOURCE_DIR}/ogl/shaders/*.vs"
         "${CMAKE_SOURCE_DIR}/ogl/shaders/*.fs"
+        "${CMAKE_SOURCE_DIR}/ogl/shaders/*.gs"
+        "${CMAKE_SOURCE_DIR}/ogl/shaders/*.ts"
         "${CMAKE_SOURCE_DIR}/ogl/shaders/*.vert"
         "${CMAKE_SOURCE_DIR}/ogl/shaders/*.frag"
     )

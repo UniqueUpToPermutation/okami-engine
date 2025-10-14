@@ -1,0 +1,56 @@
+#pragma once
+
+#include "../renderer.hpp"
+#include "../storage.hpp"
+#include "../transform.hpp"
+#include "../texture.hpp"
+
+#include "ogl_utils.hpp"
+
+#include "shaders/sprite.glsl"
+
+#include "ogl_texture.hpp"
+
+namespace okami {
+    class OGLSpriteRenderer final :
+        public EngineModule,
+        public IOGLRenderModule {
+    protected:
+        GLProgram m_program;
+        GLVertexArray m_vao;        // Vertex Array Object
+        GLBuffer m_instanceVBO;     // Vertex buffer for sprite instance data
+        
+        // Uniform locations
+        GLint u_viewProj = -1;
+        GLint u_texture = -1;
+
+        // Component storage and views
+        StorageModule<SpriteComponent>* m_storage = nullptr;
+        IComponentView<Transform>* m_transformView = nullptr;
+        OGLTextureManager* m_textureManager = nullptr;
+        
+        // Constants for sprite management
+        static constexpr uint32_t MAX_SPRITES = 1024;
+
+        Error RegisterImpl(ModuleInterface&) override;
+        Error StartupImpl(ModuleInterface&) override;
+        void ShutdownImpl(ModuleInterface&) override;
+
+        Error ProcessFrameImpl(Time const&, ModuleInterface&) override;
+        Error MergeImpl() override;
+    
+    public:
+        OGLSpriteRenderer(OGLTextureManager* textureManager);
+
+        Error Pass(OGLPass const& pass) override;
+
+        std::string_view GetName() const override;
+        
+    private:
+        // Helper method to convert SpriteComponent + Transform to SpriteInstance
+        glsl::SpriteInstance CreateSpriteInstance(const SpriteComponent& sprite, const Transform& transform) const;
+        
+        // Helper method to sort sprites back-to-front based on Z position
+        void SortSpritesBackToFront(std::vector<std::pair<entity_t, glsl::SpriteInstance>>& sprites) const;
+    };
+}
