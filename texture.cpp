@@ -125,10 +125,10 @@ uint32_t GetPixelStride(TextureFormat format) {
     }
 }
 
-uint32_t GetTextureSize(const TextureDesc& info) {
+size_t okami::GetTextureSize(const TextureDesc& info) {
     uint32_t pixelStride = GetPixelStride(info.format);
-    uint32_t totalSize = 0;
-    
+    size_t totalSize = 0;
+
     // Calculate size for all mip levels
     for (uint32_t mip = 0; mip < info.mipLevels; ++mip) {
         uint32_t mipWidth = std::max(1u, info.width >> mip);
@@ -146,6 +146,46 @@ uint32_t GetTextureSize(const TextureDesc& info) {
     }
     
     return totalSize;
+}
+
+size_t okami::GetMipSize(TextureDesc const& desc, uint32_t mipLevel) {
+    if (mipLevel >= desc.mipLevels) {
+        throw std::out_of_range("Invalid mip level");
+    }
+
+    uint32_t mipWidth = std::max(1u, desc.width >> mipLevel);
+    uint32_t mipHeight = std::max(1u, desc.height >> mipLevel);
+    uint32_t mipDepth = (desc.type == TextureType::TEXTURE_3D) ? std::max(1u, desc.depth >> mipLevel) : 1;
+    uint32_t arraySize = (desc.type == TextureType::TEXTURE_2D_ARRAY || desc.type == TextureType::TEXTURE_CUBE) ? desc.arraySize : 1;
+
+    return mipWidth * mipHeight * mipDepth * arraySize * GetPixelStride(desc.format);
+}
+
+size_t okami::GetMipOffset(TextureDesc const& desc, uint32_t mipLevel) {
+    if (mipLevel >= desc.mipLevels) {
+        throw std::out_of_range("Invalid mip level");
+    }
+
+    size_t offset = 0;
+    for (uint32_t i = 0; i < mipLevel; ++i) {
+        offset += GetMipSize(desc, i);
+    }
+    return offset;
+}
+
+size_t okami::GetSubresourceIndex(TextureDesc const& desc, uint32_t mipLevel, uint32_t layer) {
+    if (mipLevel >= desc.mipLevels) {
+        throw std::out_of_range("Invalid mip level");
+    }
+    if (layer >= desc.arraySize) {
+        throw std::out_of_range("Invalid layer index");
+    }
+
+    return layer * desc.mipLevels + mipLevel;
+}
+
+static size_t GetSubresourceCount(TextureDesc const& desc) {
+    return desc.arraySize * desc.mipLevels;
 }
 
 Expected<Texture> Texture::FromPNG(const std::filesystem::path& path,
@@ -197,6 +237,23 @@ Expected<Texture> Texture::FromPNG(const std::filesystem::path& path,
     free(imageData);
     
     return texture;
+}
+
+void Texture::UpdateSubDescs() {
+    m_subDescs.resize(GetSubresourceCount(m_desc));
+
+    size_t offset = 0;
+    for (uint32_t layer = 0; layer < m_desc.arraySize; ++layer) {
+        for (uint32_t mip = 0; mip < m_desc.mipLevels; ++mip) {
+            SubDesc subDesc = {};
+            subDesc.mipLevel = mip;
+            subDesc.layer = layer;
+            subDesc.offset = static_cast<uint32_t>(offset);
+
+            m_subDescs[GetSubresourceIndex(m_desc, mip, layer)] = subDesc;
+            offset += GetMipSize(m_desc, mip);
+        }
+    }
 }
 
 #ifdef USE_KTX
@@ -259,30 +316,52 @@ Expected<Texture> Texture::FromKTX2(const std::filesystem::path& path,
     // Create texture object
     Texture texture(info, params);
     
-    // Load the image data first if needed
-    if (!ktxTex->pData) {
-        result = ktxTexture_LoadImageData((ktxTexture*)ktxTex, nullptr, 0);
-        if (result != KTX_SUCCESS) {
-            ktxTexture_Destroy(ktxTex);
-            return std::unexpected(Error("Failed to load KTX image data (error code: " + std::to_string(result) + ")"));
+    // Check if the texture needs transcoding
+    if (ktxTexture_NeedsTranscoding(ktxTex)) {
+        // For now, we don't support transcoding - we need uncompressed formats
+        ktxTexture_Destroy(ktxTex);
+        return std::unexpected(Error("KTX2 texture requires transcoding, which is not currently supported"));
+    }
+    
+    // Load the image data into memory
+    result = ktxTexture_LoadImageData(ktxTex, nullptr, 0);
+    if (result != KTX_SUCCESS) {
+        ktxTexture_Destroy(ktxTex);
+        return std::unexpected(Error("Failed to load KTX2 image data (error code: " + std::to_string(result) + ")"));
+    }
+    
+    // Now we can safely get the data pointer
+    auto imData = ktxTexture_GetData(ktxTex);
+    auto imDataSz = ktxTexture_GetDataSize(ktxTex);
+    
+    if (!imData) {
+        ktxTexture_Destroy(ktxTex);
+        return std::unexpected(Error("KTX2 texture data is null after loading"));
+    }
+
+    for (uint32_t layer = 0; layer < ktxTex->numLayers; ++layer) {
+        for (uint32_t mip = 0; mip < ktxTex->numLevels; ++mip) {
+            ktx_size_t offset;
+            result = ktxTexture_GetImageOffset(ktxTex, mip, layer, 0, &offset);
+            if (result != KTX_SUCCESS) {
+                ktxTexture_Destroy(ktxTex);
+                return std::unexpected(Error("Failed to get image offset for mip " + std::to_string(mip) + ", layer " + std::to_string(layer)));
+            }
+
+            auto destData = texture.GetData(mip, layer);
+            auto expectedSize = destData.size();
+            
+            if (offset + expectedSize > imDataSz) {
+                ktxTexture_Destroy(ktxTex);
+                return std::unexpected(Error("KTX2 image data size mismatch: offset=" + std::to_string(offset) + 
+                                           ", expectedSize=" + std::to_string(expectedSize) + 
+                                           ", totalSize=" + std::to_string(imDataSz)));
+            }
+
+            std::memcpy(destData.data(), imData + offset, expectedSize);
         }
     }
 
-    // Load the image data into our texture
-    ktx_size_t dataSize = ktxTex->dataSize;
-    if (ktxTex->pData && dataSize > 0) {
-        // Copy data to our texture
-        if (dataSize > texture.m_data.size()) {
-            LOG(WARNING) << "KTX data size (" << dataSize << ") larger than expected texture size (" << texture.m_data.size() << "), truncating";
-            dataSize = texture.m_data.size();
-        }
-        
-        std::copy(ktxTex->pData, ktxTex->pData + dataSize, texture.m_data.begin());
-    } else {
-        ktxTexture_Destroy(ktxTex);
-        return std::unexpected(Error("KTX texture has no data after loading"));
-    }
-    
     // Clean up KTX texture
     ktxTexture_Destroy(ktxTex);
     
@@ -295,96 +374,10 @@ Expected<Texture> Texture::FromKTX2(const std::filesystem::path& path,
 }
 #endif
 
-Error Texture::SavePNG(const std::filesystem::path& path) const {
-    // PNG only supports certain formats, so we need to convert
-    std::vector<uint8_t> pngData;
-    unsigned width = m_desc.width;
-    unsigned height = m_desc.height;
-    LodePNGColorType colorType;
-    unsigned bitDepth = 8;
-
-    // Convert texture data to PNG-compatible format
-    switch (m_desc.format) {
-        case TextureFormat::R8: {
-            colorType = LCT_GREY;
-            pngData = m_data; // Direct copy for single channel 8-bit
-            break;
-        }
-        case TextureFormat::RG8: {
-            colorType = LCT_GREY_ALPHA;
-            pngData = m_data; // Direct copy for two channel 8-bit
-            break;
-        }
-        case TextureFormat::RGB8: {
-            colorType = LCT_RGB;
-            pngData = m_data; // Direct copy for three channel 8-bit
-            break;
-        }
-        case TextureFormat::RGBA8: {
-            colorType = LCT_RGBA;
-            pngData = m_data; // Direct copy for four channel 8-bit
-            break;
-        }
-        case TextureFormat::R32F: {
-            // Convert R32F to R8
-            colorType = LCT_GREY;
-            pngData.resize(width * height);
-            const float* srcData = reinterpret_cast<const float*>(m_data.data());
-            for (size_t i = 0; i < width * height; ++i) {
-                // Clamp to [0,1] and convert to 8-bit
-                float val = std::clamp(srcData[i], 0.0f, 1.0f);
-                pngData[i] = static_cast<uint8_t>(val * 255.0f);
-            }
-            break;
-        }
-        case TextureFormat::RG32F: {
-            // Convert RG32F to RG8
-            colorType = LCT_GREY_ALPHA;
-            pngData.resize(width * height * 2);
-            const float* srcData = reinterpret_cast<const float*>(m_data.data());
-            for (size_t i = 0; i < width * height * 2; ++i) {
-                // Clamp to [0,1] and convert to 8-bit
-                float val = std::clamp(srcData[i], 0.0f, 1.0f);
-                pngData[i] = static_cast<uint8_t>(val * 255.0f);
-            }
-            break;
-        }
-        case TextureFormat::RGB32F: {
-            // Convert RGB32F to RGB8
-            colorType = LCT_RGB;
-            pngData.resize(width * height * 3);
-            const float* srcData = reinterpret_cast<const float*>(m_data.data());
-            for (size_t i = 0; i < width * height * 3; ++i) {
-                // Clamp to [0,1] and convert to 8-bit
-                float val = std::clamp(srcData[i], 0.0f, 1.0f);
-                pngData[i] = static_cast<uint8_t>(val * 255.0f);
-            }
-            break;
-        }
-        case TextureFormat::RGBA32F: {
-            // Convert RGBA32F to RGBA8
-            colorType = LCT_RGBA;
-            pngData.resize(width * height * 4);
-            const float* srcData = reinterpret_cast<const float*>(m_data.data());
-            for (size_t i = 0; i < width * height * 4; ++i) {
-                // Clamp to [0,1] and convert to 8-bit
-                float val = std::clamp(srcData[i], 0.0f, 1.0f);
-                pngData[i] = static_cast<uint8_t>(val * 255.0f);
-            }
-            break;
-        }
-        default:
-            return Error("Unsupported texture format for PNG export: " + std::to_string(static_cast<int>(m_desc.format)));
-    }
-
+Error Texture::SavePNG(const std::filesystem::path& path, bool saveMips) const {
     // Only support 2D textures for PNG export
     if (m_desc.type != TextureType::TEXTURE_2D) {
         return Error("PNG export only supports 2D textures");
-    }
-
-    // Only export the first mip level
-    if (m_desc.mipLevels > 1) {
-        LOG(WARNING) << "PNG export will only save the first mip level of texture";
     }
 
     // Only export the first array slice
@@ -392,25 +385,140 @@ Error Texture::SavePNG(const std::filesystem::path& path) const {
         LOG(WARNING) << "PNG export will only save the first array slice of texture";
     }
 
-    // Use lodepng to encode and save the PNG
-    std::vector<uint8_t> encodedPng;
-    unsigned error = lodepng::encode(encodedPng, pngData, width, height, colorType, bitDepth);
+    // Determine how many mip levels to save
+    uint32_t mipsToSave = saveMips ? m_desc.mipLevels : 1;
     
-    if (error) {
-        return Error("LodePNG encoding error: " + std::string(lodepng_error_text(error)));
-    }
+    // Helper lambda to save a single mip level
+    auto saveMipLevel = [&](uint32_t mipLevel, const std::filesystem::path& outputPath) -> Error {
+        // Calculate mip dimensions
+        unsigned mipWidth = std::max(1u, m_desc.width >> mipLevel);
+        unsigned mipHeight = std::max(1u, m_desc.height >> mipLevel);
+        
+        // Get mip data
+        auto mipData = GetData(mipLevel);
+        
+        // PNG only supports certain formats, so we need to convert
+        std::vector<uint8_t> pngData;
+        LodePNGColorType colorType;
+        unsigned bitDepth = 8;
 
-    // Save to file
-    std::ofstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        return Error("Failed to open file for writing: " + path.string());
-    }
+        // Convert texture data to PNG-compatible format
+        switch (m_desc.format) {
+            case TextureFormat::R8: {
+                colorType = LCT_GREY;
+                pngData.assign(mipData.begin(), mipData.end()); // Direct copy for single channel 8-bit
+                break;
+            }
+            case TextureFormat::RG8: {
+                colorType = LCT_GREY_ALPHA;
+                pngData.assign(mipData.begin(), mipData.end()); // Direct copy for two channel 8-bit
+                break;
+            }
+            case TextureFormat::RGB8: {
+                colorType = LCT_RGB;
+                pngData.assign(mipData.begin(), mipData.end()); // Direct copy for three channel 8-bit
+                break;
+            }
+            case TextureFormat::RGBA8: {
+                colorType = LCT_RGBA;
+                pngData.assign(mipData.begin(), mipData.end()); // Direct copy for four channel 8-bit
+                break;
+            }
+            case TextureFormat::R32F: {
+                // Convert R32F to R8
+                colorType = LCT_GREY;
+                pngData.resize(mipWidth * mipHeight);
+                const float* srcData = reinterpret_cast<const float*>(mipData.data());
+                for (size_t i = 0; i < mipWidth * mipHeight; ++i) {
+                    // Clamp to [0,1] and convert to 8-bit
+                    float val = std::clamp(srcData[i], 0.0f, 1.0f);
+                    pngData[i] = static_cast<uint8_t>(val * 255.0f);
+                }
+                break;
+            }
+            case TextureFormat::RG32F: {
+                // Convert RG32F to RG8
+                colorType = LCT_GREY_ALPHA;
+                pngData.resize(mipWidth * mipHeight * 2);
+                const float* srcData = reinterpret_cast<const float*>(mipData.data());
+                for (size_t i = 0; i < mipWidth * mipHeight * 2; ++i) {
+                    // Clamp to [0,1] and convert to 8-bit
+                    float val = std::clamp(srcData[i], 0.0f, 1.0f);
+                    pngData[i] = static_cast<uint8_t>(val * 255.0f);
+                }
+                break;
+            }
+            case TextureFormat::RGB32F: {
+                // Convert RGB32F to RGB8
+                colorType = LCT_RGB;
+                pngData.resize(mipWidth * mipHeight * 3);
+                const float* srcData = reinterpret_cast<const float*>(mipData.data());
+                for (size_t i = 0; i < mipWidth * mipHeight * 3; ++i) {
+                    // Clamp to [0,1] and convert to 8-bit
+                    float val = std::clamp(srcData[i], 0.0f, 1.0f);
+                    pngData[i] = static_cast<uint8_t>(val * 255.0f);
+                }
+                break;
+            }
+            case TextureFormat::RGBA32F: {
+                // Convert RGBA32F to RGBA8
+                colorType = LCT_RGBA;
+                pngData.resize(mipWidth * mipHeight * 4);
+                const float* srcData = reinterpret_cast<const float*>(mipData.data());
+                for (size_t i = 0; i < mipWidth * mipHeight * 4; ++i) {
+                    // Clamp to [0,1] and convert to 8-bit
+                    float val = std::clamp(srcData[i], 0.0f, 1.0f);
+                    pngData[i] = static_cast<uint8_t>(val * 255.0f);
+                }
+                break;
+            }
+            default:
+                return Error("Unsupported texture format for PNG export: " + std::to_string(static_cast<int>(m_desc.format)));
+        }
 
-    file.write(reinterpret_cast<const char*>(encodedPng.data()), encodedPng.size());
-    file.close();
+        // Use lodepng to encode and save the PNG
+        std::vector<uint8_t> encodedPng;
+        unsigned error = lodepng::encode(encodedPng, pngData, mipWidth, mipHeight, colorType, bitDepth);
+        
+        if (error) {
+            return Error("LodePNG encoding error: " + std::string(lodepng_error_text(error)));
+        }
 
-    if (!file.good()) {
-        return Error("Failed to write PNG data to file: " + path.string());
+        // Save to file
+        std::ofstream file(outputPath, std::ios::binary);
+        if (!file.is_open()) {
+            return Error("Failed to open file for writing: " + outputPath.string());
+        }
+
+        file.write(reinterpret_cast<const char*>(encodedPng.data()), encodedPng.size());
+        file.close();
+
+        if (!file.good()) {
+            return Error("Failed to write PNG data to file: " + outputPath.string());
+        }
+
+        return {};
+    };
+
+    // Save mip levels
+    for (uint32_t mip = 0; mip < mipsToSave; ++mip) {
+        std::filesystem::path outputPath;
+        
+        if (mipsToSave == 1) {
+            // Single mip level, use original path
+            outputPath = path;
+        } else {
+            // Multiple mip levels, append mip level to filename
+            std::string stem = path.stem().string();
+            std::string extension = path.extension().string();
+            std::string directory = path.parent_path().string();
+            
+            std::string newFilename = stem + "_mip" + std::to_string(mip) + extension;
+            outputPath = std::filesystem::path(directory) / newFilename;
+        }
+        
+        Error result = saveMipLevel(mip, outputPath);
+        OKAMI_ERROR_RETURN(result);
     }
 
     return {};
@@ -477,55 +585,12 @@ Error Texture::SaveKTX2(const std::filesystem::path& path) const {
     return {};
 }
 
-size_t Texture::GetMipOffset(int mipLevel) const {
-    if (mipLevel >= m_desc.mipLevels) {
-        throw std::out_of_range("Invalid mip level");
-    }
-
-    size_t offset = 0;
-    for (int i = 0; i < mipLevel; ++i) {
-        offset += GetMipSize(i);
-    }
-    return offset;
+const std::span<uint8_t const> Texture::GetData(uint32_t mipLevel, uint32_t layer) const {
+    return std::span(m_data).subspan(m_subDescs.at(GetSubresourceIndex(m_desc, mipLevel, layer)).offset, GetMipSize(m_desc, mipLevel));
 }
 
-size_t Texture::GetMipSize(int mipLevel) const {
-    if (mipLevel >= m_desc.mipLevels) {
-        throw std::out_of_range("Invalid mip level");
-    }
-
-    uint32_t mipWidth = std::max(1u, m_desc.width >> mipLevel);
-    uint32_t mipHeight = std::max(1u, m_desc.height >> mipLevel);
-    uint32_t mipDepth = (m_desc.type == TextureType::TEXTURE_3D) ? std::max(1u, m_desc.depth >> mipLevel) : 1;
-    uint32_t arraySize = (m_desc.type == TextureType::TEXTURE_2D_ARRAY || m_desc.type == TextureType::TEXTURE_CUBE) ? m_desc.arraySize : 1;
-
-    return mipWidth * mipHeight * mipDepth * arraySize * GetPixelStride(m_desc.format);
-}
-
-const std::span<uint8_t const> Texture::GetData(int mipLevel) const {
-    // Validate mip level
-    if (mipLevel >= m_desc.mipLevels) {
-        throw std::out_of_range("Invalid mip level");
-    }
-
-    // Calculate offset and size for the specified mip level
-    size_t offset = GetMipOffset(mipLevel);
-    size_t size = GetMipSize(mipLevel);
-
-    return std::span(m_data).subspan(offset, size);
-}
-
-std::span<uint8_t> Texture::GetData(int mipLevel) {
-    // Validate mip level
-    if (mipLevel >= m_desc.mipLevels) {
-        throw std::out_of_range("Invalid mip level");
-    }
-
-    // Calculate offset and size for the specified mip level
-    size_t offset = GetMipOffset(mipLevel);
-    size_t size = GetMipSize(mipLevel);
-
-    return std::span(m_data).subspan(offset, size);
+std::span<uint8_t> Texture::GetData(uint32_t mipLevel, uint32_t layer) {
+    return std::span(m_data).subspan(m_subDescs.at(GetSubresourceIndex(m_desc, mipLevel, layer)).offset, GetMipSize(m_desc, mipLevel));
 }
 
 #else

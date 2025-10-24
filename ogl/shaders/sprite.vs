@@ -17,10 +17,10 @@ void main() {
     );
 
     vec2 uvs[4] = vec2[](
-        vec2(0.0, 0.0),
-        vec2(1.0, 0.0),
         vec2(0.0, 1.0),
-        vec2(1.0, 1.0)
+        vec2(1.0, 1.0),
+        vec2(0.0, 0.0),
+        vec2(1.0, 0.0)
     );
 
     int idx = gl_VertexID % 4;

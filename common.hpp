@@ -33,10 +33,10 @@
 
 #define OKAMI_DEFER(x) auto OKAMI_DEFER_##__LINE__ = okami::ScopeGuard([&]() { x; })
 
-#define OKAMI_ERROR_RETURN(x) if (!x) { return okami::MakeError(std::move(x)); }
+#define OKAMI_ERROR_RETURN(x) if (IsError(x)) { return okami::MakeError(std::move(x)); }
 #define OKAMI_UNEXPECTED_RETURN(x) \
 { \
-	auto tmp = x; if (!tmp) { return std::unexpected(okami::MakeError(std::move(tmp))); } \
+	auto tmp = x; if (IsError(tmp)) { return std::unexpected(okami::MakeError(std::move(tmp))); } \
 }
 
 namespace okami {
@@ -56,10 +56,6 @@ namespace okami {
 			return Union(other);
 		}
 
-		inline operator bool() const {
-			return IsOk();
-		}
-
 		inline bool IsOk() const {
 			return std::holds_alternative<std::monostate>(m_contents);
 		}
@@ -75,13 +71,21 @@ namespace okami {
 
 		std::string Str() const;
 	};
+	
+	template <typename T>
+	using Expected = std::expected<T, Error>;
+
+	inline bool IsError(Error const& err) {
+		return err.IsError();
+	}
+
+	template <typename T> bool IsError(Expected<T> const& expected) {
+		return !expected.has_value();
+	}
 
 	inline Error MakeError(Error err) {
 		return err;
 	}
-
-	template <typename T>
-	using Expected = std::expected<T, Error>;
 
 	template <typename T>
 	inline Error MakeError(Expected<T> expected) {

@@ -38,7 +38,6 @@ namespace okami {
 
 	public:
 		Error Startup();
-		void UploadResources();
 		void Run(std::optional<size_t> frameCount = std::nullopt);
 		void Shutdown();
 
