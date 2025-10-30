@@ -98,9 +98,6 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
     glBindVertexArray(m_instanceBuffer.GetVertexArray()); 
     OKAMI_DEFER(glBindVertexArray(0)); OKAMI_CHK_GL;
 
-    glBindBuffer(GL_ARRAY_BUFFER, m_instanceBuffer.GetBuffer()); 
-    OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0)); OKAMI_CHK_GL;
-
     {
         auto map = m_instanceBuffer.Map();
         OKAMI_ERROR_RETURN_IF(!map, "Failed to map instance buffer for sprite rendering");
