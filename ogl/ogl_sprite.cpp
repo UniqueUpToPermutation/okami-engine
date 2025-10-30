@@ -79,15 +79,8 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
             return a.second.a_position.z > b.second.a_position.z;
         });
 
-    // Upload sprite instance data
-    std::vector<glsl::SpriteInstance> instanceData;
-    instanceData.reserve(spriteInstances.size());
-    for (const auto& pair : spriteInstances) {
-        instanceData.push_back(pair.second);
-    }
-
     // Resize if necessary
-    m_instanceBuffer.Reserve(instanceData.size());
+    m_instanceBuffer.Reserve(spriteInstances.size());
 
     OKAMI_CHK_GL;
 
@@ -101,8 +94,8 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
     {
         auto map = m_instanceBuffer.Map();
         OKAMI_ERROR_RETURN_IF(!map, "Failed to map instance buffer for sprite rendering");
-        for (size_t i = 0; i < instanceData.size(); ++i) {
-            (*map)[i] = instanceData[i];
+        for (size_t i = 0; i < spriteInstances.size(); ++i) {
+            (*map)[i] = spriteInstances[i].second;
         }
     }
 
