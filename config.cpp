@@ -259,13 +259,11 @@ protected:
             config = YAML::LoadFile(GetConfigPath(DEFAULT_PATH).string());
 		}
 		catch (const YAML::Exception& e) {
-			return Error(std::string("Failed to load config: ") + e.what());
+			return OKAMI_ERROR(std::string("Failed to load config: ") + e.what());
 		}
 
-		if (!config.IsMap()) {
-			return Error("Configuration file is not a valid map structure.");
-		}
-
+        OKAMI_ERROR_RETURN_IF(!config.IsMap(), "Configuration file is not a valid map structure.");
+        
         std::vector<std::string> configSections;
         for (auto const& configSection : config) {
             if (!configSection.first.IsScalar()) {

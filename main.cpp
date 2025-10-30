@@ -52,6 +52,12 @@ int main() {
     en.AddComponent(e5, SpriteComponent{ textureHandle });
     en.AddComponent(e5, Transform::Scale(1.0 / 128.0f));
 
+    auto e6 = en.CreateEntity();
+    en.AddComponent(e6, SpriteComponent{ 
+        .m_texture = textureHandle,
+    });
+    en.AddComponent(e6, Transform::Translate(0.5f, 0.5f, 0.0f) * Transform::Scale(1.0 / 128.0f));
+
     en.AddScript([e2](Time const& t, ModuleInterface& mi) {
         static double angle = 0.0f;
         angle += t.m_deltaTime;

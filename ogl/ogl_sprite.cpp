@@ -13,46 +13,25 @@ Error OGLSpriteRenderer::RegisterImpl(ModuleInterface& mi) {
 
 Error OGLSpriteRenderer::StartupImpl(ModuleInterface& mi) {
     auto* cache = mi.m_interfaces.Query<IGLShaderCache>();
-    if (!cache) {
-        return Error("IGLShaderCache interface not available for OGLSpriteRenderer");
-    }
+    OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLSpriteRenderer");
 
     m_transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
-    if (!m_transformView) {
-        return Error("IComponentView<Transform> interface not available for OGLSpriteRenderer");
-    }
+    OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OGLSpriteRenderer");
 
     // Create shader program with vertex, geometry, and fragment shaders
     auto program = CreateProgram(ProgramShaderPaths{
         .m_vertex = GetGLSLShaderPath("sprite.vs"),
-        .m_fragment = GetGLSLShaderPath("sprite.fs")
+        .m_fragment = GetGLSLShaderPath("sprite.fs"),
+        .m_geometry = GetGLSLShaderPath("sprite.gs"),
     }, *cache);
     OKAMI_ERROR_RETURN(program);
 
     m_program = std::move(*program);
-
-    // Create and setup VAO
-    GLuint vaoId;
-    glGenVertexArrays(1, &vaoId);
-    m_vao = GLVertexArray(vaoId);
     
     // Create instance VBO for sprite data
-    GLuint vboId;
-    glGenBuffers(1, &vboId);
-    m_instanceVBO = GLBuffer(vboId);
-    
-    // Setup VAO with sprite instance attributes
-    glBindVertexArray(m_vao.get());
-    glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO.get());
-    
-    // Reserve space for maximum sprites (will be updated each frame)
-    glBufferData(GL_ARRAY_BUFFER, MAX_SPRITES * sizeof(glsl::SpriteInstance), nullptr, GL_DYNAMIC_DRAW);
-    
-    // Setup vertex attributes after buffer is bound
-    glsl::__create_vertex_array_SpriteInstance();
-    
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    auto buffer = UploadVertexBuffer<glsl::SpriteInstance>::Create(glsl::__create_vertex_array_SpriteInstance, 1);
+    OKAMI_ERROR_RETURN(buffer);
+    m_instanceBuffer = std::move(*buffer);
 
     // Get uniform locations
     Error uniformErrs;
@@ -78,7 +57,7 @@ Error OGLSpriteRenderer::MergeImpl() {
 
 Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
     // Collect all sprites and their transforms
-    std::vector<std::pair<entity_t, glsl::SpriteInstance>> spriteInstances;
+    std::vector<std::pair<ResHandle<Texture>, glsl::SpriteInstance>> spriteInstances;
     
     m_storage->ForEach([&](entity_t entity, const SpriteComponent& sprite) {
         // Skip sprites without textures
@@ -87,59 +66,64 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
         }
         
         Transform transform = m_transformView->GetOr(entity, Transform::Identity());
-        glsl::SpriteInstance instance = CreateSpriteInstance(sprite, transform);
-        
-        spriteInstances.emplace_back(entity, instance);
+
+        spriteInstances.emplace_back(std::make_pair(sprite.m_texture, CreateSpriteInstance(sprite, transform)));
     });
-    
-    if (spriteInstances.empty()) {
-        return {};
-    }
-    
+
     // Sort sprites back-to-front for proper alpha blending
-    SortSpritesBackToFront(spriteInstances);
-    
-    // Limit to maximum sprites per batch
-    if (spriteInstances.size() > MAX_SPRITES) {
-        spriteInstances.resize(MAX_SPRITES);
-        LOG(WARNING) << "Too many sprites (" << spriteInstances.size() << "), limiting to " << MAX_SPRITES;
-    }
-    
+    std::sort(spriteInstances.begin(), spriteInstances.end(),
+        [this](const auto& a, const auto& b) {
+            if (a.second.a_position.z == b.second.a_position.z) {
+                return a.first < b.first; // Break ties by texture handle
+            }
+            return a.second.a_position.z > b.second.a_position.z;
+        });
+
     // Upload sprite instance data
     std::vector<glsl::SpriteInstance> instanceData;
     instanceData.reserve(spriteInstances.size());
     for (const auto& pair : spriteInstances) {
         instanceData.push_back(pair.second);
     }
-    
+
+    // Resize if necessary
+    m_instanceBuffer.Reserve(instanceData.size());
+
+    OKAMI_CHK_GL;
+
     // Set up rendering state
-    glUseProgram(m_program.get());
-    glBindVertexArray(m_vao.get());
-    
-    // Upload sprite instance data (VAO binding also binds the associated buffer)
-    glBufferSubData(GL_ARRAY_BUFFER, 0, instanceData.size() * sizeof(glsl::SpriteInstance), instanceData.data());
-    
+    glUseProgram(m_program.get()); 
+    OKAMI_DEFER(glUseProgram(0)); OKAMI_CHK_GL;
+
+    glBindVertexArray(m_instanceBuffer.GetVertexArray()); 
+    OKAMI_DEFER(glBindVertexArray(0)); OKAMI_CHK_GL;
+
+    glBindBuffer(GL_ARRAY_BUFFER, m_instanceBuffer.GetBuffer()); 
+    OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0)); OKAMI_CHK_GL;
+
+    {
+        auto map = m_instanceBuffer.Map();
+        OKAMI_ERROR_RETURN_IF(!map, "Failed to map instance buffer for sprite rendering");
+        for (size_t i = 0; i < instanceData.size(); ++i) {
+            (*map)[i] = instanceData[i];
+        }
+    }
+
     // Set uniforms
-    glUniformMatrix4fv(u_viewProj, 1, GL_FALSE, &pass.m_viewProjection[0][0]);
-    glUniform1i(u_texture, 0); // Texture unit 0
+    glUniformMatrix4fv(u_viewProj, 1, GL_FALSE, &pass.m_viewProjection[0][0]); OKAMI_CHK_GL;
+    glUniform1i(u_texture, 0); OKAMI_CHK_GL; // Texture unit 0
     
     // Enable blending for sprites
     glEnable(GL_BLEND);
+    OKAMI_DEFER(glDisable(GL_BLEND)); OKAMI_CHK_GL;
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     // Group sprites by texture to minimize texture binding
     ResHandle<Texture> currentTexture;
     uint32_t batchStart = 0;
     
-    for (uint32_t i = 0; i <= static_cast<uint32_t>(spriteInstances.size()); ++i) {
-        ResHandle<Texture> spriteTexture;
-        if (i < spriteInstances.size()) {
-            // Find the sprite component for this instance
-            entity_t entity = spriteInstances[i].first;
-            if (auto* spriteComp = m_storage->TryGet(entity)) {
-                spriteTexture = spriteComp->m_texture;
-            }
-        }
+    for (uint32_t i = 0; i <= spriteInstances.size(); ++i) {
+        ResHandle<Texture> spriteTexture = spriteInstances[i < spriteInstances.size() ? i : 0].first;
         
         // Check if we need to flush the current batch
         if (i == spriteInstances.size() || spriteTexture.Ptr() != currentTexture.Ptr()) {
@@ -148,24 +132,18 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
                 // For now, render without texture binding
                 if (currentTexture.IsLoaded()) {
                     auto& tex = m_textureManager->GetImpl(currentTexture)->m_texture;
-                    glBindTexture(GL_TEXTURE_2D, tex.get());
+                    glBindTexture(GL_TEXTURE_2D, tex.get()); OKAMI_CHK_GL;
                 }
 
                 uint32_t instanceCount = i - batchStart;
-                // Draw 4 vertices per sprite instance using instanced rendering
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4 * instanceCount);
+                // Draw points, geometry shader will expand them to quads
+                glDrawArrays(GL_POINTS, batchStart, instanceCount); OKAMI_CHK_GL;
             }
             
             currentTexture = spriteTexture;
             batchStart = i;
         }
     }
-    
-    // Cleanup
-    glDisable(GL_BLEND);
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glUseProgram(0);
     
     return {};
 }
@@ -212,20 +190,4 @@ glsl::SpriteInstance OGLSpriteRenderer::CreateSpriteInstance(const SpriteCompone
     instance.a_color = sprite.m_color;
 
     return instance;
-}
-
-void OGLSpriteRenderer::SortSpritesBackToFront(
-    std::vector<std::pair<entity_t, glsl::SpriteInstance>>& sprites) const {
-    std::sort(sprites.begin(), sprites.end(), 
-        [this](const auto& a, const auto& b) {
-            // Get Z positions from transforms for depth sorting
-            Transform transformA = m_transformView->GetOr(a.first, Transform::Identity());
-            Transform transformB = m_transformView->GetOr(b.first, Transform::Identity());
-            
-            glm::vec3 posA = transformA.TransformPoint(glm::vec3(0.0f));
-            glm::vec3 posB = transformB.TransformPoint(glm::vec3(0.0f));
-            
-            // Sort back-to-front (higher Z values first)
-            return posA.z > posB.z;
-        });
 }

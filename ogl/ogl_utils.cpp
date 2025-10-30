@@ -42,30 +42,22 @@ Expected<GLShader> okami::LoadShader(GLenum shaderType, const std::filesystem::p
     }
     
     // Check if file exists
-    if (!std::filesystem::exists(fullShaderPath)) {
-        return std::unexpected(Error("Shader file does not exist: " + fullShaderPath.string()));
-    }
+    OKAMI_UNEXPECTED_RETURN_IF(!std::filesystem::exists(fullShaderPath), "Shader file does not exist: " + fullShaderPath.string());
     
     // Read shader source from file
     std::ifstream file(fullShaderPath);
-    if (!file.is_open()) {
-        return std::unexpected(Error("Could not open shader file: " + fullShaderPath.string()));
-    }
+    OKAMI_UNEXPECTED_RETURN_IF(!file.is_open(), "Failed to open shader file: " + fullShaderPath.string());
     
     std::stringstream buffer;
     buffer << file.rdbuf();
     std::string shaderSource = buffer.str();
     file.close();
     
-    if (shaderSource.empty()) {
-        return std::unexpected(Error("Shader file is empty: " + fullShaderPath.string()));
-    }
-    
+    OKAMI_UNEXPECTED_RETURN_IF(shaderSource.empty(), "Shader file is empty: " + fullShaderPath.string());
+
     // Create shader object
     GLuint shaderId = glCreateShader(shaderType);
-    if (shaderId == 0) {
-        return std::unexpected(Error("Failed to create shader object"));
-    }
+    OKAMI_UNEXPECTED_RETURN_IF(shaderId == 0, "Failed to create shader object");    
     
     // Compile shader
     const char* sourcePtr = shaderSource.c_str();
@@ -88,7 +80,7 @@ Expected<GLShader> okami::LoadShader(GLenum shaderType, const std::filesystem::p
         }
         
         glDeleteShader(shaderId);
-        return std::unexpected(Error("Shader compilation failed for " + fullShaderPath.string() + ": " + errorLog));
+        return OKAMI_UNEXPECTED("Shader compilation failed for " + fullShaderPath.string() + ": " + errorLog);
     }
     
     LOG(INFO) << "Successfully compiled shader: " << fullShaderPath.string();
@@ -98,9 +90,7 @@ Expected<GLShader> okami::LoadShader(GLenum shaderType, const std::filesystem::p
 Expected<GLProgram> okami::CreateProgram(ProgramShaders const& shaders) {
     // Create program object
     GLuint programId = glCreateProgram();
-    if (programId == 0) {
-        return std::unexpected(Error("Failed to create program object"));
-    }
+    OKAMI_UNEXPECTED_RETURN_IF(programId == 0, "Failed to create program object");
     
     // Attach shaders to program
     if (shaders.m_vertex) {
@@ -142,7 +132,7 @@ Expected<GLProgram> okami::CreateProgram(ProgramShaders const& shaders) {
         }
         
         glDeleteProgram(programId);
-        return std::unexpected(Error("Program linking failed: " + errorLog));
+        return OKAMI_UNEXPECTED("Program linking failed: " + errorLog);
     }
     
     // Detach shaders after linking (optional, but good practice)
@@ -248,7 +238,7 @@ GLint okami::GetUniformLocation(GLProgram const& program, const char* name, Erro
     GLint location = glGetUniformLocation(program, name);
     if (location == -1) {
         auto errorCode = glGetError();
-        error += Error("Uniform '" + std::string(name) + "' not found in program: " + GetGLErrorString(errorCode));
+        error += OKAMI_ERROR("Uniform '" + std::string(name) + "' not found in program: " + GetGLErrorString(errorCode));
     }
     return location;
 }
@@ -256,7 +246,7 @@ GLint okami::GetUniformLocation(GLProgram const& program, const char* name, Erro
 Error okami::GetGlError() {
     GLenum errorCode = glGetError();
     if (errorCode != GL_NO_ERROR) {
-        return Error("OpenGL error: " + GetGLErrorString(errorCode));
+        return OKAMI_ERROR("OpenGL error: " + GetGLErrorString(errorCode));
     }
     return {};
 }

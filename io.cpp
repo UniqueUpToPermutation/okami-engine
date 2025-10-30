@@ -25,7 +25,7 @@ namespace okami {
                 LOG(ERROR) << "Unsupported texture format for file: " << msg.m_path;
 
                 return OnResourceLoadedMessage<Texture>{
-                    std::unexpected(Error("Unsupported texture format: " + ext)),
+                    OKAMI_UNEXPECTED("Unsupported texture format: " + ext),
                     msg.m_handle
                 };
             }

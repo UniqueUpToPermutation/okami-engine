@@ -82,9 +82,7 @@ Error Engine::Startup() {
     OKAMI_ERROR_RETURN(e);
 
     m_entityManager = m_moduleInterface.m_interfaces.Query<IEntityManager>();
-    if (!m_entityManager) {
-        return Error("No IEntityManager found after registering modules");
-    }
+	OKAMI_ERROR_RETURN_IF(!m_entityManager, "No IEntityManager registered after registering modules");
 
     e += m_ioModules.Startup(m_moduleInterface);
     e += m_updateModules.Startup(m_moduleInterface);

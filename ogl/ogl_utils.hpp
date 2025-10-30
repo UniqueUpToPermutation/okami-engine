@@ -1,12 +1,47 @@
 #pragma once
 
 #include "../common.hpp"
+#include "../sizer.hpp"
 
 #include <glad/gl.h>
 
 #include <filesystem>
 
 #include <glm/glm.hpp>
+
+#include "../log.hpp"
+
+#define GET_GL_ERROR() []() -> Error { \
+    Error glErr = okami::GetGlError(); \
+    glErr.m_line = __LINE__; \
+    glErr.m_file = __FILE__; \
+    return glErr; \
+}()
+
+#ifndef NDEBUG
+#define OKAMI_CHK_GL \
+    { \
+        Error glErr = GET_GL_ERROR(); \
+        if (glErr.IsError()) { \
+            OKAMI_LOG_ERROR(glErr.Str()); \
+            return glErr; \
+        } \
+    } 
+#else
+#define OKAMI_CHK_GL
+#endif
+
+#ifndef NDEBUG
+#define OKAMI_LOG_GL \
+    { \
+        Error glErr = GET_GL_ERROR(); \
+        if (glErr.IsError()) { \
+            OKAMI_LOG_ERROR(glErr.Str()); \
+        } \
+    }
+#else
+#define OKAMI_LOG_GL
+#endif
 
 namespace okami {
 
@@ -155,5 +190,213 @@ namespace okami {
     GLint GetUniformLocation(GLProgram const& program, const char* name, Error& error);
     Error GetGlError();
 
+    template <typename InstanceType>
+	class BufferWriteMap {
+	private:
+		InstanceType* m_data = nullptr;
+        GLBuffer* m_resource = nullptr;
 
+	public:
+		BufferWriteMap() = default;
+		BufferWriteMap(BufferWriteMap&& map) : m_data(map.m_data), m_resource(map.m_resource) {
+            map.m_data = nullptr;
+            map.m_resource = nullptr;
+        }
+		BufferWriteMap& operator=(BufferWriteMap&& map) {
+            std::swap(m_data, map.m_data);
+            std::swap(m_resource, map.m_resource);
+            return *this;
+        }
+		BufferWriteMap(BufferWriteMap const&) = delete;
+		BufferWriteMap& operator=(BufferWriteMap const&) = delete;
+
+		inline InstanceType* Data() {
+			return static_cast<InstanceType*>(m_data);
+		}
+
+		static Expected<BufferWriteMap<InstanceType>> Map(
+			GLBuffer& resource) {
+			BufferWriteMap<InstanceType> result;
+
+            OKAMI_UNEXPECTED_RETURN_IF(!resource, "Resource not initialized");
+
+			result.m_resource = &resource;
+
+            glBindBuffer(GL_ARRAY_BUFFER, result.m_resource->get());
+            OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0));
+            void* data = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+            auto err = GET_GL_ERROR();
+            OKAMI_UNEXPECTED_RETURN(err);
+
+            OKAMI_UNEXPECTED_RETURN_IF(!data, "Failed to map buffer resource");
+
+			result.m_data = reinterpret_cast<InstanceType*>(data);
+			return result;
+		}
+
+		InstanceType& operator[](size_t i) {
+			return m_data[i];
+		}
+
+		InstanceType& At(size_t i) {
+			return m_data[i];
+		}
+
+		InstanceType& operator*() {
+			return *m_data;
+		}
+
+		~BufferWriteMap() {
+            if (m_data) {
+                glBindBuffer(GL_ARRAY_BUFFER, m_resource->get()); OKAMI_LOG_GL;
+                OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0)); OKAMI_LOG_GL;
+                glUnmapBuffer(GL_ARRAY_BUFFER); OKAMI_LOG_GL;
+
+                m_data = nullptr;
+            }
+		}
+	};
+
+    template <typename T>
+    class UploadBuffer {
+    private:
+        GLBuffer m_buffer;
+		Sizer m_sizer;
+
+    public:
+        GLuint GetBuffer() const {
+            return m_buffer.get();
+        }
+
+        size_t SizeOf(size_t elementCount) const {
+			return elementCount * sizeof(T);
+		}
+
+        Error Resize(size_t elementCount, bool* wasResized = nullptr) {
+			// Release the current buffer
+			m_buffer.reset();
+
+			if (elementCount == 0) {
+				return {};
+			}
+
+            glGenBuffers(1, m_buffer.ptr()); OKAMI_CHK_GL;
+            glBindBuffer(GL_ARRAY_BUFFER, m_buffer.get()); OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0)); OKAMI_CHK_GL;
+            glBufferData(GL_ARRAY_BUFFER, SizeOf(elementCount), nullptr, GL_DYNAMIC_DRAW); OKAMI_CHK_GL;
+			glBindBuffer(GL_ARRAY_BUFFER, 0); OKAMI_CHK_GL;
+
+            if (wasResized) {
+                *wasResized = true;
+            }
+
+			return {};
+		}
+
+        static Expected<UploadBuffer<T>> Create(
+            size_t elementCount = 1) {
+			UploadBuffer<T> result;
+
+			result.m_sizer.Reset(result.SizeOf(elementCount));
+            auto err = result.Resize(elementCount);
+            OKAMI_UNEXPECTED_RETURN(err);
+
+			return result;
+		}
+
+        Error Reserve(size_t elementCount, bool* wasResized = nullptr) {
+			auto sizeChanged = m_sizer.GetNextSize(SizeOf(elementCount));
+
+			if (sizeChanged) {
+				return Resize(elementCount, wasResized);
+			}
+			else {
+				return {};
+			}
+		}
+
+        size_t GetElementCount() const {
+			return m_sizer.m_currentSize;
+		}
+
+        Expected<BufferWriteMap<T>> Map() {
+			return BufferWriteMap<T>::Map(m_buffer);
+		}
+    };
+
+    template <typename T>
+    class UploadVertexBuffer {
+    private:
+		UploadBuffer<T> m_buffer;
+        GLVertexArray m_vao;
+        std::function<void()> m_setupVertexArray;
+
+    public:
+        GLuint GetVertexArray() const {
+            return m_vao.get();
+        }
+
+        GLuint GetBuffer() const {
+            return m_buffer.GetBuffer();
+        }
+
+        size_t SizeOf(size_t elementCount) const {
+			return m_buffer.SizeOf(elementCount);
+		}
+
+        Error Resize(size_t elementCount) {
+            auto err = m_buffer.Resize(elementCount);
+            OKAMI_ERROR_RETURN(err);
+
+            glBindVertexArray(m_vao.get()); OKAMI_CHK_GL;
+            OKAMI_DEFER(glBindVertexArray(0));
+
+            glBindBuffer(GL_ARRAY_BUFFER, m_buffer.GetBuffer()); OKAMI_CHK_GL;
+            OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0)); 
+            
+            if (elementCount == 0) {
+                return {};
+            }
+            // Setup vertex attributes after buffer is bound
+            m_setupVertexArray(); OKAMI_CHK_GL;
+
+			return {};
+		}
+
+        static Expected<UploadVertexBuffer<T>> Create(
+			std::function<void()> setupVertexArray,
+            size_t elementCount = 1) {
+			UploadVertexBuffer<T> result;
+			result.m_setupVertexArray = std::move(setupVertexArray);
+            auto buffer = UploadBuffer<T>::Create(elementCount);
+            OKAMI_UNEXPECTED_RETURN(buffer);
+            result.m_buffer = std::move(*buffer);
+			
+            glGenVertexArrays(1, result.m_vao.ptr());
+            auto err = GET_GL_ERROR();
+            OKAMI_UNEXPECTED_RETURN(err);
+
+            err = result.Resize(elementCount);
+            OKAMI_UNEXPECTED_RETURN(err);
+
+			return result;
+		}
+
+        Error Reserve(size_t elementCount) {
+			bool wasResized = false;
+            auto err = m_buffer.Reserve(elementCount, &wasResized);
+            OKAMI_ERROR_RETURN(err);
+            if (wasResized) {
+                return Resize(m_buffer.GetElementCount());
+            }
+            return {};
+		}
+
+		size_t GetElementCount() const {
+			return m_buffer.GetElementCount();
+		}
+
+        Expected<BufferWriteMap<T>> Map() {
+			return m_buffer.Map();
+		}
+    };
 }

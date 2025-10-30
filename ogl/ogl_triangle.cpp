@@ -8,14 +8,10 @@ Error OGLTriangleRenderer::RegisterImpl(ModuleInterface& mi) {
 
 Error OGLTriangleRenderer::StartupImpl(ModuleInterface& mi) {
     auto* cache = mi.m_interfaces.Query<IGLShaderCache>();
-    if (!cache) {
-        return Error("IGLShaderCache interface not available for OGLTriangleRenderer");
-    }
+    OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLTriangleRenderer");
 
     m_transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
-    if (!m_transformView) {
-        return Error("IComponentView<Transform> interface not available for OGLTriangleRenderer");
-    }
+    OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OGLTriangleRenderer");
 
     auto program = CreateProgram(ProgramShaderPaths{
         .m_vertex = GetGLSLShaderPath("triangle.vs"),

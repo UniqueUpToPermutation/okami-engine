@@ -31,13 +31,22 @@
 #define OKAMI_ASSERT(condition, message) 
 #endif
 
-#define OKAMI_DEFER(x) auto OKAMI_DEFER_##__LINE__ = okami::ScopeGuard([&]() { x; })
+#define OKAMI_CONCAT_IMPL(a, b) a##b
+#define OKAMI_CONCAT(a, b) OKAMI_CONCAT_IMPL(a, b)
+#define OKAMI_DEFER(x) auto OKAMI_CONCAT(OKAMI_DEFER_, __LINE__) = okami::ScopeGuard([&]() { x; })
 
 #define OKAMI_ERROR_RETURN(x) if (IsError(x)) { return okami::MakeError(std::move(x)); }
 #define OKAMI_UNEXPECTED_RETURN(x) \
 { \
-	auto tmp = x; if (IsError(tmp)) { return std::unexpected(okami::MakeError(std::move(tmp))); } \
+	auto& tmp = x; if (IsError(tmp)) { return std::unexpected(okami::MakeError(std::move(tmp))); } \
 }
+
+#define OKAMI_ERROR(msg) okami::Error(__LINE__, __FILE__, msg)
+#define OKAMI_UNEXPECTED(msg) std::unexpected(OKAMI_ERROR(msg))
+#define OKAMI_ERROR_RETURN_IF(condition, msg) \
+	if (condition) { return OKAMI_ERROR(msg); }
+#define OKAMI_UNEXPECTED_RETURN_IF(condition, msg) \
+	if (condition) { return OKAMI_UNEXPECTED(msg); }
 
 namespace okami {
 	struct Error {
@@ -46,10 +55,13 @@ namespace okami {
 			std::string,
 			std::vector<Error>> m_contents;
 
+		int m_line = -1;
+		std::string_view m_file;
+
 		Error() : m_contents(std::monostate{}) {}
-		Error(const std::string& msg) : m_contents(msg) {}
-		Error(const char* msg) : m_contents(std::string_view{ msg }) {}
-		Error(std::vector<Error> errors) : m_contents(std::move(errors)) {}
+		Error(int line, std::string_view file, const std::string& msg) : m_contents(msg), m_line(line), m_file(file) {}
+		Error(int line, std::string_view file, const char* msg) : m_contents(std::string_view{ msg }), m_line(line), m_file(file) {}
+		Error(int line, std::string_view file, std::vector<Error> errors) : m_contents(std::move(errors)), m_line(line), m_file(file) {}
 		Error& Union(const Error& other);
 
 		inline Error& operator+=(const Error& other) {

@@ -18,15 +18,20 @@ using vec4 = glm::vec4;
 
 } // namespace glsl
 
-#define BEGIN_INPUT_STRUCT(name) \
+enum class Frequency {
+    PER_VERTEX = 0,
+    PER_INSTANCE = 1,
+};
+
+#define BEGIN_INPUT_STRUCT(name, sFrequency) \
     struct name { \
-        using type_t = name;
+        using type_t = name; \
+        static constexpr int __frequency = static_cast<int>(sFrequency); \
 
 #define IN_MEMBER(type_name, member_name, location) \
         type_name member_name; \
-        static constexpr std::size_t __##member_name##_offset() { return offsetof(type_t, member_name); } \
-        static constexpr int __##member_name##_location() { return location; } \
-        static constexpr int __##member_name##_size() { return ComponentCount<type_name>::value; }
+        static constexpr int __##member_name##_location = location; \
+        static constexpr int __##member_name##_size = ComponentCount<type_name>::value;
 
 #define END_INPUT_STRUCT() \
     };
@@ -36,23 +41,22 @@ using vec4 = glm::vec4;
         using type_t = name;
 
 #define VERTEX_ARRAY_ITEM(member_name) \
-    glEnableVertexAttribArray(type_t::__##member_name##_location()); \
+    glEnableVertexAttribArray(type_t::__##member_name##_location); \
     glVertexAttribPointer( \
-        type_t::__##member_name##_location(), \
-        type_t::__##member_name##_size(), \
+        type_t::__##member_name##_location, \
+        type_t::__##member_name##_size, \
         GL_FLOAT, \
         GL_FALSE, \
         sizeof(type_t), \
-        (void*)type_t::__##member_name##_offset() \
-    ); \
-    glVertexAttribDivisor(type_t::__##member_name##_location(), 1);
+        (void*)offsetof(type_t, member_name)); \
+    glVertexAttribDivisor(type_t::__##member_name##_location, type_t::__frequency);
 
 #define VERTEX_ARRAY_DEF_END() \
     }
 
 #else
 // GLSL side - generate vertex shader input attributes
-#define BEGIN_INPUT_STRUCT(name)
+#define BEGIN_INPUT_STRUCT(name, frequency)
 #define IN_MEMBER(type, member_name, loc_idx) \
     layout(location = loc_idx) in type member_name;
 #define END_INPUT_STRUCT()

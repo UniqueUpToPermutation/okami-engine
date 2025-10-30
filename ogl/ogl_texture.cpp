@@ -79,7 +79,8 @@ Expected<std::pair<typename Texture::Desc, TextureImpl>>
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-    OKAMI_UNEXPECTED_RETURN(GetGlError());
+    auto err = GET_GL_ERROR();
+    OKAMI_UNEXPECTED_RETURN(err);
 
     return std::make_pair(data.GetDesc(), std::move(impl));
 }

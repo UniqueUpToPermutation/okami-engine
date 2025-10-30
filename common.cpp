@@ -1,5 +1,7 @@
 #include "common.hpp"
 
+#include <sstream>
+
 using namespace okami;
 
 Error& Error::Union(Error const& other) {
@@ -37,6 +39,7 @@ Error& Error::Union(Error const& other) {
 }
 
 std::string Error::Str() const {
+    std::stringstream ss;
     if (std::holds_alternative<std::string_view>(m_contents)) {
         return std::string(std::get<std::string_view>(m_contents));
     }
@@ -44,14 +47,13 @@ std::string Error::Str() const {
         return std::get<std::string>(m_contents);
     } else if (std::holds_alternative<std::vector<Error>>(m_contents)) {
         const auto& vec = std::get<std::vector<Error>>(m_contents);
-        std::string result;
         for (const auto& e : vec) {
-            if (!result.empty()) {
-                result += "; ";
+            if (!ss.str().empty()) {
+                ss << "; ";
             }
-            result += e.Str();
+            ss << e.Str();
         }
-        return result;
+        return ss.str();
     }
     else {
         return "No error";

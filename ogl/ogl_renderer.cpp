@@ -40,14 +40,10 @@ protected:
         RegisterConfig<RendererConfig>(mi.m_interfaces, LOG_WRAP(WARNING));
 
         m_glProvider = mi.m_interfaces.Query<IGLProvider>();
-        if (!m_glProvider) {
-            return Error("IGLProvider interface not available for OpenGL renderer");
-        }
+        OKAMI_ERROR_RETURN_IF(!m_glProvider, "IGLProvider interface not available for OpenGL renderer");
 
         m_transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
-        if (!m_transformView) {
-            return Error("IComponentView<Transform> interface not available for OpenGL renderer");
-        }   
+        OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OpenGL renderer");
 
         m_glProvider->NotifyNeedGLContext();
 
@@ -56,13 +52,11 @@ protected:
 
     Error StartupImpl(ModuleInterface& mi) override {
         int version = gladLoadGL(m_glProvider->GetGLLoaderFunction());
-        
-        if (version == 0) {
-            return Error("Failed to initialize OpenGL context via GLAD");
-        }
+
+        OKAMI_ERROR_RETURN_IF(version == 0, "Failed to initialize OpenGL context via GLAD");
 
         m_glProvider->SetSwapInterval(1);
-        
+
         // Enable depth testing
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);

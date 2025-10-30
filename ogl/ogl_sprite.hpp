@@ -17,8 +17,7 @@ namespace okami {
         public IOGLRenderModule {
     protected:
         GLProgram m_program;
-        GLVertexArray m_vao;        // Vertex Array Object
-        GLBuffer m_instanceVBO;     // Vertex buffer for sprite instance data
+        UploadVertexBuffer<glsl::SpriteInstance> m_instanceBuffer; // Instance buffer for sprite data
         
         // Uniform locations
         GLint u_viewProj = -1;

@@ -202,7 +202,7 @@ namespace okami {
 
 				auto implIt = m_res_to_impl.find(msg.m_handle.Ptr());
 				if (implIt == m_res_to_impl.end()) {
-					e += Error("Loaded resource not found in implementation map");
+					e += OKAMI_ERROR("Loaded resource not found in implementation map");
 					continue;
 				}
 

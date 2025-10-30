@@ -104,7 +104,7 @@ namespace okami {
                     it->second = signal.m_component;
                     m_modified.push_back(signal.m_entity);
                 } else {
-                    LogWarning("Attempted to update non-existent entity: " + std::to_string(signal.m_entity));
+                    OKAMI_LOG_WARNING("Attempted to update non-existent entity: " + std::to_string(signal.m_entity));
                 }
             }
 
@@ -115,7 +115,7 @@ namespace okami {
                     m_storage.erase(it);
                     m_removed.push_back(signal.m_entity);
                 } else {
-                    LogWarning("Attempted to remove non-existent entity: " + std::to_string(signal.m_entity));
+                    OKAMI_LOG_WARNING("Attempted to remove non-existent entity: " + std::to_string(signal.m_entity));
                 }
             }
 

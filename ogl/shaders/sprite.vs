@@ -2,33 +2,23 @@
 
 #include "sprite.glsl"
 
-uniform mat4 u_viewProj;
-
-// Output to fragment shader
-out vec2 v_texCoord;
-out vec4 v_color;
+// Output to geometry shader
+out VS_OUT {
+    vec3 position;
+    float rotation;
+    vec4 spriteRect;
+    vec4 color;
+    vec2 size;
+} vs_out;
 
 void main() {
-    vec2 positions[4] = vec2[](
-        vec2(-0.5, -0.5),
-        vec2( 0.5, -0.5),
-        vec2(-0.5,  0.5),
-        vec2( 0.5,  0.5)
-    );
-
-    vec2 uvs[4] = vec2[](
-        vec2(0.0, 1.0),
-        vec2(1.0, 1.0),
-        vec2(0.0, 0.0),
-        vec2(1.0, 0.0)
-    );
-
-    int idx = gl_VertexID % 4;
-
-    // Pass sprite data to fragment shader
-    //v_texCoord = a_spriteRect.xy + uvs[idx] * a_spriteRect.zw;
-    v_texCoord = uvs[idx];
-    v_color = a_color;
-
-    gl_Position = u_viewProj * vec4(positions[idx], 0.0, 1.0);
+    // Pass all sprite instance data to geometry shader
+    vs_out.position = a_position;
+    vs_out.rotation = a_rotation;
+    vs_out.spriteRect = a_spriteRect;
+    vs_out.color = a_color;
+    vs_out.size = a_size;
+    
+    // Output the point at the sprite's center position
+    gl_Position = vec4(a_position, 1.0);
 }

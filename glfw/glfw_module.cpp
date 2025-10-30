@@ -70,7 +70,7 @@ protected:
         glfwSetErrorCallback(glfw_errorCallback);
         
         if (!glfwInit()) {
-            return Error("Failed to initialize GLFW");
+            return OKAMI_ERROR("Failed to initialize GLFW");
         }
 
         if (m_createContext) {
@@ -86,9 +86,7 @@ protected:
             m_config.backbufferWidth, 
             m_config.backbufferHeight, 
             m_config.windowTitle.c_str(), nullptr, nullptr);
-        if (!m_window) {
-            return Error("Failed to create GLFW window");
-        }
+        OKAMI_ERROR_RETURN_IF(!m_window, "Failed to create GLFW window");
 
         if (m_createContext) {
             glfwMakeContextCurrent(m_window);

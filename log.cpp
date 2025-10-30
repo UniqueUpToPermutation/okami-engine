@@ -4,26 +4,26 @@
 
 using namespace okami;
 
-void okami::LogInfo(std::string_view msg) {
-    LOG(INFO) << msg;
+void okami::LogInfo(std::string_view msg, std::string_view file, int line) {
+    LOG(INFO) << msg << " (" << file << ":" << line << ")";
 }
 
-void okami::LogWarning(std::string_view msg) {
-    LOG(WARNING) << msg;
+void okami::LogWarning(std::string_view msg, std::string_view file, int line) {
+    LOG(WARNING) << msg << " (" << file << ":" << line << ")";
 }
 
-void okami::LogError(std::string_view msg) {
-    LOG(ERROR) << msg;
+void okami::LogError(std::string_view msg, std::string_view file, int line) {
+    LOG(ERROR) << msg << " (" << file << ":" << line << ")";
 }
 
-void okami::LogInfo(std::string const& msg) {
-    LOG(INFO) << msg;
+void okami::LogInfo(std::string const& msg, std::string const& file, int line) {
+    LOG(INFO) << msg << " (" << file << ":" << line << ")";
 }
 
-void okami::LogWarning(std::string const& msg) {
-    LOG(WARNING) << msg;
+void okami::LogWarning(std::string const& msg, std::string const& file, int line) {
+    LOG(WARNING) << msg << " (" << file << ":" << line << ")";
 }
 
-void okami::LogError(std::string const& msg) {
-    LOG(ERROR) << msg;
+void okami::LogError(std::string const& msg, std::string const& file, int line) {
+    LOG(ERROR) << msg << " (" << file << ":" << line << ")";
 }

@@ -191,9 +191,7 @@ static size_t GetSubresourceCount(TextureDesc const& desc) {
 Expected<Texture> Texture::FromPNG(const std::filesystem::path& path,
     const TextureLoadParams& params) {
     // Check if file exists
-    if (!std::filesystem::exists(path)) {
-        return std::unexpected(Error("PNG file does not exist: " + path.string()));
-    }
+    OKAMI_UNEXPECTED_RETURN_IF(!std::filesystem::exists(path), "PNG file does not exist: " + path.string());
     
     // Convert path to string for lodepng (which expects char*)
     std::string pathStr = path.string();
@@ -203,18 +201,15 @@ Expected<Texture> Texture::FromPNG(const std::filesystem::path& path,
     
     // Load PNG with 32-bit RGBA format
     unsigned error = lodepng_decode32_file(&imageData, &width, &height, pathStr.c_str());
-    
-    if (error) {
-        return std::unexpected(Error("Failed to load PNG: " + std::string(lodepng_error_text(error))));
-    }
-    
-    // Ensure we have valid data
-    if (!imageData || width == 0 || height == 0) {
+    OKAMI_DEFER({
         if (imageData) {
             free(imageData);
         }
-        return std::unexpected(Error("Invalid PNG data"));
-    }
+    });
+    OKAMI_UNEXPECTED_RETURN_IF(error, "Failed to load PNG: " + std::string(lodepng_error_text(error)));
+
+    // Ensure we have valid data
+    OKAMI_UNEXPECTED_RETURN_IF(!imageData || width == 0 || height == 0, "Invalid PNG data");
     
     // Create texture info - PNG loaded as RGBA8, 2D texture, single mip level
     TextureDesc info = {};
@@ -232,9 +227,6 @@ Expected<Texture> Texture::FromPNG(const std::filesystem::path& path,
     // Copy data to texture
     uint32_t dataSize = width * height * 4; // RGBA8 = 4 bytes per pixel
     std::copy(imageData, imageData + dataSize, texture.m_data.begin());
-    
-    // Free lodepng allocated memory
-    free(imageData);
     
     return texture;
 }
@@ -260,10 +252,8 @@ void Texture::UpdateSubDescs() {
 Expected<Texture> Texture::FromKTX2(const std::filesystem::path& path,
     const TextureLoadParams& params) {
     // Check if file exists
-    if (!std::filesystem::exists(path)) {
-        return std::unexpected(Error("KTX2 file does not exist: " + path.string()));
-    }
-    
+    OKAMI_UNEXPECTED_RETURN_IF(!std::filesystem::exists(path), "KTX2 file does not exist: " + path.string());
+
     // Load KTX texture from file
     ktxTexture* ktxTex = nullptr;
     KTX_error_code result = ktxTexture_CreateFromNamedFile(
@@ -271,15 +261,14 @@ Expected<Texture> Texture::FromKTX2(const std::filesystem::path& path,
         KTX_TEXTURE_CREATE_NO_FLAGS, 
         &ktxTex
     );
-    
-    if (result != KTX_SUCCESS) {
-        return std::unexpected(Error("Failed to load KTX2 file: " + path.string() + " (error code: " + std::to_string(result) + ")"));
-    }
-    
-    if (!ktxTex) {
-        return std::unexpected(Error("KTX texture is null"));
-    }
-    
+
+    OKAMI_UNEXPECTED_RETURN_IF(result != KTX_SUCCESS, 
+        "Failed to load KTX2 file: " + path.string() + " (error code: " + std::to_string(result) + ")");
+    OKAMI_UNEXPECTED_RETURN_IF(!ktxTex, "KTX texture is null");
+    OKAMI_DEFER({
+        ktxTexture_Destroy(ktxTex);
+    });
+
     // Determine texture type
     TextureType type = TextureType::TEXTURE_2D;
     if (ktxTex->isCubemap) {
@@ -316,54 +305,39 @@ Expected<Texture> Texture::FromKTX2(const std::filesystem::path& path,
     // Create texture object
     Texture texture(info, params);
     
-    // Check if the texture needs transcoding
-    if (ktxTexture_NeedsTranscoding(ktxTex)) {
-        // For now, we don't support transcoding - we need uncompressed formats
-        ktxTexture_Destroy(ktxTex);
-        return std::unexpected(Error("KTX2 texture requires transcoding, which is not currently supported"));
-    }
-    
+    OKAMI_UNEXPECTED_RETURN_IF(ktxTexture_NeedsTranscoding(ktxTex), 
+        "KTX2 texture requires transcoding, which is not currently supported");
+
     // Load the image data into memory
     result = ktxTexture_LoadImageData(ktxTex, nullptr, 0);
-    if (result != KTX_SUCCESS) {
-        ktxTexture_Destroy(ktxTex);
-        return std::unexpected(Error("Failed to load KTX2 image data (error code: " + std::to_string(result) + ")"));
-    }
+    OKAMI_UNEXPECTED_RETURN_IF(result != KTX_SUCCESS, "Failed to load KTX2 image data (error code: " + std::to_string(result) + ")");
     
     // Now we can safely get the data pointer
     auto imData = ktxTexture_GetData(ktxTex);
     auto imDataSz = ktxTexture_GetDataSize(ktxTex);
-    
-    if (!imData) {
-        ktxTexture_Destroy(ktxTex);
-        return std::unexpected(Error("KTX2 texture data is null after loading"));
-    }
+
+    OKAMI_UNEXPECTED_RETURN_IF(!imData, "KTX2 texture data is null after loading");
+    OKAMI_UNEXPECTED_RETURN_IF(imDataSz == 0, "KTX2 texture data size is zero after loading");
 
     for (uint32_t layer = 0; layer < ktxTex->numLayers; ++layer) {
         for (uint32_t mip = 0; mip < ktxTex->numLevels; ++mip) {
             ktx_size_t offset;
             result = ktxTexture_GetImageOffset(ktxTex, mip, layer, 0, &offset);
-            if (result != KTX_SUCCESS) {
-                ktxTexture_Destroy(ktxTex);
-                return std::unexpected(Error("Failed to get image offset for mip " + std::to_string(mip) + ", layer " + std::to_string(layer)));
-            }
+
+            OKAMI_UNEXPECTED_RETURN_IF(result != KTX_SUCCESS, 
+                "Failed to get image offset for mip " + std::to_string(mip) + ", layer " + std::to_string(layer));
 
             auto destData = texture.GetData(mip, layer);
             auto expectedSize = destData.size();
-            
-            if (offset + expectedSize > imDataSz) {
-                ktxTexture_Destroy(ktxTex);
-                return std::unexpected(Error("KTX2 image data size mismatch: offset=" + std::to_string(offset) + 
-                                           ", expectedSize=" + std::to_string(expectedSize) + 
-                                           ", totalSize=" + std::to_string(imDataSz)));
-            }
+
+            OKAMI_UNEXPECTED_RETURN_IF(offset + expectedSize > imDataSz, 
+                "KTX2 image data size mismatch: offset=" + std::to_string(offset) + 
+                ", expectedSize=" + std::to_string(expectedSize) + 
+                ", totalSize=" + std::to_string(imDataSz));
 
             std::memcpy(destData.data(), imData + offset, expectedSize);
         }
     }
-
-    // Clean up KTX texture
-    ktxTexture_Destroy(ktxTex);
     
     return texture;
 }
@@ -375,10 +349,9 @@ Expected<Texture> Texture::FromKTX2(const std::filesystem::path& path,
 #endif
 
 Error Texture::SavePNG(const std::filesystem::path& path, bool saveMips) const {
-    // Only support 2D textures for PNG export
-    if (m_desc.type != TextureType::TEXTURE_2D) {
-        return Error("PNG export only supports 2D textures");
-    }
+
+    OKAMI_ERROR_RETURN_IF(path.empty(), "Output path is empty");
+    OKAMI_ERROR_RETURN_IF(m_desc.type != TextureType::TEXTURE_2D, "PNG export only supports 2D textures");
 
     // Only export the first array slice
     if (m_desc.arraySize > 1) {
@@ -473,29 +446,22 @@ Error Texture::SavePNG(const std::filesystem::path& path, bool saveMips) const {
                 break;
             }
             default:
-                return Error("Unsupported texture format for PNG export: " + std::to_string(static_cast<int>(m_desc.format)));
+                return OKAMI_ERROR("Unsupported texture format for PNG export: " + std::to_string(static_cast<int>(m_desc.format)));
         }
 
         // Use lodepng to encode and save the PNG
         std::vector<uint8_t> encodedPng;
         unsigned error = lodepng::encode(encodedPng, pngData, mipWidth, mipHeight, colorType, bitDepth);
-        
-        if (error) {
-            return Error("LodePNG encoding error: " + std::string(lodepng_error_text(error)));
-        }
+        OKAMI_ERROR_RETURN_IF(error != 0, "LodePNG encoding error: " + std::string(lodepng_error_text(error)));
 
         // Save to file
         std::ofstream file(outputPath, std::ios::binary);
-        if (!file.is_open()) {
-            return Error("Failed to open file for writing: " + outputPath.string());
-        }
+        OKAMI_ERROR_RETURN_IF(!file.is_open(), "Failed to create output file: " + outputPath.string());
 
         file.write(reinterpret_cast<const char*>(encodedPng.data()), encodedPng.size());
         file.close();
 
-        if (!file.good()) {
-            return Error("Failed to write PNG data to file: " + outputPath.string());
-        }
+        OKAMI_ERROR_RETURN_IF(!file.good(), "Failed to write PNG data to file: " + outputPath.string());
 
         return {};
     };
@@ -528,9 +494,8 @@ Error Texture::SavePNG(const std::filesystem::path& path, bool saveMips) const {
 Error Texture::SaveKTX2(const std::filesystem::path& path) const {
     // Only support certain texture types for KTX2 export
     ktx_uint32_t vkFormat = TextureFormatToVkFormat(m_desc.format);
-    if (vkFormat == VkFormat::VK_FORMAT_UNDEFINED) {
-        return Error("Unsupported texture format for KTX2 export: " + std::to_string(static_cast<int>(m_desc.format)));
-    }
+    OKAMI_ERROR_RETURN_IF(vkFormat == VkFormat::VK_FORMAT_UNDEFINED, 
+        "Unsupported texture format for KTX2 export: " + std::to_string(static_cast<int>(m_desc.format)));
     
     // Create KTX2 texture create info
     ktxTextureCreateInfo createInfo = {};
@@ -550,15 +515,15 @@ Error Texture::SaveKTX2(const std::filesystem::path& path) const {
     // Create empty KTX2 texture
     ktxTexture2* texture = nullptr;
     KTX_error_code result = ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &texture);
-    
-    if (result != KTX_SUCCESS) {
-        return Error("Failed to create KTX2 texture (error code: " + std::to_string(result) + ")");
-    }
-    
-    if (!texture) {
-        return Error("Created KTX2 texture is null");
-    }
-    
+    OKAMI_DEFER({
+        if (texture) {
+            ktxTexture_Destroy((ktxTexture*)texture);
+        }
+    });
+
+    OKAMI_ERROR_RETURN_IF(result != KTX_SUCCESS, "Failed to create KTX2 texture (error code: " + std::to_string(result) + ")");
+    OKAMI_ERROR_RETURN_IF(!texture, "Created KTX2 texture is null");
+
     // Set the texture data using the KTX API
     result = ktxTexture_SetImageFromMemory((ktxTexture*)texture, 
                                            0,  // level (mip level 0)
@@ -567,21 +532,14 @@ Error Texture::SaveKTX2(const std::filesystem::path& path) const {
                                            m_data.data(), 
                                            m_data.size());
     
-    if (result != KTX_SUCCESS) {
-        ktxTexture_Destroy((ktxTexture*)texture);
-        return Error("Failed to set KTX texture data (error code: " + std::to_string(result) + ")");
-    }
-    
+    OKAMI_ERROR_RETURN_IF(result != KTX_SUCCESS, "Failed to set KTX texture data (error code: " + std::to_string(result) + ")");
+
     // Write the KTX2 file
     result = ktxTexture_WriteToNamedFile((ktxTexture*)texture, path.string().c_str());
     
     // Clean up
-    ktxTexture_Destroy((ktxTexture*)texture);
-    
-    if (result != KTX_SUCCESS) {
-        return Error("Failed to write KTX2 file: " + path.string() + " (error code: " + std::to_string(result) + ")");
-    }
-    
+    OKAMI_ERROR_RETURN_IF(result != KTX_SUCCESS, "Failed to write KTX2 file: " + path.string() + " (error code: " + std::to_string(result) + ")");
+
     return {};
 }
 

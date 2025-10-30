@@ -3,11 +3,18 @@
 #include <string_view>
 #include <string>
 
+#define OKAMI_LOG_INFO(msg) \
+    okami::LogInfo(msg, __FILE__, __LINE__)
+#define OKAMI_LOG_WARNING(msg) \
+    okami::LogWarning(msg, __FILE__, __LINE__)
+#define OKAMI_LOG_ERROR(msg) \
+    okami::LogError(msg, __FILE__, __LINE__)
+
 namespace okami {
-    void LogInfo(std::string_view msg);
-    void LogWarning(std::string_view msg);
-    void LogError(std::string_view msg);
-    void LogInfo(std::string const& msg);
-    void LogWarning(std::string const& msg);
-    void LogError(std::string const& msg);
+    void LogInfo(std::string_view msg, std::string_view file, int line);
+    void LogWarning(std::string_view msg, std::string_view file, int line);
+    void LogError(std::string_view msg, std::string_view file, int line);
+    void LogInfo(std::string const& msg, std::string const& file, int line);
+    void LogWarning(std::string const& msg, std::string const& file, int line);
+    void LogError(std::string const& msg, std::string const& file, int line);
 }

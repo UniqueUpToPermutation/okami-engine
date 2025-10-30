@@ -78,7 +78,7 @@ namespace okami {
         ResHandle<T> LoadResource(const std::filesystem::path& path, typename T::LoadParams params = {}) {
             auto* cm = m_moduleInterface.m_interfaces.Query<IContentManager<T>>();
             if (!cm) {
-                LogError("No IContentManager<" + std::string(typeid(T).name()) + "> registered in Engine");
+                OKAMI_LOG_ERROR("No IContentManager<" + std::string(typeid(T).name()) + "> registered in Engine");
                 return ResHandle<T>();
             }
             return cm->Load(path, params, m_moduleInterface);

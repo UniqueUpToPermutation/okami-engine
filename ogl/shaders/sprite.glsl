@@ -7,7 +7,7 @@
 namespace glsl {
 #endif
 
-BEGIN_INPUT_STRUCT(SpriteInstance)
+BEGIN_INPUT_STRUCT(SpriteInstance, Frequency::PER_VERTEX)
     IN_MEMBER(vec3, a_position, 0)       // vec3 a_position;
     IN_MEMBER(float, a_rotation, 1)       // float a_rotation;
     IN_MEMBER(vec4, a_spriteRect, 2)     // vec4 a_spriteRect;
