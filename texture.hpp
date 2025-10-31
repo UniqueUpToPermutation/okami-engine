@@ -45,6 +45,7 @@ namespace okami {
     size_t GetMipSize(TextureDesc const& desc, uint32_t mipLevel);
     size_t GetMipOffset(TextureDesc const& desc, uint32_t mipLevel);
     size_t GetSubresourceIndex(TextureDesc const& desc, uint32_t mipLevel, uint32_t layer);
+    size_t GetSubresourceCount(TextureDesc const& desc);
 
     struct TextureLoadParams {
         bool m_srgb = false;

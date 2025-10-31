@@ -30,11 +30,11 @@ namespace VkFormat {
 }
 #endif
 
-namespace okami {
+using namespace okami;
 
 #ifdef USE_KTX
 // Helper function to convert TextureFormat to Vulkan format
-ktx_uint32_t TextureFormatToVkFormat(TextureFormat format) {
+static ktx_uint32_t TextureFormatToVkFormat(TextureFormat format) {
     switch (format) {
         case TextureFormat::R8:
             return VkFormat::VK_FORMAT_R8_UNORM;
@@ -58,7 +58,7 @@ ktx_uint32_t TextureFormatToVkFormat(TextureFormat format) {
 }
 
 // Helper function to convert Vulkan format to TextureFormat
-TextureFormat VkFormatToTextureFormat(ktx_uint32_t vkFormat) {
+static TextureFormat VkFormatToTextureFormat(ktx_uint32_t vkFormat) {
     switch (vkFormat) {
         case VkFormat::VK_FORMAT_R8_UNORM:
             return TextureFormat::R8;
@@ -83,7 +83,7 @@ TextureFormat VkFormatToTextureFormat(ktx_uint32_t vkFormat) {
 }
 #endif
 
-uint32_t GetChannelCount(TextureFormat format) {
+uint32_t okami::GetChannelCount(TextureFormat format) {
     switch (format) {
         case TextureFormat::R8:
         case TextureFormat::R32F:
@@ -102,7 +102,7 @@ uint32_t GetChannelCount(TextureFormat format) {
     }
 }
 
-uint32_t GetPixelStride(TextureFormat format) {
+uint32_t okami::GetPixelStride(TextureFormat format) {
     switch (format) {
         case TextureFormat::R8:
             return 1;
@@ -184,7 +184,7 @@ size_t okami::GetSubresourceIndex(TextureDesc const& desc, uint32_t mipLevel, ui
     return layer * desc.mipLevels + mipLevel;
 }
 
-static size_t GetSubresourceCount(TextureDesc const& desc) {
+size_t okami::GetSubresourceCount(TextureDesc const& desc) {
     return desc.arraySize * desc.mipLevels;
 }
 
@@ -556,5 +556,3 @@ Error Texture::SaveKTX2(const std::filesystem::path& path) const {
     return Error("KTX2 support not compiled in");
 }
 #endif
-
-} // namespace okami
