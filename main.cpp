@@ -35,7 +35,7 @@ int main() {
     }
 
     auto textureHandle = en.LoadResource<Texture>(GetAssetPath("test.ktx2"));
-    auto geometryHandle = en.LoadResource<Geometry>(GetAssetPath("box.glb"));
+    //auto geometryHandle = en.LoadResource<Geometry>(GetAssetPath("box.glb"));
 
     auto e2 = en.CreateEntity();
     en.AddComponent(e2, DummyTriangleComponent{});
