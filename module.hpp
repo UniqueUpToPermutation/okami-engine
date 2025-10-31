@@ -71,9 +71,9 @@ namespace okami {
             for (auto it = range.first; it != range.second; ++it) {
                 auto sink = std::any_cast<std::shared_ptr<IMessageSink<T>>>(it->second);
                 if (sink) {
-                    sink->Send(message);
+                    sink->Send(std::move(message));
                 } else {
-
+                    
                 }
             }
         }

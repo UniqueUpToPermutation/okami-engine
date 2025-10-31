@@ -28,9 +28,6 @@ namespace okami {
         IComponentView<Transform>* m_transformView = nullptr;
         OGLTextureManager* m_textureManager = nullptr;
         
-        // Constants for sprite management
-        static constexpr uint32_t MAX_SPRITES = 1024;
-
         Error RegisterImpl(ModuleInterface&) override;
         Error StartupImpl(ModuleInterface&) override;
         void ShutdownImpl(ModuleInterface&) override;

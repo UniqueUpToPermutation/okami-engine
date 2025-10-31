@@ -146,67 +146,6 @@ set(SHADER_ENTRY_POINTS
     "DSMain:ds"    # Domain Shader (Tessellation)
 )
 
-
-#==============================================================================
-# WebGPU
-#==============================================================================
-
-if (USE_WEBGPU)
-    # Set up wgpu-native
-    set(WGPU_NATIVE_VERSION "v0.19.4.1")
-
-    # Download wgpu-native if not present
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/webgpu.h")
-        message(STATUS "Downloading wgpu-native...")
-        if(APPLE)
-            set(WGPU_PLATFORM "macos-x86_64")
-            set(WGPU_ARCHIVE "wgpu-macos-x86_64-release.zip")
-        elseif(WIN32)
-            set(WGPU_PLATFORM "windows-x86_64")
-            set(WGPU_ARCHIVE "wgpu-windows-x86_64-release.zip")
-        else()
-            set(WGPU_PLATFORM "linux-x86_64")
-            set(WGPU_ARCHIVE "wgpu-linux-x86_64-release.zip")
-        endif()
-        
-        file(DOWNLOAD 
-            "https://github.com/gfx-rs/wgpu-native/releases/download/${WGPU_NATIVE_VERSION}/${WGPU_ARCHIVE}"
-            "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}"
-            SHOW_PROGRESS
-        )
-        
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -E tar xzf "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}"
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        )
-        
-        # Move extracted files to wgpu-native directory
-        file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native")
-        file(GLOB WGPU_FILES "${CMAKE_CURRENT_SOURCE_DIR}/webgpu.h" 
-                            "${CMAKE_CURRENT_SOURCE_DIR}/wgpu.h"
-                            "${CMAKE_CURRENT_SOURCE_DIR}/libwgpu_native.*"
-                            "${CMAKE_CURRENT_SOURCE_DIR}/wgpu_native.*"
-                            "${CMAKE_CURRENT_SOURCE_DIR}/commit-sha")
-        foreach(FILE ${WGPU_FILES})
-            get_filename_component(FILENAME ${FILE} NAME)
-            file(RENAME ${FILE} "${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/${FILENAME}")
-        endforeach()
-        
-        file(REMOVE "${CMAKE_CURRENT_SOURCE_DIR}/${WGPU_ARCHIVE}")
-    endif()
-
-    # Include wgpu-native headers from wgpu-native directory
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native)
-
-    if(APPLE)
-        set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/libwgpu_native.dylib)
-    elseif(WIN32)
-        set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/wgpu_native.lib)
-    else()
-        set(WGPU_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/wgpu-native/libwgpu_native.so)
-    endif()
-endif() # USE_WEBGPU
-
 #==============================================================================
 # Main Engine Executable
 #==============================================================================

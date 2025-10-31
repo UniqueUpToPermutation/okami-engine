@@ -15,13 +15,5 @@ void main() {
     vec4 texColor = texture(u_texture, v_texCoord);
     
     // Apply sprite color tint
-    //FragColor = texColor * v_color;
-    FragColor = texColor;
-
-    // Discard transparent pixels if needed (optional)
-    //if (FragColor.a < 0.01) {
-    //    discard;
-    //}
-
-    //FragColor = vec4(v_texCoord, 1.0, 1.0);
+    FragColor = texColor * v_color;
 }

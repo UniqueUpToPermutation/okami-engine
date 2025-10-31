@@ -29,7 +29,8 @@ Error OGLSpriteRenderer::StartupImpl(ModuleInterface& mi) {
     m_program = std::move(*program);
     
     // Create instance VBO for sprite data
-    auto buffer = UploadVertexBuffer<glsl::SpriteInstance>::Create(glsl::__create_vertex_array_SpriteInstance, 1);
+    auto buffer = UploadVertexBuffer<glsl::SpriteInstance>::Create(
+        glsl::__create_vertex_array_SpriteInstance, 1);
     OKAMI_ERROR_RETURN(buffer);
     m_instanceBuffer = std::move(*buffer);
 

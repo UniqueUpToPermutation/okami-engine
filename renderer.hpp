@@ -9,6 +9,7 @@
 #include "config.hpp"
 #include "camera.hpp"
 #include "texture.hpp"
+#include "geometry.hpp"	
 
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
@@ -61,13 +62,6 @@ namespace okami {
 
 	struct DummyTriangleComponent {};
 
-	/*struct Geometry {
-        std::vector<GeometryMeshDesc> m_meshes;
-		std::any m_privateData;
-
-		using CreationData = RawGeometry;
-	};
-
 	struct StaticMeshComponent {
 		ResHandle<Geometry> m_mesh;
 		int m_meshIndex = 0;
@@ -78,7 +72,7 @@ namespace okami {
 		inline bool operator==(StaticMeshComponent const& other) const {
 			return m_mesh.Ptr() == other.m_mesh.Ptr() && m_meshIndex == other.m_meshIndex;
 		}
-	};*/
+	};
 
 	struct Rect {
 		glm::vec2 m_position = glm::vec2(0.0f, 0.0f);

@@ -44,6 +44,7 @@ Engine::Engine(EngineParams params) :
 	CreateUpdateModule(PhysicsModuleFactory{});
 
 	CreateIOModule(TextureIOModuleFactory{});
+	CreateIOModule(GeometryIOModuleFactory{});
 }
 
 entity_t Engine::CreateEntity(entity_t parent) {

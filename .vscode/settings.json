@@ -109,6 +109,7 @@
         "xtr1common": "cpp",
         "xtree": "cpp",
         "xutility": "cpp",
-        "*.glsl": "cpp"
+        "*.glsl": "cpp",
+        "resumable": "cpp"
     }
 }

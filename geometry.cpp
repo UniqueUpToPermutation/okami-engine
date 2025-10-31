@@ -108,8 +108,6 @@ uint32_t IndexInfo::GetStride() const {
 void okami::GenerateDefaultAttributeData(
     std::span<uint8_t> buffer, 
     AttributeType attrType) {
-    auto stride = GetStride(attrType);
-        
     switch (attrType) {
         case AttributeType::Position: {
             std::span<glm::vec3> dst(reinterpret_cast<glm::vec3*>(buffer.data()), 
@@ -209,4 +207,120 @@ namespace {
         // Note: GLTF doesn't typically have BITANGENT, it's computed from normal and tangent
         return AttributeType::Unknown; // fallback - will be handled as unsupported
     }
+}
+
+Expected<Geometry> Geometry::LoadGLTF(
+    std::filesystem::path const& path) {
+    Geometry result;
+
+    // Check if file exists and has correct extension
+    OKAMI_UNEXPECTED_RETURN_IF(!std::filesystem::exists(path), 
+        "File does not exist: " + path.string());
+    
+    auto extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    OKAMI_UNEXPECTED_RETURN_IF(extension != ".glb" && extension != ".gltf", 
+        "Unsupported file format: " + extension);
+
+    // Load GLTF model
+    tinygltf::Model model;
+    tinygltf::TinyGLTF loader;
+    std::string err;
+    std::string warn;
+
+    bool ret;
+    if (extension == ".glb") {
+        ret = loader.LoadBinaryFromFile(&model, &err, &warn, path.string());
+    } else {
+        ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
+    }
+
+    if (!warn.empty()) {
+        LOG(WARNING) << "GLTF loading warning: " << warn;
+    }
+
+    OKAMI_UNEXPECTED_RETURN_IF(!err.empty(), "GLTF loading error: " + err);
+    OKAMI_UNEXPECTED_RETURN_IF(!ret, "Failed to parse GLTF file");
+
+    // Copy buffer data
+    result.m_buffers.reserve(model.buffers.size());
+    for (const auto& buffer : model.buffers) {
+        result.m_buffers.emplace_back(std::move(buffer.data));
+    }
+
+    // Process first mesh
+    OKAMI_UNEXPECTED_RETURN_IF(model.meshes.empty(), 
+        "No meshes found in GLTF file");
+    const auto& mesh = model.meshes[0];
+    
+    for (const auto& primitive : mesh.primitives) {
+        GeometryMeshDesc geometryMesh;
+        geometryMesh.m_type = MeshType::Static;
+
+        // Process attributes
+        size_t vertexCount = 0;
+        for (const auto& [attribName, accessorIndex] : primitive.attributes) {
+            const auto& accessor = model.accessors[accessorIndex];
+            const auto& bufferView = model.bufferViews[accessor.bufferView];
+            
+            AttributeType attrType = MapGLTFAttributeName(attribName);
+            if (attrType == AttributeType::Unknown) {
+                LOG(WARNING) << "Skipping unknown attribute: " << attribName;
+                continue;
+            }
+
+            Attribute attribute;
+            attribute.m_type = attrType;
+            attribute.m_buffer = bufferView.buffer;
+            attribute.m_offset = bufferView.byteOffset + accessor.byteOffset;
+            
+            geometryMesh.m_attributes.push_back(attribute);
+            
+            // Track vertex count (should be same for all attributes)
+            if (vertexCount == 0) {
+                vertexCount = accessor.count;
+            } else if (vertexCount != accessor.count) {
+                LOG(WARNING) << "Attribute " << attribName << " has different vertex count (" 
+                            << accessor.count << ") than expected (" << vertexCount << ")";
+            }
+        }
+        
+        geometryMesh.m_vertexCount = vertexCount;
+
+        // Process indices if present
+        if (primitive.indices >= 0) {
+            const auto& accessor = model.accessors[primitive.indices];
+            const auto& bufferView = model.bufferViews[accessor.bufferView];
+            
+            IndexInfo indexInfo;
+            indexInfo.m_type = ConvertComponentType(accessor.componentType);
+            indexInfo.m_buffer = bufferView.buffer;
+            indexInfo.m_count = accessor.count;
+            indexInfo.m_offset = bufferView.byteOffset + accessor.byteOffset;
+            
+            geometryMesh.m_indices = indexInfo;
+        }
+
+        result.m_desc.m_meshes.push_back(std::move(geometryMesh));
+    }
+
+    // Compute AABBs
+    for (int i = 0; i < result.GetMeshCount(); ++i) {
+        auto aabb_max = glm::vec3(-std::numeric_limits<float>::infinity());
+        auto aabb_min = glm::vec3(std::numeric_limits<float>::infinity());
+        auto access = result.TryAccess<glm::vec3>(AttributeType::Position, i);
+        if (access) {
+            aabb_max = std::accumulate(access->begin(), access->end(), aabb_max,
+                [](const glm::vec3& a, const glm::vec3& b) {
+                    return glm::max(a, b);
+                });
+            aabb_min = std::accumulate(access->begin(), access->end(), aabb_min,
+                [](const glm::vec3& a, const glm::vec3& b) {
+                    return glm::min(a, b);
+                });
+        }
+        result.m_desc.m_meshes[i].m_aabb = AABB{aabb_min, aabb_max};
+    }
+
+    return result;
 }

@@ -11,6 +11,8 @@
 
 #include "../log.hpp"
 
+#include "shaders/types.glsl"
+
 #define GET_GL_ERROR() []() -> Error { \
     Error glErr = okami::GetGlError(); \
     glErr.m_line = __LINE__; \
@@ -328,7 +330,7 @@ namespace okami {
     private:
 		UploadBuffer<T> m_buffer;
         GLVertexArray m_vao;
-        std::function<void()> m_setupVertexArray;
+        glsl::vs_meta_func_t m_setupVertexArray;
 
     public:
         GLuint GetVertexArray() const {
@@ -346,24 +348,27 @@ namespace okami {
         Error Resize(size_t elementCount) {
             auto err = m_buffer.Resize(elementCount);
             OKAMI_ERROR_RETURN(err);
-
-            glBindVertexArray(m_vao.get()); OKAMI_CHK_GL;
-            OKAMI_DEFER(glBindVertexArray(0));
-
-            glBindBuffer(GL_ARRAY_BUFFER, m_buffer.GetBuffer()); OKAMI_CHK_GL;
-            OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0)); 
             
             if (elementCount == 0) {
                 return {};
             }
+
+            glBindBuffer(GL_ARRAY_BUFFER, m_buffer.GetBuffer()); OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0));
+
             // Setup vertex attributes after buffer is bound
-            m_setupVertexArray(); OKAMI_CHK_GL;
+            glsl::SetupVertexArray(
+                m_setupVertexArray,
+                glsl::VertexArraySetupArgs{ 
+                    .vertexArray = m_vao.get()
+                });
+                
+            OKAMI_CHK_GL;
 
 			return {};
 		}
 
         static Expected<UploadVertexBuffer<T>> Create(
-			std::function<void()> setupVertexArray,
+			glsl::vs_meta_func_t setupVertexArray,
             size_t elementCount = 1) {
 			UploadVertexBuffer<T> result;
 			result.m_setupVertexArray = std::move(setupVertexArray);

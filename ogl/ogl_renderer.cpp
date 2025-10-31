@@ -3,6 +3,7 @@
 #include "ogl_triangle.hpp"
 #include "ogl_texture.hpp"
 #include "ogl_sprite.hpp"
+#include "ogl_geometry.hpp"
 
 #include "../config.hpp"
 #include "../storage.hpp"
@@ -29,6 +30,7 @@ private:
     OGLTriangleRenderer* m_triangleRenderer = nullptr;
     OGLTextureManager* m_textureManager = nullptr;
     OGLSpriteRenderer* m_spriteRenderer = nullptr;
+    OGLGeometryManager* m_geometryManager = nullptr;
 
     StorageModule<Camera>* m_cameraStorage = nullptr;
     IComponentView<Transform>* m_transformView = nullptr;
@@ -68,8 +70,9 @@ protected:
     }
 
     Error ProcessFrameImpl(Time const&, ModuleInterface&) override {
-        // Upload textures
+        // Upload textures and geometry created this frame
         m_textureManager->ProcessNewResources({});
+        m_geometryManager->ProcessNewResources({});
 
         m_shaderCache.reset();
 
@@ -122,6 +125,7 @@ public:
         m_cameraStorage = CreateChild<StorageModule<Camera>>();
         m_triangleRenderer = CreateChild<OGLTriangleRenderer>();
         m_textureManager = CreateChild<OGLTextureManager>();
+        m_geometryManager = CreateChild<OGLGeometryManager>();
         m_spriteRenderer = CreateChild<OGLSpriteRenderer>(m_textureManager);
     }
 

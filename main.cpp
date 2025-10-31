@@ -15,6 +15,7 @@
 #include "transform.hpp"
 #include "texture.hpp"
 #include "paths.hpp"
+#include "geometry.hpp"
 
 using namespace okami;
 
@@ -34,6 +35,7 @@ int main() {
     }
 
     auto textureHandle = en.LoadResource<Texture>(GetAssetPath("test.ktx2"));
+    auto geometryHandle = en.LoadResource<Geometry>(GetAssetPath("box.glb"));
 
     auto e2 = en.CreateEntity();
     en.AddComponent(e2, DummyTriangleComponent{});
@@ -55,6 +57,7 @@ int main() {
     auto e6 = en.CreateEntity();
     en.AddComponent(e6, SpriteComponent{ 
         .m_texture = textureHandle,
+        .m_color = color::Red,
     });
     en.AddComponent(e6, Transform::Translate(0.5f, 0.5f, 0.0f) * Transform::Scale(1.0 / 128.0f));
 

@@ -100,30 +100,41 @@ namespace okami {
 		}
 	};
 
+	struct GeometryDesc {
+		std::vector<GeometryMeshDesc> m_meshes;
+	};
+
+	struct GeometryLoadParams {
+	};
+
 	void GenerateDefaultAttributeData(
     	std::span<uint8_t> buffer, 
     	AttributeType attrType);
 
-    class RawGeometry {
+    class Geometry {
 	private:
         std::vector<std::vector<uint8_t>> m_buffers;
-        std::vector<GeometryMeshDesc> m_meshes;
+        GeometryDesc m_desc;
 
 	public:
-		RawGeometry() = default;
-		OKAMI_NO_COPY(RawGeometry);
-		OKAMI_MOVE(RawGeometry);
+		Geometry() = default;
+		OKAMI_NO_COPY(Geometry);
+		OKAMI_MOVE(Geometry);
 
 		inline std::span<std::vector<uint8_t> const> GetBuffers() const {
 			return std::span(m_buffers);
 		}
 
+		inline GeometryDesc const& GetDesc() const {
+			return m_desc;
+		}
+
         inline std::span<GeometryMeshDesc const> GetMeshes() const {
-            return std::span(m_meshes);
+            return std::span(m_desc.m_meshes);
         }
 
 		inline size_t GetMeshCount() const {
-			return m_meshes.size();
+			return m_desc.m_meshes.size();
 		}
 
 		inline std::span<uint8_t const> GetRawVertexData(int buffer = 0) const {
@@ -142,11 +153,11 @@ namespace okami {
 
 		template <typename T>
 		std::optional<GeometryView<T>> TryAccess(AttributeType attrType, size_t meshIndex = 0) const {
-			if (meshIndex >= m_meshes.size()) {
+			if (meshIndex >= m_desc.m_meshes.size()) {
 				return std::nullopt;
             }
             
-            const auto& mesh = m_meshes[meshIndex];
+            const auto& mesh = m_desc.m_meshes[meshIndex];
 
             // Find the attribute for the given attribute type
             auto const attribute = mesh.TryGetAttribute(attrType);
@@ -169,11 +180,11 @@ namespace okami {
 
 		template <typename T>
 		std::optional<GeometryView<T>> TryAccess(AttributeType attrType, size_t meshIndex = 0) {
-			if (meshIndex >= m_meshes.size()) {
+			if (meshIndex >= m_desc.m_meshes.size()) {
 				return std::nullopt;
             }
             
-            const auto& mesh = m_meshes[meshIndex];
+            const auto& mesh = m_desc.m_meshes[meshIndex];
             
             // Find the attribute for the given attribute type
             auto const attribute = mesh.TryGetAttribute(attrType);
@@ -193,5 +204,10 @@ namespace okami {
 				reinterpret_cast<T*>(data.data() + bufferOffset + stride * mesh.m_vertexCount)
 			};
 		}
+
+		static Expected<Geometry> LoadGLTF(std::filesystem::path const& path);
+
+		using Desc = GeometryDesc;
+        using LoadParams = GeometryLoadParams;
 	};
 }
