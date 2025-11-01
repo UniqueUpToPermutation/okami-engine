@@ -6,14 +6,14 @@
 #include "../content.hpp"
 
 namespace okami {
-    struct MeshImpl {
+    struct PrimitiveImpl {
         GLVertexArray m_vao;
         std::optional<int> m_indexBufferIndex;
         size_t m_indexBufferOffset = 0;
     };
 
     struct GeometryImpl {
-        std::vector<MeshImpl> m_meshes;
+        std::vector<PrimitiveImpl> m_meshes;
         std::vector<std::shared_ptr<GLBuffer>> m_buffers;
     };
 

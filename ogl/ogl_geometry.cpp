@@ -26,10 +26,10 @@ Expected<std::pair<typename Geometry::Desc, GeometryImpl>>
     }
 
     // Build VAOs for each mesh
-    std::vector<MeshImpl> meshesImpl;
-    for (auto const& mesh : data.GetMeshes()) {
+    std::vector<PrimitiveImpl> primitivesImpl;
+    for (auto const& primitive : data.GetPrimitives()) {
         auto vsInputMetaFunc = [&]() {
-            switch (mesh.m_type) {
+            switch (primitive.m_type) {
                 case okami::MeshType::Static:
                     return m_staticMeshMetaFunc;
                 default:
@@ -44,7 +44,7 @@ Expected<std::pair<typename Geometry::Desc, GeometryImpl>>
         // Get vertex attributes    
         for (auto const& [location, attribInfo] : inputInfo.locationToAttrib) {
             // Verify that the mesh has the required attribute
-            auto attribute = mesh.TryGetAttribute(attribInfo.type);
+            auto attribute = primitive.TryGetAttribute(attribInfo.type);
 
             if (!attribute) {
                 auto result = OKAMI_UNEXPECTED("Mesh is missing required attribute for attribute " + std::string(AttributeTypeToString(attribInfo.type)) +
@@ -59,17 +59,19 @@ Expected<std::pair<typename Geometry::Desc, GeometryImpl>>
 
             setupByLocation[location] = glsl::VertexArraySetupAttrib{
                 .buffer = oglBuffers[attribute->m_buffer]->get(),
-                .offset = attribute->m_offset
+                .offset = attribute->m_offset,
+                .stride = static_cast<GLsizei>(attribute->m_stride)
             };
         }
         
         // Get index buffer if present
         std::optional<glsl::VertexArraySetupAttrib> indexBufferSetup;
-        if (mesh.HasIndexBuffer()) {
-            auto const& indexInfo = mesh.m_indices.value();
+        if (primitive.HasIndexBuffer()) {
+            auto const& indexInfo = primitive.m_indices.value();
             indexBufferSetup = glsl::VertexArraySetupAttrib{
                 .buffer = oglBuffers[indexInfo.m_buffer]->get(),
-                .offset = indexInfo.m_offset
+                .offset = indexInfo.m_offset,
+                .stride = static_cast<GLsizei>(indexInfo.GetStride())
             };
         }
 
@@ -84,17 +86,17 @@ Expected<std::pair<typename Geometry::Desc, GeometryImpl>>
         });
         Error err = GET_GL_ERROR();
 
-        meshesImpl.emplace_back(MeshImpl{
+        primitivesImpl.emplace_back(PrimitiveImpl{
             .m_vao = std::move(vao),
-            .m_indexBufferIndex = mesh.HasIndexBuffer() ? std::optional<int>{ mesh.m_indices->m_buffer } : std::nullopt,
-            .m_indexBufferOffset = mesh.HasIndexBuffer() ? mesh.m_indices->m_offset : 0,
+            .m_indexBufferIndex = primitive.HasIndexBuffer() ? std::optional<int>{ primitive.m_indices->m_buffer } : std::nullopt,
+            .m_indexBufferOffset = primitive.HasIndexBuffer() ? primitive.m_indices->m_offset : 0,
         });
     }
 
     return std::make_pair(
         data.GetDesc(),
         GeometryImpl{
-            .m_meshes = std::move(meshesImpl),
+            .m_meshes = std::move(primitivesImpl),
             .m_buffers = std::move(oglBuffers),
         }
     );

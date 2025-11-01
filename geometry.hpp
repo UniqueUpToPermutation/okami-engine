@@ -9,6 +9,8 @@
 #include "aabb.hpp"
 
 #include <glm/vec3.hpp>
+#include <glm/vec2.hpp>
+#include <glm/vec4.hpp>
 #include <glm/common.hpp>
 
 namespace okami {
@@ -27,20 +29,6 @@ namespace okami {
 
 	enum class MeshType {
 		Static
-	};
-
-	template <typename T>
-	struct GeometryView {
-		T* m_begin;
-		T* m_end;
-
-		T* begin() const {
-			return m_begin;
-		}
-
-		T* end() const {
-			return m_end;
-		}
 	};
 
     enum class AccessorType {
@@ -69,14 +57,6 @@ namespace okami {
 	uint32_t GetStride(AccessorType type, AccessorComponentType componentType);
 	uint32_t GetStride(AttributeType type);
 
-    struct Attribute {
-        AttributeType m_type;
-        int m_buffer;
-        size_t m_offset;
-
-        uint32_t GetStride() const;
-    };
-
 	struct IndexInfo {
 		AccessorComponentType m_type;
 		int m_buffer;
@@ -85,26 +65,6 @@ namespace okami {
 
 		uint32_t GetStride() const;
 	};
-	
-	struct GeometryMeshDesc {
-		std::vector<Attribute> m_attributes;
-		size_t m_vertexCount = 0;
-		std::optional<IndexInfo> m_indices;
-		MeshType m_type;
-		AABB m_aabb;
-
-		size_t GetVertexByteSize() const;
-		size_t GetIndexByteSize() const;
-		Attribute const* TryGetAttribute(AttributeType type) const;
-
-		inline bool HasIndexBuffer() const {
-			return m_indices.has_value();
-		}
-	};
-
-	struct GeometryDesc {
-		std::vector<GeometryMeshDesc> m_meshes;
-	};
 
 	struct GeometryLoadParams {
 	};
@@ -112,6 +72,110 @@ namespace okami {
 	void GenerateDefaultAttributeData(
     	std::span<uint8_t> buffer, 
     	AttributeType attrType);
+
+	template <typename T>
+    constexpr bool VerifyGeometryAttributeType(AttributeType attrType) {
+        switch (attrType) {
+            case AttributeType::Position:
+                return std::is_same_v<T, glm::vec3>;
+            case AttributeType::Normal:
+                return std::is_same_v<T, glm::vec3>;
+            case AttributeType::TexCoord:
+                return std::is_same_v<T, glm::vec2>;
+            case AttributeType::Color:
+                return std::is_same_v<T, glm::vec4>;
+            case AttributeType::Tangent:
+                return std::is_same_v<T, glm::vec4>;
+            case AttributeType::Bitangent:
+                return std::is_same_v<T, glm::vec3>;
+            default:
+                return false;
+        }
+    }
+
+    template <typename T>
+    constexpr bool VerifyIndexType(AccessorComponentType componentType) {
+        switch (componentType) {
+            case AccessorComponentType::UByte:
+                return std::is_same_v<T, uint8_t>;
+            case AccessorComponentType::UShort:
+                return std::is_same_v<T, uint16_t>;
+            case AccessorComponentType::UInt:
+                return std::is_same_v<T, uint32_t>;
+            default:
+                return false;
+        }
+    }
+
+    template <typename T>
+    struct GeometryViewIterator {
+        std::conditional_t<std::is_const_v<T>, const uint8_t*, uint8_t*> m_data;
+        uint32_t m_stride;
+
+        T& operator*() const {
+            return *reinterpret_cast<T*>(m_data);
+        }
+
+        GeometryViewIterator& operator++() {
+            m_data += m_stride;
+            return *this;
+        }
+
+        bool operator!=(const GeometryViewIterator& other) const {
+            return m_data != other.m_data;
+        }
+
+        bool operator==(const GeometryViewIterator& other) const {
+            return m_data == other.m_data;
+        }
+    };
+    
+    template <typename T>
+    struct GeometryView {
+        GeometryViewIterator<T> m_begin;
+        GeometryViewIterator<T> m_end;
+
+        GeometryViewIterator<T> begin() const {
+            return m_begin;
+        }
+
+        GeometryViewIterator<T> end() const {
+            return m_end;
+        }
+        
+        T& operator[](size_t index) const {
+            auto it = m_begin;
+            it.m_data += index * it.m_stride;
+            return *it;
+        }
+    };
+
+    struct Attribute {
+        AttributeType m_type;
+        int m_buffer;
+        size_t m_offset;
+        uint32_t m_stride;
+
+        uint32_t GetStride() const;
+    };
+
+    struct GeometryPrimitiveDesc {
+		std::unordered_map<AttributeType, Attribute> m_attributes;
+		size_t m_vertexCount = 0;
+		std::optional<IndexInfo> m_indices;
+		MeshType m_type;
+		AABB m_aabb;
+
+		Attribute const* TryGetAttribute(AttributeType type) const;
+
+		inline bool HasIndexBuffer() const {
+			return m_indices.has_value();
+		}
+	};
+
+    struct GeometryDesc {
+		std::vector<GeometryPrimitiveDesc> m_primitives;
+	};
 
     class Geometry {
 	private:
@@ -131,12 +195,12 @@ namespace okami {
 			return m_desc;
 		}
 
-        inline std::span<GeometryMeshDesc const> GetMeshes() const {
-            return std::span(m_desc.m_meshes);
+        inline std::span<GeometryPrimitiveDesc const> GetPrimitives() const {
+            return std::span(m_desc.m_primitives);
         }
 
-		inline size_t GetMeshCount() const {
-			return m_desc.m_meshes.size();
+		inline size_t GetPrimitiveCount() const {
+			return m_desc.m_primitives.size();
 		}
 
 		inline std::span<uint8_t const> GetRawVertexData(int buffer = 0) const {
@@ -153,58 +217,91 @@ namespace okami {
 			return m_buffers[buffer];
 		}
 
-		template <typename T>
-		std::optional<GeometryView<T>> TryAccess(AttributeType attrType, size_t meshIndex = 0) const {
-			if (meshIndex >= m_desc.m_meshes.size()) {
-				return std::nullopt;
-            }
-            
-            const auto& mesh = m_desc.m_meshes[meshIndex];
+        template <typename T>
+        static Expected<GeometryView<T>> TryAccessIndexedStatic(
+            std::conditional_t<std::is_const_v<T>, Geometry const&, Geometry&> data, 
+            size_t primitiveIndex = 0) {
 
+            OKAMI_UNEXPECTED_RETURN_IF(primitiveIndex >= data.m_desc.m_primitives.size(), 
+                "Primitive index out of bounds"); 
+            OKAMI_UNEXPECTED_RETURN_IF(!VerifyIndexType<T>(data.m_desc.m_primitives[primitiveIndex].m_indices->m_type), 
+                "Type T does not match the index buffer component type");
+
+            GeometryPrimitiveDesc const& primitive = data.m_desc.m_primitives[primitiveIndex];
+            OKAMI_UNEXPECTED_RETURN_IF(primitive.m_indices == std::nullopt, "No index buffer found");
+
+            // Get the index buffer data
+            auto indexBufferData = data.GetRawVertexData(primitive.m_indices->m_buffer);
+            auto indexBufferOffset = primitive.m_indices->m_offset;
+            auto stride = primitive.m_indices->GetStride();
+
+            return GeometryView<T>(
+                GeometryViewIterator<T>{
+                    indexBufferData.data() + indexBufferOffset,
+                    stride
+                },
+                GeometryViewIterator<T>{
+                    indexBufferData.data() + indexBufferOffset + stride * primitive.m_indices->m_count,
+                    stride
+                }
+            );
+        }
+
+        template <typename T>
+        Expected<GeometryView<T>> TryAccessIndexed(size_t primitiveIndex = 0) const {
+            static_assert(std::is_const_v<T>, "T must be const for const Geometry");
+            return TryAccessIndexedStatic<T>(*this, primitiveIndex);
+        }
+
+        template <typename T>
+        Expected<GeometryView<T>> TryAccessIndexed(size_t primitiveIndex = 0) {
+            return TryAccessIndexedStatic<T>(*this, primitiveIndex);
+        }
+
+        template <typename T>
+        static Expected<GeometryView<T>> TryAccessStatic(
+            std::conditional_t<std::is_const_v<T>, Geometry const&, Geometry&> data, 
+            AttributeType attrType, 
+            size_t primitiveIndex = 0) {
+            OKAMI_UNEXPECTED_RETURN_IF(!VerifyGeometryAttributeType<T>(attrType), 
+                "Type T does not match the AttributeType");
+            OKAMI_UNEXPECTED_RETURN_IF(primitiveIndex >= data.m_desc.m_primitives.size(), 
+                "Primitive index out of bounds");
+
+            const auto& primitive = data.m_desc.m_primitives[primitiveIndex];
             // Find the attribute for the given attribute type
-            auto const attribute = mesh.TryGetAttribute(attrType);
-            if (!attribute) {
-                return std::nullopt;
-            }
+            Attribute const* attribute = primitive.TryGetAttribute(attrType);
+            OKAMI_UNEXPECTED_RETURN_IF(attribute == nullptr, 
+                "AttributeType not found in primitive");
 
             // Get the buffer data
-            auto data = GetRawVertexData(attribute->m_buffer);
+            auto bufferData = data.GetRawVertexData(attribute->m_buffer);
 
             auto bufferOffset = attribute->m_offset;
             auto stride = attribute->GetStride();
 
             // Create a view of the buffer data
             return GeometryView<T>(
-				reinterpret_cast<T*>(data.data() + bufferOffset),
-				reinterpret_cast<T*>(data.data() + bufferOffset + stride * mesh.m_vertexCount)
+                GeometryViewIterator<T>{
+                    bufferData.data() + bufferOffset,
+                    stride
+                },
+                GeometryViewIterator<T>{
+                    bufferData.data() + bufferOffset + stride * primitive.m_vertexCount,
+                    stride
+                }
 			);
+        }
+
+		template <typename T>
+		Expected<GeometryView<T>> TryAccess(AttributeType attrType, size_t primitiveIndex = 0) const {
+			static_assert(std::is_const_v<T>, "T must be const for const Geometry");
+            return TryAccessStatic<T>(*this, attrType, primitiveIndex);
 		}
 
 		template <typename T>
-		std::optional<GeometryView<T>> TryAccess(AttributeType attrType, size_t meshIndex = 0) {
-			if (meshIndex >= m_desc.m_meshes.size()) {
-				return std::nullopt;
-            }
-            
-            const auto& mesh = m_desc.m_meshes[meshIndex];
-            
-            // Find the attribute for the given attribute type
-            auto const attribute = mesh.TryGetAttribute(attrType);
-            if (!attribute) {
-                return std::nullopt;
-            }
-
-            // Get the buffer data
-            auto data = GetRawVertexData(attribute->m_buffer);
-
-            auto bufferOffset = attribute->m_offset;
-            auto stride = attribute->GetStride();
-
-            // Create a view of the buffer data
-            return GeometryView<T>{
-				reinterpret_cast<T*>(data.data() + bufferOffset),
-				reinterpret_cast<T*>(data.data() + bufferOffset + stride * mesh.m_vertexCount)
-			};
+		Expected<GeometryView<T>> TryAccess(AttributeType attrType, size_t primitiveIndex = 0) {
+			return TryAccessStatic<T>(*this, attrType, primitiveIndex);
 		}
 
 		static Expected<Geometry> LoadGLTF(std::filesystem::path const& path);

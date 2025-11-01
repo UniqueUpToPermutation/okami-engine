@@ -69,9 +69,10 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
         
         Transform transform = m_transformView->GetOr(entity, Transform::Identity());
 
+        auto matrix = transform.AsMatrix();
         instances.emplace_back(std::make_pair(mesh.m_geometry, glsl::StaticMeshInstance{
-            .u_model = transform.AsMatrix(),
-            .u_normalMatrix = glm::transpose(glm::inverse(glm::mat3(transform.AsMatrix()))),
+            .u_model = matrix,
+            .u_normalMatrix = glm::transpose(glm::inverse(matrix)),
         }));
     });
 
@@ -102,7 +103,7 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
     // Group sprites by texture to minimize texture binding
     uint32_t batchStart = 0;
 
-    okami::MeshImpl* currentMeshImpl = nullptr;
+    okami::PrimitiveImpl* currentMeshImpl = nullptr;
     ResHandle<Geometry> currentGeometry;
 
     if (instances.empty()) {
@@ -128,19 +129,33 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
         if (currentMeshImpl) {
             m_instanceUBO.Write(geo.second);
             auto const& desc = currentGeometry.GetDesc();
+
+            auto const& primitive = desc.m_primitives[0];
             
-            if (desc.m_meshes[0].m_indices) {
+            if (primitive.m_indices) {
+                GLint indexType = 0;
+                switch (primitive.m_indices->m_type) {
+                    case AccessorComponentType::Byte:
+                        indexType = GL_UNSIGNED_BYTE;
+                        break;
+                    case AccessorComponentType::UShort:
+                        indexType = GL_UNSIGNED_SHORT;
+                        break;
+                    case AccessorComponentType::UInt:
+                        indexType = GL_UNSIGNED_INT;
+                        break;
+                }
+
                 glDrawElements(
                     GL_TRIANGLES,
-                    static_cast<GLsizei>(desc.m_meshes[0].m_indices->m_count),
-                    GL_UNSIGNED_INT,
-                    reinterpret_cast<void*>(currentMeshImpl->m_indexBufferOffset)
-                ); OKAMI_CHK_GL;
+                    static_cast<GLsizei>(primitive.m_indices->m_count),
+                    indexType,
+                    (void*)currentMeshImpl->m_indexBufferOffset); OKAMI_CHK_GL;
             } else {
                 glDrawArrays(
                     GL_TRIANGLES,
                     0,
-                    static_cast<GLsizei>(desc.m_meshes[0].m_vertexCount)
+                    static_cast<GLsizei>(primitive.m_vertexCount)
                 ); OKAMI_CHK_GL;
             }
         }

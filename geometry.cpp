@@ -78,39 +78,8 @@ uint32_t okami::GetStride(AccessorType type, AccessorComponentType componentType
     return elementLength * attributeCount;
 }
 
-Attribute const* GeometryMeshDesc::TryGetAttribute(AttributeType type) const {
-    auto it = std::find_if(m_attributes.begin(), m_attributes.end(),
-        [type](const Attribute& accessor) {
-            return accessor.m_type == type;
-        });
-    if (it != m_attributes.end()) {
-        return &*it;
-    } else {
-        return nullptr;
-    }
-}
-
-size_t GeometryMeshDesc::GetVertexByteSize() const {
-    size_t size = 0;
-    for (const auto& attr : m_attributes) {
-        size += attr.GetStride() * m_vertexCount;
-    }
-    return size;
-}
-
-size_t GeometryMeshDesc::GetIndexByteSize() const {
-    if (m_indices) {
-        return m_indices->GetStride() * m_indices->m_count;
-    }
-    return 0;
-}
-
 uint32_t okami::GetStride(AttributeType type) {
     return GetStride(GetAccessorType(type), GetComponentType(type));
-}
-
-uint32_t Attribute::GetStride() const {
-    return okami::GetStride(m_type);
 }
 
 uint32_t IndexInfo::GetStride() const {
@@ -221,8 +190,23 @@ namespace {
     }
 }
 
-Expected<Geometry> Geometry::LoadGLTF(
-    std::filesystem::path const& path) {
+uint32_t Attribute::GetStride() const {
+    if (m_stride != 0) {
+        return m_stride;
+    } else {
+        return ::GetStride(m_type);
+    }
+}
+
+Attribute const* GeometryPrimitiveDesc::TryGetAttribute(AttributeType type) const {
+    auto it = m_attributes.find(type);
+    if (it != m_attributes.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
+Expected<Geometry> Geometry::LoadGLTF(std::filesystem::path const& path) {
     Geometry result;
 
     // Check if file exists and has correct extension
@@ -266,8 +250,8 @@ Expected<Geometry> Geometry::LoadGLTF(
     const auto& mesh = model.meshes[0];
     
     for (const auto& primitive : mesh.primitives) {
-        GeometryMeshDesc geometryMesh;
-        geometryMesh.m_type = MeshType::Static;
+        GeometryPrimitiveDesc geometryPrimitive;
+        geometryPrimitive.m_type = MeshType::Static;
 
         // Process attributes
         size_t vertexCount = 0;
@@ -285,8 +269,9 @@ Expected<Geometry> Geometry::LoadGLTF(
             attribute.m_type = attrType;
             attribute.m_buffer = bufferView.buffer;
             attribute.m_offset = bufferView.byteOffset + accessor.byteOffset;
-            
-            geometryMesh.m_attributes.push_back(attribute);
+            attribute.m_stride = static_cast<uint32_t>(bufferView.byteStride);
+
+            geometryPrimitive.m_attributes.emplace(attrType, attribute);
             
             // Track vertex count (should be same for all attributes)
             if (vertexCount == 0) {
@@ -296,8 +281,8 @@ Expected<Geometry> Geometry::LoadGLTF(
                             << accessor.count << ") than expected (" << vertexCount << ")";
             }
         }
-        
-        geometryMesh.m_vertexCount = vertexCount;
+
+        geometryPrimitive.m_vertexCount = vertexCount;
 
         // Process indices if present
         if (primitive.indices >= 0) {
@@ -310,14 +295,14 @@ Expected<Geometry> Geometry::LoadGLTF(
             indexInfo.m_count = accessor.count;
             indexInfo.m_offset = bufferView.byteOffset + accessor.byteOffset;
             
-            geometryMesh.m_indices = indexInfo;
+            geometryPrimitive.m_indices = indexInfo;
         }
 
-        result.m_desc.m_meshes.push_back(std::move(geometryMesh));
+        result.m_desc.m_primitives.push_back(std::move(geometryPrimitive));
     }
 
     // Compute AABBs
-    for (int i = 0; i < result.GetMeshCount(); ++i) {
+    for (int i = 0; i < result.GetPrimitiveCount(); ++i) {
         auto aabb_max = glm::vec3(-std::numeric_limits<float>::infinity());
         auto aabb_min = glm::vec3(std::numeric_limits<float>::infinity());
         auto access = result.TryAccess<glm::vec3>(AttributeType::Position, i);
@@ -331,7 +316,7 @@ Expected<Geometry> Geometry::LoadGLTF(
                     return glm::min(a, b);
                 });
         }
-        result.m_desc.m_meshes[i].m_aabb = AABB{aabb_min, aabb_max};
+        result.m_desc.m_primitives[i].m_aabb = AABB{aabb_min, aabb_max};
     }
 
     return result;

@@ -27,6 +27,7 @@ using mat3 = glm::mat3;
 struct VertexArraySetupAttrib {
     GLuint buffer = 0;
     size_t offset = 0;
+    GLsizei stride = 0;
 };
 
 struct VertexArraySetupArgs {
