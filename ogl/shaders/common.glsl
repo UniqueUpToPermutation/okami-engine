@@ -1,6 +1,4 @@
-#ifndef COMMON_GLSL_INCLUDED
-#define COMMON_GLSL_INCLUDED
-
+#pragma once
 #include "types.glsl"
 
 #ifdef __cplusplus
@@ -24,7 +22,10 @@
         if (args.vertexArraySetup) { \
             glBindVertexArray(args.vertexArraySetup->vertexArray); \
             if (args.vertexArraySetup->indexBufferSetup) { \
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, args.vertexArraySetup->indexBufferSetup->buffer); \
+                glBindBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, \
+                    args.vertexArraySetup->indexBufferSetup->buffer, \
+                    args.vertexArraySetup->indexBufferSetup->offset, \
+                    args.vertexArraySetup->indexBufferSetup->size); \
             } \
         } \
         using type_t = name;
@@ -79,5 +80,3 @@
 #define VERTEX_ARRAY_ITEM(member_name)
 #define VERTEX_ARRAY_DEF_END()
 #endif
-
-#endif // COMMON_GLSL_INCLUDED

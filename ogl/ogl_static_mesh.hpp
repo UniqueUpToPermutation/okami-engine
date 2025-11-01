@@ -8,16 +8,18 @@
 #include "../transform.hpp"
 #include "../renderer.hpp"
 
+#include "shaders/scene.glsl"
+#include "shaders/static_mesh.glsl"
+
 namespace okami {
     class OGLStaticMeshRenderer final :
         public EngineModule,
         public IOGLRenderModule {
     protected:
         GLProgram m_program;
-        
-        // Uniform locations
-        GLint u_viewProj = -1;
-        GLint u_texture = -1;
+
+        UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
+        UniformBuffer<glsl::StaticMeshInstance> m_instanceUBO;
 
         // Component storage and views
         StorageModule<StaticMeshComponent>* m_storage = nullptr;
@@ -36,6 +38,6 @@ namespace okami {
 
         Error Pass(OGLPass const& pass) override;
 
-        std::string_view GetName() const override;
+        std::string GetName() const override;
     };
 }

@@ -32,8 +32,12 @@ Error OGLTriangleRenderer::StartupImpl(ModuleInterface& mi) {
 
     Error uniformErrs;
     u_world = GetUniformLocation(m_program, "u_world", uniformErrs);
-    u_viewProj = GetUniformLocation(m_program, "u_viewProj", uniformErrs);
     OKAMI_ERROR_RETURN(uniformErrs);
+
+    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create(
+        m_program, "SceneGlobalsBlock", 0);
+    OKAMI_ERROR_RETURN(sceneUBO);
+    m_sceneUBO = std::move(*sceneUBO);
 
     return {};
 }
@@ -52,12 +56,20 @@ Error OGLTriangleRenderer::MergeImpl() {
 
 Error OGLTriangleRenderer::Pass(OGLPass const& pass) {
     glUseProgram(m_program.get());
-    
+
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
+
     // Bind VAO
     glBindVertexArray(m_vao.get());
+    OKAMI_DEFER(glBindVertexArray(0)); OKAMI_CHK_GL;
     
     // Set view-projection matrix uniform
-    glUniformMatrix4fv(u_viewProj, 1, GL_FALSE, &pass.m_viewProjection[0][0]);
+    m_sceneUBO.Bind();
+    OKAMI_DEFER(m_sceneUBO.Unbind()); OKAMI_CHK_GL;
+    m_sceneUBO.Write(pass.m_sceneGlobals); OKAMI_CHK_GL;
 
     m_storage->ForEach(
         [&](entity_t entity, DummyTriangleComponent const&) {
@@ -69,13 +81,10 @@ Error OGLTriangleRenderer::Pass(OGLPass const& pass) {
         }
     );
     
-    // Unbind VAO
-    glBindVertexArray(0);
-
     return {};
 }
 
-std::string_view OGLTriangleRenderer::GetName() const {
+std::string OGLTriangleRenderer::GetName() const {
     return "OpenGL Triangle Renderer";
 }
 

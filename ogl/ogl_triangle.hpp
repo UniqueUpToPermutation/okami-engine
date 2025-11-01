@@ -15,7 +15,7 @@ namespace okami {
         GLVertexArray m_vao;  // Vertex Array Object
 
         GLint u_world = -1;
-        GLint u_viewProj = -1;
+        UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
 
         StorageModule<DummyTriangleComponent>* m_storage = nullptr;
         IComponentView<Transform>* m_transformView = nullptr;
@@ -32,6 +32,6 @@ namespace okami {
 
         Error Pass(OGLPass const& pass) override;
 
-        std::string_view GetName() const override;
+        std::string GetName() const override;
     };
 }

@@ -2,13 +2,15 @@
 
 #include "shaders/common.glsl"
 
+#include <glog/logging.h>   
+
 using namespace okami;
 
 Expected<std::pair<typename Geometry::Desc, GeometryImpl>> 
     OGLGeometryManager::CreateResource(Geometry&& data, std::any userData) {
 
     // Upload buffers to OpenGL
-    std::vector<GLBuffer> oglBuffers;
+    std::vector<std::shared_ptr<GLBuffer>> oglBuffers;
     for (auto const& bufferData : data.GetBuffers()) {
         Error err;
 
@@ -19,6 +21,8 @@ Expected<std::pair<typename Geometry::Desc, GeometryImpl>>
 
         OKAMI_UNEXPECTED_RETURN_IF(!oglBuffer, "Failed to create OpenGL buffer for geometry");
         OKAMI_UNEXPECTED_RETURN(err);
+
+        oglBuffers.emplace_back(std::make_shared<GLBuffer>(std::move(oglBuffer)));
     }
 
     // Build VAOs for each mesh
@@ -41,11 +45,20 @@ Expected<std::pair<typename Geometry::Desc, GeometryImpl>>
         for (auto const& [location, attribInfo] : inputInfo.locationToAttrib) {
             // Verify that the mesh has the required attribute
             auto attribute = mesh.TryGetAttribute(attribInfo.type);
+
+            if (!attribute) {
+                auto result = OKAMI_UNEXPECTED("Mesh is missing required attribute for attribute " + std::string(AttributeTypeToString(attribInfo.type)) +
+                    " at location " + std::to_string(location));
+                LOG(ERROR) << result.error();
+                return (result);
+            }
+
             OKAMI_UNEXPECTED_RETURN_IF(!attribute, 
-                "Mesh is missing required attribute for location " + std::to_string(location));
+                "Mesh is missing required attribute for attribute " + std::string(AttributeTypeToString(attribInfo.type)) +
+                " at location " + std::to_string(location));
 
             setupByLocation[location] = glsl::VertexArraySetupAttrib{
-                .buffer = oglBuffers[attribute->m_buffer].get(),
+                .buffer = oglBuffers[attribute->m_buffer]->get(),
                 .offset = attribute->m_offset
             };
         }
@@ -55,7 +68,7 @@ Expected<std::pair<typename Geometry::Desc, GeometryImpl>>
         if (mesh.HasIndexBuffer()) {
             auto const& indexInfo = mesh.m_indices.value();
             indexBufferSetup = glsl::VertexArraySetupAttrib{
-                .buffer = oglBuffers[indexInfo.m_buffer].get(),
+                .buffer = oglBuffers[indexInfo.m_buffer]->get(),
                 .offset = indexInfo.m_offset
             };
         }

@@ -267,8 +267,9 @@ namespace okami {
 			return res;
 		}
 
-		std::string_view GetName() const override {
-			return "Content Module";
+		std::string GetName() const override {
+			auto typeName = typeid(T).name();
+			return "Content Module <" + std::string{typeName} + ">";
 		}
     };
 }

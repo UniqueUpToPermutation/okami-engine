@@ -63,15 +63,7 @@ namespace okami {
 	struct DummyTriangleComponent {};
 
 	struct StaticMeshComponent {
-		ResHandle<Geometry> m_mesh;
-		int m_meshIndex = 0;
-
-		inline auto operator<=>(StaticMeshComponent const& other) const {
-			return (std::pair(m_mesh.Ptr(), m_meshIndex) <=> std::pair(other.m_mesh.Ptr(), other.m_meshIndex));
-		}
-		inline bool operator==(StaticMeshComponent const& other) const {
-			return m_mesh.Ptr() == other.m_mesh.Ptr() && m_meshIndex == other.m_meshIndex;
-		}
+		ResHandle<Geometry> m_geometry;
 	};
 
 	struct Rect {

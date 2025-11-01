@@ -36,8 +36,9 @@ namespace okami {
         }
 
     public:
-        std::string_view GetName() const override {
-            return "IO Module";
+        std::string GetName() const override {
+            auto typeName = typeid(T).name();
+            return "IO Module <" + std::string{typeName} + ">";
         }
     };
 

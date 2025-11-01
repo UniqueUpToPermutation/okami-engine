@@ -1,6 +1,4 @@
-#ifndef TYPES_GLSL
-#define TYPES_GLSL
-
+#pragma once
 #ifdef __cplusplus
 #include <glad/gl.h> // Preprocessor: Ignore
 #include <glm/glm.hpp> // Preprocessor: Ignore
@@ -23,6 +21,8 @@ namespace glsl {
 using vec2 = glm::vec2;
 using vec3 = glm::vec3;
 using vec4 = glm::vec4;
+using mat4 = glm::mat4;
+using mat3 = glm::mat3;
 
 struct VertexArraySetupAttrib {
     GLuint buffer = 0;
@@ -54,11 +54,6 @@ enum class Frequency {
     PER_INSTANCE = 1,
 };
 
-enum class VertexLayout {
-    INTERLEAVED = 0,
-    SEPARATE = 1
-};
-
 using vs_meta_func_t = std::function<void(VertexShaderMeta const&)>;
 
 inline VertexShaderInputInfo GetVSShaderInputInfo(vs_meta_func_t func) {
@@ -78,5 +73,3 @@ inline void SetupVertexArray(vs_meta_func_t func, VertexArraySetupArgs args) {
 } // namespace glsl
 
 #endif
-
-#endif // TYPES_GLSL

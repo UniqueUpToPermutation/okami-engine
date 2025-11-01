@@ -114,7 +114,7 @@ void EngineModule::Shutdown(ModuleInterface& a) {
     ShutdownImpl(a);
 }
 
-std::string_view EmptyModule::GetName() const {
+std::string EmptyModule::GetName() const {
     return m_name;
 }
 

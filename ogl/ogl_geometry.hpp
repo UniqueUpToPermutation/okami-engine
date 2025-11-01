@@ -14,7 +14,7 @@ namespace okami {
 
     struct GeometryImpl {
         std::vector<MeshImpl> m_meshes;
-        std::vector<GLBuffer> m_buffers;
+        std::vector<std::shared_ptr<GLBuffer>> m_buffers;
     };
 
     class OGLGeometryManager : 

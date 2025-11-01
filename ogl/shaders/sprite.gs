@@ -1,9 +1,13 @@
 #version 410 core
 
+#include "scene.glsl"
+
 layout(points) in;
 layout(triangle_strip, max_vertices = 4) out;
 
-uniform mat4 u_viewProj;
+layout(std140) uniform SceneGlobalsBlock {
+    SceneGlobals sceneGlobals;  // Use the struct inside the block
+};
 
 // Input from vertex shader
 in VS_OUT {
@@ -60,7 +64,7 @@ void main() {
         vec3 worldPos = center + vec3(rotatedCorner, 0.0);
         
         // Transform to clip space
-        gl_Position = u_viewProj * vec4(worldPos, 1.0);
+        gl_Position = sceneGlobals.u_camera.u_viewProj * vec4(worldPos, 1.0);
         
         // Calculate texture coordinate
         v_texCoord = spriteRect.xy + uvs[i] * spriteRect.zw;

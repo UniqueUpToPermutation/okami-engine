@@ -179,7 +179,7 @@ namespace okami {
 
         void Shutdown(ModuleInterface& a);
 
-        virtual std::string_view GetName() const = 0;
+        virtual std::string GetName() const = 0;
 
         virtual ~EngineModule();
     };
@@ -199,6 +199,6 @@ namespace okami {
         virtual Error ProcessFrameImpl(Time const&, ModuleInterface&) override { return {}; }
         virtual Error MergeImpl() override { return {}; }
 
-		std::string_view GetName() const override;
+		std::string GetName() const override;
     };
 }

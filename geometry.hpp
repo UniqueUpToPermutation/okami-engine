@@ -23,6 +23,8 @@ namespace okami {
 		// Add more attribute types as needed
 	};
 
+	std::string_view AttributeTypeToString(AttributeType type);
+
 	enum class MeshType {
 		Static
 	};

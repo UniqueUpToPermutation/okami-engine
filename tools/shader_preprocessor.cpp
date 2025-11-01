@@ -16,9 +16,10 @@ private:
         auto absolutePath = std::filesystem::absolute(filePath);
         std::string absolutePathStr = absolutePath.string();
         
-        // Check for circular includes
+        // Check if already included (prevents duplicate includes)
         if (m_includedFiles.find(absolutePathStr) != m_includedFiles.end()) {
-            throw std::runtime_error("Circular include detected: " + absolutePathStr);
+            // File already included, return empty string to skip it
+            return "";
         }
         
         m_includedFiles.insert(absolutePathStr);
@@ -37,6 +38,10 @@ private:
             // Check if this line is an include directive
             if (processIncludeLine(line, filePath.parent_path(), result)) {
                 // Line was processed as an include, continue to next line
+            } else if (line.find("#pragma once") != std::string::npos) {
+                // Skip #pragma once directives (include guard handled by tracking)
+                // Optionally add a comment to indicate it was removed
+                result += "// #pragma once removed by preprocessor\n";
             } else {
                 // Regular line, add it to the result
                 result += line + "\n";
@@ -44,8 +49,7 @@ private:
             lineNumber++;
         }
         
-        // Remove this file from the included set (for potential reuse in other branches)
-        m_includedFiles.erase(absolutePathStr);
+        // Keep file in included set to prevent future duplicates
         
         return result;
     }

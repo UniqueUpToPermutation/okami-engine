@@ -35,38 +35,50 @@ int main() {
     }
 
     auto textureHandle = en.LoadResource<Texture>(GetAssetPath("test.ktx2"));
-    //auto geometryHandle = en.LoadResource<Geometry>(GetAssetPath("box.glb"));
+    auto geometryHandle = en.LoadResource<Geometry>(GetAssetPath("box.glb"));
 
     auto e2 = en.CreateEntity();
     en.AddComponent(e2, DummyTriangleComponent{});
     en.AddComponent(e2, Transform::Translate(0.0f, 0.0f, 0.0f));
 
-    auto e3 = en.CreateEntity();
-    en.AddComponent(e3, Camera::Identity());
-    en.AddComponent(e3, Transform::Translate(0.5f, 0.0f, 0.0f));
-    en.SetActiveCamera(e3);
-
     auto e4 = en.CreateEntity();
     en.AddComponent(e4, DummyTriangleComponent{});
-    en.AddComponent(e4, Transform::Translate(0.5f, 0.5f, 0.0f));
+    en.AddComponent(e4, Transform::Translate(0.25f, 0.25f, 0.15f));
+
+    auto e3 = en.CreateEntity();
+    en.AddComponent(e3, Camera::Orthographic(3.0f, 3.0f, -3.0f));
+    en.AddComponent(e3, Transform::LookAt(
+        glm::vec3(-1.0f, -1.0f, -1.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    ));
+    en.SetActiveCamera(e3);
 
     auto e5 = en.CreateEntity();
     en.AddComponent(e5, SpriteComponent{ textureHandle });
-    en.AddComponent(e5, Transform::Scale(1.0 / 128.0f));
+    en.AddComponent(e5, Transform(glm::vec3(0.0f, 0.0f, -0.25f), 1.0 / 128.0f));
 
     auto e6 = en.CreateEntity();
     en.AddComponent(e6, SpriteComponent{ 
         .m_texture = textureHandle,
         .m_color = color::Red,
     });
-    en.AddComponent(e6, Transform::Translate(0.5f, 0.5f, 0.0f) * Transform::Scale(1.0 / 128.0f));
+    en.AddComponent(e6, Transform::Translate(0.5f, 0.5f, 0.5f) * Transform::Scale(1.0 / 128.0f));
+    
+    auto e7 = en.CreateEntity();
+    en.AddComponent(e7, StaticMeshComponent{ geometryHandle });
+    en.AddComponent(e7, Transform::Scale(0.5f));
 
-    en.AddScript([e2](Time const& t, ModuleInterface& mi) {
+    en.AddScript([e2, e3](Time const& t, ModuleInterface& mi) {
         static double angle = 0.0f;
         angle += t.m_deltaTime;
 
         mi.m_messages.Send(UpdateComponentSignal<Transform>{
-            e2, Transform::RotateZ(static_cast<float>(angle))
+            e3, Transform::LookAt(
+                glm::vec3(sin(angle), -1.0f, cos(angle)),
+                glm::vec3(0.0f, 0.0f, 0.0f),
+                glm::vec3(0.0f, 1.0f, 0.0f)
+            )
         });
     });
 

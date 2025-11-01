@@ -337,7 +337,7 @@ protected:
         return {};
     }
 
-    std::string_view GetName() const override {
+    std::string GetName() const override {
         return "Entity Manager";
     }
 

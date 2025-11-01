@@ -110,6 +110,7 @@
         "xtree": "cpp",
         "xutility": "cpp",
         "*.glsl": "cpp",
-        "resumable": "cpp"
+        "resumable": "cpp",
+        "codecvt": "cpp"
     }
 }

@@ -8,6 +8,7 @@
 #include "ogl_utils.hpp"
 
 #include "shaders/sprite.glsl"
+#include "shaders/scene.glsl"
 
 #include "ogl_texture.hpp"
 
@@ -20,7 +21,7 @@ namespace okami {
         UploadVertexBuffer<glsl::SpriteInstance> m_instanceBuffer; // Instance buffer for sprite data
         
         // Uniform locations
-        GLint u_viewProj = -1;
+        UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
         GLint u_texture = -1;
 
         // Component storage and views
@@ -40,7 +41,7 @@ namespace okami {
 
         Error Pass(OGLPass const& pass) override;
 
-        std::string_view GetName() const override;
+        std::string GetName() const override;
         
     private:
         // Helper method to convert SpriteComponent + Transform to SpriteInstance

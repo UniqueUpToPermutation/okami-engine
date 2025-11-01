@@ -14,6 +14,18 @@
 
 using namespace okami;
 
+std::string_view okami::AttributeTypeToString(AttributeType type) {
+    switch (type) {
+        case AttributeType::Position: return "Position";
+        case AttributeType::Normal: return "Normal";
+        case AttributeType::TexCoord: return "TexCoord";
+        case AttributeType::Color: return "Color";
+        case AttributeType::Tangent: return "Tangent";
+        case AttributeType::Bitangent: return "Bitangent";
+        default: return "Unknown";
+    }
+}
+
 AccessorType okami::GetAccessorType(AttributeType type) {
     switch (type) {
         case AttributeType::Position: return AccessorType::Vec3;

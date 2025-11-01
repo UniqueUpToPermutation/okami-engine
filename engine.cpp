@@ -204,7 +204,7 @@ void Engine::AddScript(
 				std::string name)
 				: m_script(std::move(script)), m_name(std::move(name)) {}
 
-			std::string_view GetName() const override {
+			std::string GetName() const override {
 				return m_name;
 			}
 		};

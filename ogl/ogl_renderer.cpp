@@ -4,6 +4,7 @@
 #include "ogl_texture.hpp"
 #include "ogl_sprite.hpp"
 #include "ogl_geometry.hpp"
+#include "ogl_static_mesh.hpp"
 
 #include "../config.hpp"
 #include "../storage.hpp"
@@ -31,6 +32,7 @@ private:
     OGLTextureManager* m_textureManager = nullptr;
     OGLSpriteRenderer* m_spriteRenderer = nullptr;
     OGLGeometryManager* m_geometryManager = nullptr;
+    OGLStaticMeshRenderer* m_staticMeshRenderer = nullptr;
 
     StorageModule<Camera>* m_cameraStorage = nullptr;
     IComponentView<Transform>* m_transformView = nullptr;
@@ -59,26 +61,13 @@ protected:
 
         m_glProvider->SetSwapInterval(1);
 
-        // Enable depth testing
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LESS);
-
         return {};
     }
 
     void ShutdownImpl(ModuleInterface&) override {
     }
 
-    Error ProcessFrameImpl(Time const&, ModuleInterface&) override {
-        // Upload textures and geometry created this frame
-        m_textureManager->ProcessNewResources({});
-        m_geometryManager->ProcessNewResources({});
-
-        m_shaderCache.reset();
-
-        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+    glsl::SceneGlobals GetSceneGlobals() {
         auto cameraPtr = m_cameraStorage->TryGet(m_activeCamera.load(std::memory_order_relaxed));
         auto camera = cameraPtr ? *cameraPtr : Camera::Identity();
 
@@ -92,18 +81,38 @@ protected:
         glm::mat4 projMatrix = camera.GetProjectionMatrix(framebufferSize.x, framebufferSize.y, false);
         glm::mat4 viewProjMatrix = projMatrix * viewMatrix;
 
-        OGLPass pass = {
-            .m_viewport = m_glProvider->GetFramebufferSize(),
-            .m_projection = camera.GetProjectionMatrix(
-                m_glProvider->GetFramebufferSize().x, 
-                m_glProvider->GetFramebufferSize().y, 
-                false),
-            .m_view = viewMatrix,
-            .m_viewProjection = viewProjMatrix,
-            .m_cameraPosition = cameraTransform.TransformPoint(glm::vec3(0.0f)),
-            .m_cameraDirection = cameraTransform.TransformVector(glm::vec3(0.0f, 0.0f, -1.0f))
+        return glsl::SceneGlobals{
+            .u_camera = {
+                .u_view = viewMatrix,
+                .u_proj = projMatrix,
+                .u_viewProj = viewProjMatrix,
+                .u_invView = cameraTransform.AsMatrix(),
+                .u_invProj = glm::inverse(projMatrix),
+                .u_invViewProj = glm::inverse(viewProjMatrix),
+
+                .u_viewport = m_glProvider->GetFramebufferSize(),
+                .u_cameraPosition = cameraTransform.m_position,
+                .u_cameraDirection = cameraTransform.TransformVector(glm::vec3(0.0f, 0.0f, -1.0f))
+            }
+        };
+    }
+
+    Error ProcessFrameImpl(Time const&, ModuleInterface&) override {
+        // Upload textures and geometry created this frame
+        m_textureManager->ProcessNewResources({});
+        m_geometryManager->ProcessNewResources({});
+
+        m_shaderCache.reset();
+
+        glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+        //glClearDepth(1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        OGLPass pass{
+            .m_sceneGlobals = GetSceneGlobals(),
         };
 
+        m_staticMeshRenderer->Pass(pass);
         m_triangleRenderer->Pass(pass);
         m_spriteRenderer->Pass(pass);
 
@@ -127,9 +136,10 @@ public:
         m_textureManager = CreateChild<OGLTextureManager>();
         m_geometryManager = CreateChild<OGLGeometryManager>();
         m_spriteRenderer = CreateChild<OGLSpriteRenderer>(m_textureManager);
+        m_staticMeshRenderer = CreateChild<OGLStaticMeshRenderer>(m_geometryManager);
     }
 
-    std::string_view GetName() const override {
+    std::string GetName() const override {
         return "OpenGL Renderer Module";
     }
 

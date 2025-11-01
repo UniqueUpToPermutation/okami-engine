@@ -323,10 +323,11 @@ if (USE_OGL)
             set(PROCESSED_SHADER_PATH "${CMAKE_BINARY_DIR}/ogl/shaders/${SHADER_NAME}")
             
             # Create custom command to preprocess the shader file
+            # Each shader now depends on ALL shader files so touching any file regenerates all
             add_custom_command(
                 OUTPUT ${PROCESSED_SHADER_PATH}
                 COMMAND ShaderPreprocessor ${OGL_SHADER_FILE} ${PROCESSED_SHADER_PATH} "${CMAKE_SOURCE_DIR}/ogl/shaders"
-                DEPENDS ${OGL_SHADER_FILE} ShaderPreprocessor
+                DEPENDS ${OGL_SHADER_FILES} ShaderPreprocessor
                 COMMENT "Preprocessing OpenGL shader: ${SHADER_NAME}"
             )
             

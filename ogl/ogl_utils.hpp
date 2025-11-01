@@ -12,6 +12,7 @@
 #include "../log.hpp"
 
 #include "shaders/types.glsl"
+#include "shaders/scene.glsl"
 
 #define GET_GL_ERROR() []() -> Error { \
     Error glErr = okami::GetGlError(); \
@@ -48,12 +49,7 @@
 namespace okami {
 
     struct OGLPass {
-        glm::ivec2 m_viewport = {0, 0};
-        glm::mat4 m_projection = glm::mat4(1.0f);
-        glm::mat4 m_view = glm::mat4(1.0f);
-        glm::mat4 m_viewProjection = glm::mat4(1.0f);
-        glm::vec3 m_cameraPosition = glm::vec3(0.0f);
-        glm::vec3 m_cameraDirection = glm::vec3(0.0f, 0.0f, -1.0f);
+        glsl::SceneGlobals m_sceneGlobals;
     };
 
     class IOGLRenderModule {
@@ -403,5 +399,68 @@ namespace okami {
         Expected<BufferWriteMap<T>> Map() {
 			return m_buffer.Map();
 		}
+    };
+
+    template <typename T>
+    class UniformBuffer {
+    private:
+        GLBuffer m_buffer;
+        GLint m_bindingPoint = -1;
+
+    public:
+        GLuint GetBuffer() const {
+            return m_buffer.get();
+        }
+
+        static Expected<UniformBuffer<T>> Create(
+            GLProgram const& program,
+            std::string_view blockName,
+            GLint bindingPointToAssign,
+            size_t count = 1) {
+            GLint blockIndex = glGetUniformBlockIndex(program.get(), blockName.data());
+            OKAMI_UNEXPECTED_RETURN_IF(blockIndex == GL_INVALID_INDEX,
+                "Uniform block '" + std::string(blockName) + "' not found in program");
+            
+            // Assign binding point
+            glUniformBlockBinding(program, blockIndex, bindingPointToAssign);
+            Error err = GET_GL_ERROR();
+            OKAMI_UNEXPECTED_RETURN(err);
+
+            UniformBuffer<T> result;
+            result.m_bindingPoint = bindingPointToAssign;
+            glGenBuffers(1, result.m_buffer.ptr()); 
+            OKAMI_UNEXPECTED_RETURN_IF(!result.m_buffer, "Failed to create uniform buffer");
+
+            glBindBuffer(GL_UNIFORM_BUFFER, result.m_buffer.get());
+            OKAMI_DEFER(glBindBuffer(GL_UNIFORM_BUFFER, 0)); 
+            OKAMI_UNEXPECTED_RETURN_IF(!result.m_buffer, "Failed to bind uniform buffer");
+
+            glBufferData(GL_UNIFORM_BUFFER, sizeof(T) * count, nullptr, GL_DYNAMIC_DRAW); 
+            OKAMI_UNEXPECTED_RETURN_IF(!result.m_buffer, "Failed to allocate uniform buffer data");
+
+            return result;
+        }
+
+        Error Bind() {
+            glBindBufferBase(GL_UNIFORM_BUFFER, m_bindingPoint, m_buffer.get()); 
+            OKAMI_CHK_GL;
+            return {};
+        }
+
+        void Unbind() {
+            glBindBufferBase(GL_UNIFORM_BUFFER, m_bindingPoint, 0); 
+        }
+
+        Error Write(const T& data) {
+            glBindBuffer(GL_UNIFORM_BUFFER, m_buffer.get()); 
+            OKAMI_DEFER(glBindBuffer(GL_UNIFORM_BUFFER, 0)); 
+            glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(T), &data); 
+            OKAMI_CHK_GL;
+            return {};
+        }
+
+        BufferWriteMap<T> Map() {
+            return BufferWriteMap<T>::Map(m_buffer);
+        }
     };
 }

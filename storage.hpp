@@ -132,8 +132,9 @@ namespace okami {
         }
 
     public:
-        std::string_view GetName() const override {
-            return "Storage Module";
+        std::string GetName() const override {
+            auto typeName = typeid(T).name();
+            return "Storage Module <" + std::string{typeName} + ">";
         }
 
         void ForEach(std::function<void(entity_t, T const&)> func) override {

@@ -16,16 +16,19 @@ glm::mat4 OrthographicProjection::GetProjectionMatrix(int width, int height, boo
 	float size_x = m_width.value_or(static_cast<float>(width));
 	float size_y = m_height.value_or(size_x / aspectRatio);
 
-	auto proj = glm::ortho(
-		-size_x / 2.0f, size_x / 2.0f,
-		-size_y / 2.0f, size_y / 2.0f,
-		m_nearZ, m_farZ);
+	auto result = glm::ortho(
+		-size_x * 0.5f,
+		size_x * 0.5f,
+		-size_y * 0.5f,
+		size_y * 0.5f,
+		m_nearZ,
+		m_farZ);
 
 	if (usingDirectX) {
-		return g_openGlToDirectX * proj;
+		return g_openGlToDirectX * result;
 	}
 	else {
-		return proj;
+		return result;
 	}
 }
 

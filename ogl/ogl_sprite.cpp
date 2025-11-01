@@ -35,8 +35,12 @@ Error OGLSpriteRenderer::StartupImpl(ModuleInterface& mi) {
     m_instanceBuffer = std::move(*buffer);
 
     // Get uniform locations
+    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create(
+        m_program, "SceneGlobalsBlock", 0);
+    OKAMI_ERROR_RETURN(sceneUBO);
+    m_sceneUBO = std::move(*sceneUBO); 
+
     Error uniformErrs;
-    u_viewProj = GetUniformLocation(m_program, "u_viewProj", uniformErrs);
     u_texture = GetUniformLocation(m_program, "u_texture", uniformErrs);
     OKAMI_ERROR_RETURN(uniformErrs);
 
@@ -101,17 +105,25 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
     }
 
     // Set uniforms
-    glUniformMatrix4fv(u_viewProj, 1, GL_FALSE, &pass.m_viewProjection[0][0]); OKAMI_CHK_GL;
+    m_sceneUBO.Bind();
+    OKAMI_DEFER(m_sceneUBO.Unbind()); OKAMI_CHK_GL;
+    m_sceneUBO.Write(pass.m_sceneGlobals); OKAMI_CHK_GL;
     glUniform1i(u_texture, 0); OKAMI_CHK_GL; // Texture unit 0
-    
+
     // Enable blending for sprites
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
-    OKAMI_DEFER(glDisable(GL_BLEND)); OKAMI_CHK_GL;
+    glDepthMask(GL_TRUE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     // Group sprites by texture to minimize texture binding
     ResHandle<Texture> currentTexture;
     uint32_t batchStart = 0;
+
+    if (spriteInstances.empty()) {
+        return {};
+    }
     
     for (uint32_t i = 0; i <= spriteInstances.size(); ++i) {
         ResHandle<Texture> spriteTexture = spriteInstances[i < spriteInstances.size() ? i : 0].first;
@@ -139,7 +151,7 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
     return {};
 }
 
-std::string_view OGLSpriteRenderer::GetName() const {
+std::string OGLSpriteRenderer::GetName() const {
     return "OpenGL Sprite Renderer";
 }
 

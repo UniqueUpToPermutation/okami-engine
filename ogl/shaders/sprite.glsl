@@ -1,6 +1,4 @@
-#ifndef SPRITE_GLSL
-#define SPRITE_GLSL
-
+#pragma once
 #include "common.glsl"
 
 #ifdef __cplusplus
@@ -26,5 +24,3 @@ VERTEX_ARRAY_DEF_END()
 #ifdef __cplusplus
 } // namespace glsl
 #endif
-
-#endif // SPRITE_GLSL
