@@ -34,26 +34,6 @@ int main() {
         return 1;
     }
 
-    auto geo = Geometry::LoadGLTF(GetAssetPath("box.glb"));
-    auto indices = geo->TryAccessIndexed<uint16_t>(0);
-
-    for (auto index : indices.value()) {
-        std::cout << index << " ";
-    }
-    std::cout << "\n";
-
-    std::cout << "Positions:\n";
-    auto pos = geo->TryAccess<glm::vec3>(AttributeType::Position, 0);
-    for (auto vertex : pos.value()) {
-        std::cout << "(" << vertex.x << ", " << vertex.y << ", " << vertex.z << ")\n";
-    }
-
-    std::cout << "Normals:\n";
-    auto normals = geo->TryAccess<glm::vec3>(AttributeType::Normal, 0);
-    for (auto vertex : normals.value()) {
-        std::cout << "(" << vertex.x << ", " << vertex.y << ", " << vertex.z << ")\n";
-    }
-
     auto textureHandle = en.LoadResource<Texture>(GetAssetPath("test.ktx2"));
     auto geometryHandle = en.LoadResource<Geometry>(GetAssetPath("box.glb"));
 
@@ -76,7 +56,7 @@ int main() {
 
     auto e5 = en.CreateEntity();
     en.AddComponent(e5, SpriteComponent{ textureHandle });
-    en.AddComponent(e5, Transform(glm::vec3(0.0f, 0.0f, -0.25f), 1.0 / 128.0f));
+    en.AddComponent(e5, Transform(glm::vec3(0.0f, 0.0f, -0.25f), 1.0 / 64.0f));
 
     auto e6 = en.CreateEntity();
     en.AddComponent(e6, SpriteComponent{ 
