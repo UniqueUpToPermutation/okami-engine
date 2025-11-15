@@ -47,7 +47,6 @@
 #endif
 
 namespace okami {
-
     struct OGLPass {
         glsl::SceneGlobals m_sceneGlobals;
     };
@@ -57,6 +56,8 @@ namespace okami {
         virtual ~IOGLRenderModule() = default;
         virtual Error Pass(OGLPass const& pass) = 0;
     };
+
+    GLint ToOpenGL(AccessorComponentType type);
 
     template<typename Deleter>
     class GLObject {
@@ -187,6 +188,12 @@ namespace okami {
 
     GLint GetUniformLocation(GLProgram const& program, const char* name, Error& error);
     Error GetGlError();
+
+    void SetupVertexArray(
+        GLVertexArray const& vao,
+        glsl::VertexShaderInputInfo const& inputInfo,
+        GLuint vertexBuffer,
+        std::optional<GLuint> indexBuffer);
 
     template <typename InstanceType>
 	class BufferWriteMap {
@@ -326,7 +333,7 @@ namespace okami {
     private:
 		UploadBuffer<T> m_buffer;
         GLVertexArray m_vao;
-        glsl::vs_meta_func_t m_setupVertexArray;
+        glsl::VertexShaderInputInfo m_vsInputInfo;
 
     public:
         GLuint GetVertexArray() const {
@@ -352,11 +359,7 @@ namespace okami {
             glBindBuffer(GL_ARRAY_BUFFER, m_buffer.GetBuffer()); OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
             // Setup vertex attributes after buffer is bound
-            glsl::SetupVertexArray(
-                m_setupVertexArray,
-                glsl::VertexArraySetupArgs{ 
-                    .vertexArray = m_vao.get()
-                });
+            SetupVertexArray(m_vao, m_vsInputInfo, m_buffer.GetBuffer(), std::nullopt);
                 
             OKAMI_CHK_GL;
 
@@ -364,10 +367,10 @@ namespace okami {
 		}
 
         static Expected<UploadVertexBuffer<T>> Create(
-			glsl::vs_meta_func_t setupVertexArray,
+			glsl::VertexShaderInputInfo const& vsInputInfo,
             size_t elementCount = 1) {
 			UploadVertexBuffer<T> result;
-			result.m_setupVertexArray = std::move(setupVertexArray);
+			result.m_vsInputInfo = vsInputInfo;
             auto buffer = UploadBuffer<T>::Create(elementCount);
             OKAMI_UNEXPECTED_RETURN(buffer);
             result.m_buffer = std::move(*buffer);

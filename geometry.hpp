@@ -54,8 +54,8 @@ namespace okami {
 
 	AccessorType GetAccessorType(AttributeType type);
 	AccessorComponentType GetComponentType(AttributeType type);
-	uint32_t GetStride(AccessorType type, AccessorComponentType componentType);
-	uint32_t GetStride(AttributeType type);
+	uint32_t GetSize(AccessorType type, AccessorComponentType componentType);
+	uint32_t GetSize(AttributeType type);
 
 	struct IndexInfo {
 		AccessorComponentType m_type;
@@ -63,7 +63,8 @@ namespace okami {
 		size_t m_count;
 		size_t m_offset;
 
-		uint32_t GetStride() const;
+		uint32_t GetComponentSize() const;
+        size_t GetTotalSize() const;
 	};
 
 	struct GeometryLoadParams {
@@ -156,6 +157,7 @@ namespace okami {
         size_t m_offset;
         uint32_t m_stride;
 
+        uint32_t GetComponentSize() const;
         uint32_t GetStride() const;
     };
 
@@ -233,7 +235,7 @@ namespace okami {
             // Get the index buffer data
             auto indexBufferData = data.GetRawVertexData(primitive.m_indices->m_buffer);
             auto indexBufferOffset = primitive.m_indices->m_offset;
-            auto stride = primitive.m_indices->GetStride();
+            auto stride = primitive.m_indices->GetComponentSize();
 
             return GeometryView<T>(
                 GeometryViewIterator<T>{
@@ -278,7 +280,7 @@ namespace okami {
             auto bufferData = data.GetRawVertexData(attribute->m_buffer);
 
             auto bufferOffset = attribute->m_offset;
-            auto stride = attribute->GetStride();
+            auto stride = attribute->GetComponentSize();
 
             // Create a view of the buffer data
             return GeometryView<T>(

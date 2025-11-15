@@ -1,6 +1,7 @@
 #include "ogl_geometry.hpp"
 
 #include "shaders/common.glsl"
+#include "shaders/static_mesh.glsl"
 
 #include <glog/logging.h>   
 
@@ -9,92 +10,114 @@ using namespace okami;
 Expected<std::pair<typename Geometry::Desc, GeometryImpl>> 
     OGLGeometryManager::CreateResource(Geometry&& data, std::any userData) {
 
-    // Upload buffers to OpenGL
     std::vector<std::shared_ptr<GLBuffer>> oglBuffers;
-    for (auto const& bufferData : data.GetBuffers()) {
-        Error err;
-
-        GLBuffer oglBuffer;
-        glGenBuffers(1, oglBuffer.ptr()); err += GET_GL_ERROR();
-        glBindBuffer(GL_ARRAY_BUFFER, oglBuffer.get()); err += GET_GL_ERROR();
-        glBufferData(GL_ARRAY_BUFFER, bufferData.size(), bufferData.data(), GL_STATIC_DRAW); err += GET_GL_ERROR();
-
-        OKAMI_UNEXPECTED_RETURN_IF(!oglBuffer, "Failed to create OpenGL buffer for geometry");
-        OKAMI_UNEXPECTED_RETURN(err);
-
-        oglBuffers.emplace_back(std::make_shared<GLBuffer>(std::move(oglBuffer)));
-    }
 
     // Build VAOs for each mesh
     std::vector<PrimitiveImpl> primitivesImpl;
+    GeometryDesc newDesc;
     for (auto const& primitive : data.GetPrimitives()) {
-        auto vsInputMetaFunc = [&]() {
+        auto vsInputInfo = [&]() -> glsl::VertexShaderInputInfo {
             switch (primitive.m_type) {
                 case okami::MeshType::Static:
-                    return m_staticMeshMetaFunc;
+                    return glsl::__get_vs_input_infoStaticMeshVertex();
                 default:
-                    return glsl::vs_meta_func_t{};
+                    return {};
             }
         }();
 
-        auto inputInfo = glsl::GetVSShaderInputInfo(vsInputMetaFunc);
+        std::vector<uint8_t> bufferData;
 
-        std::unordered_map<int, glsl::VertexArraySetupAttrib> setupByLocation;
-
-        // Get vertex attributes    
-        for (auto const& [location, attribInfo] : inputInfo.locationToAttrib) {
+        size_t totalSize = vsInputInfo.m_totalStride * primitive.m_vertexCount;
+        bufferData.resize(totalSize);
+       
+        // Copy attribute data into temporary buffer and then to OpenGL buffer
+        // Interleave attributes as per vsInputInfo
+        for (auto const& [location, attribInfo] : vsInputInfo.locationToAttrib) {
             // Verify that the mesh has the required attribute
-            auto attribute = primitive.TryGetAttribute(attribInfo.type);
+            auto meshAttribute = primitive.TryGetAttribute(attribInfo.m_type);
 
-            if (!attribute) {
-                auto result = OKAMI_UNEXPECTED("Mesh is missing required attribute for attribute " + std::string(AttributeTypeToString(attribInfo.type)) +
+            if (!meshAttribute) {
+                auto result = OKAMI_UNEXPECTED("Mesh is missing required attribute for attribute " + 
+                    std::string(AttributeTypeToString(attribInfo.m_type)) +
                     " at location " + std::to_string(location));
                 LOG(ERROR) << result.error();
                 return (result);
             }
 
-            OKAMI_UNEXPECTED_RETURN_IF(!attribute, 
-                "Mesh is missing required attribute for attribute " + std::string(AttributeTypeToString(attribInfo.type)) +
+            OKAMI_UNEXPECTED_RETURN_IF(!meshAttribute, 
+                "Mesh is missing required attribute for attribute " + 
+                std::string(AttributeTypeToString(attribInfo.m_type)) +
                 " at location " + std::to_string(location));
 
-            setupByLocation[location] = glsl::VertexArraySetupAttrib{
-                .buffer = oglBuffers[attribute->m_buffer]->get(),
-                .offset = attribute->m_offset,
-                .stride = static_cast<GLsizei>(attribute->m_stride)
-            };
+            OKAMI_UNEXPECTED_RETURN_IF(attribInfo.m_frequency == glsl::Frequency::PerInstance,
+                "Instanced attributes are not supported in this context");
+
+            // Copy attribute data into temp buffer
+            auto sz = meshAttribute->GetComponentSize();
+            auto srcData = data.GetRawVertexData(meshAttribute->m_buffer).data();
+            auto destData = bufferData.data();
+            for (int i = 0; i < primitive.m_vertexCount; ++i) {
+                size_t srcOffset = meshAttribute->m_offset + i * meshAttribute->GetStride();
+                size_t dstOffset = attribInfo.m_offset + i * vsInputInfo.m_totalStride;
+                std::memcpy(destData + dstOffset, srcData + srcOffset, sz);
+            } 
         }
-        
-        // Get index buffer if present
-        std::optional<glsl::VertexArraySetupAttrib> indexBufferSetup;
+
+        // Create vertex buffer and upload data
+        GLBuffer vertexBuffer;
+        glGenBuffers(1, vertexBuffer.ptr());
+        OKAMI_UNEXPECTED_RETURN_IF(!vertexBuffer, "Failed to create OpenGL buffer for geometry mesh");
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.get()); OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0));
+        glBufferData(GL_ARRAY_BUFFER, totalSize, bufferData.data(), GL_STATIC_DRAW);
+        int vertexBufferIndex = static_cast<int>(oglBuffers.size());
+        oglBuffers.push_back(std::make_shared<GLBuffer>(std::move(vertexBuffer)));
+
+        // Create index buffer if needed
+        std::optional<GLBuffer> indexBuffer;
+        std::optional<int> indexBufferIndex;
         if (primitive.HasIndexBuffer()) {
-            auto const& indexInfo = primitive.m_indices.value();
-            indexBufferSetup = glsl::VertexArraySetupAttrib{
-                .buffer = oglBuffers[indexInfo.m_buffer]->get(),
-                .offset = indexInfo.m_offset,
-                .stride = static_cast<GLsizei>(indexInfo.GetStride())
-            };
+            indexBuffer.emplace();
+            glGenBuffers(1, indexBuffer->ptr());
+            OKAMI_UNEXPECTED_RETURN_IF(!*indexBuffer, "Failed to create OpenGL index buffer for geometry mesh");
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->get()); OKAMI_DEFER(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+            auto& buffer = data.GetBuffers()[primitive.m_indices->m_buffer];
+
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, 
+                primitive.m_indices->GetTotalSize(), 
+                buffer.data() + primitive.m_indices->m_offset, GL_STATIC_DRAW);
+            indexBufferIndex = static_cast<int>(oglBuffers.size());
+            oglBuffers.push_back(std::make_shared<GLBuffer>(std::move(*indexBuffer)));
         }
 
         // Create VAO
         GLVertexArray vao;
         glGenVertexArrays(1, vao.ptr()); OKAMI_UNEXPECTED_RETURN_IF(!vao, "Failed to create VAO for geometry mesh");
 
-        glsl::SetupVertexArray(vsInputMetaFunc, glsl::VertexArraySetupArgs{
-            .vertexArray = vao.get(),
-            .indexBufferSetup = indexBufferSetup,
-            .setupByLocation = setupByLocation,
-        });
+        SetupVertexArray(vao, vsInputInfo, oglBuffers[vertexBufferIndex]->get(), 
+            indexBufferIndex ? std::make_optional(oglBuffers[indexBufferIndex.value()]->get()) : std::nullopt);
         Error err = GET_GL_ERROR();
 
-        primitivesImpl.emplace_back(PrimitiveImpl{
-            .m_vao = std::move(vao),
-            .m_indexBufferIndex = primitive.HasIndexBuffer() ? std::optional<int>{ primitive.m_indices->m_buffer } : std::nullopt,
-            .m_indexBufferOffset = primitive.HasIndexBuffer() ? primitive.m_indices->m_offset : 0,
-        });
+        primitivesImpl.emplace_back(PrimitiveImpl{.m_vao = std::move(vao)});
+
+        GeometryPrimitiveDesc newPrimitiveDesc = primitive;
+
+        for (auto it = newPrimitiveDesc.m_attributes.begin(); 
+            it != newPrimitiveDesc.m_attributes.end(); ++it) {
+            it->second.m_buffer = vertexBufferIndex;
+            it->second.m_offset = 0;
+            it->second.m_stride = vsInputInfo.m_totalStride;
+        }
+
+        if (newPrimitiveDesc.m_indices) {
+            newPrimitiveDesc.m_indices->m_buffer = indexBufferIndex.value();
+            newPrimitiveDesc.m_indices->m_offset = 0;
+        }
+
+        newDesc.m_primitives.push_back(std::move(newPrimitiveDesc));
     }
 
     return std::make_pair(
-        data.GetDesc(),
+        newDesc,
         GeometryImpl{
             .m_meshes = std::move(primitivesImpl),
             .m_buffers = std::move(oglBuffers),
@@ -102,6 +125,6 @@ Expected<std::pair<typename Geometry::Desc, GeometryImpl>>
     );
 }
 
-void OGLGeometryManager::SetStaticMeshMetaFunc(glsl::vs_meta_func_t func) {
-    m_staticMeshMetaFunc = func;
+void OGLGeometryManager::SetStaticMeshVSInput(glsl::VertexShaderInputInfo info) {
+    m_staticMeshVSInput = info;
 }

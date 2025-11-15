@@ -50,7 +50,7 @@ AccessorComponentType okami::GetComponentType(AttributeType type) {
     }
 }
 
-uint32_t okami::GetStride(AccessorType type, AccessorComponentType componentType) {
+uint32_t okami::GetSize(AccessorType type, AccessorComponentType componentType) {
     uint32_t elementLength = 0;
 
     switch (componentType) {
@@ -78,12 +78,16 @@ uint32_t okami::GetStride(AccessorType type, AccessorComponentType componentType
     return elementLength * attributeCount;
 }
 
-uint32_t okami::GetStride(AttributeType type) {
-    return GetStride(GetAccessorType(type), GetComponentType(type));
+uint32_t okami::GetSize(AttributeType type) {
+    return GetSize(GetAccessorType(type), GetComponentType(type));
 }
 
-uint32_t IndexInfo::GetStride() const {
-    return okami::GetStride(AccessorType::Scalar, m_type);
+uint32_t IndexInfo::GetComponentSize() const {
+    return okami::GetSize(AccessorType::Scalar, m_type);
+}
+
+size_t IndexInfo::GetTotalSize() const {
+    return GetComponentSize() * m_count;
 }
 
 void okami::GenerateDefaultAttributeData(
@@ -190,11 +194,15 @@ namespace {
     }
 }
 
+uint32_t Attribute::GetComponentSize() const {
+    return ::GetSize(m_type);
+}
+
 uint32_t Attribute::GetStride() const {
     if (m_stride != 0) {
         return m_stride;
     } else {
-        return ::GetStride(m_type);
+        return GetComponentSize();
     }
 }
 

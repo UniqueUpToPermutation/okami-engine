@@ -5,7 +5,7 @@
 namespace glsl {
 #endif
 
-BEGIN_INPUT_STRUCT(StaticMeshVertex, Frequency::PER_VERTEX)
+BEGIN_INPUT_STRUCT(StaticMeshVertex, Frequency::PerVertex)
     IN_MEMBER(vec3, a_position, 0,      okami::AttributeType::Position)       
     IN_MEMBER(vec2, a_uv, 1,            okami::AttributeType::TexCoord)   
     IN_MEMBER(vec3, a_normal, 2,        okami::AttributeType::Normal)

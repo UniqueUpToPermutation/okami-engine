@@ -8,8 +8,6 @@
 namespace okami {
     struct PrimitiveImpl {
         GLVertexArray m_vao;
-        std::optional<int> m_indexBufferIndex;
-        size_t m_indexBufferOffset = 0;
     };
 
     struct GeometryImpl {
@@ -20,12 +18,12 @@ namespace okami {
     class OGLGeometryManager : 
         public ContentModule<Geometry, GeometryImpl> {
     private:
-        glsl::vs_meta_func_t m_staticMeshMetaFunc;
+        glsl::VertexShaderInputInfo m_staticMeshVSInput;;
         
     public:
         Expected<std::pair<typename Geometry::Desc, GeometryImpl>> 
             CreateResource(Geometry&& data, std::any userData) override;
 
-        void SetStaticMeshMetaFunc(glsl::vs_meta_func_t func);
+        void SetStaticMeshVSInput(glsl::VertexShaderInputInfo info);
     };
 }

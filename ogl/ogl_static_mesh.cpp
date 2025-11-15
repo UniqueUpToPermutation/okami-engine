@@ -5,7 +5,7 @@
 using namespace okami;
 
 Error OGLStaticMeshRenderer::RegisterImpl(ModuleInterface& mi) {
-    m_geometryManager->SetStaticMeshMetaFunc(glsl::__create_vertex_array_StaticMeshVertex);
+    m_geometryManager->SetStaticMeshVSInput(glsl::__get_vs_input_infoStaticMeshVertex());
 
     return {};
 }
@@ -133,24 +133,13 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
             auto const& primitive = desc.m_primitives[0];
             
             if (primitive.m_indices) {
-                GLint indexType = 0;
-                switch (primitive.m_indices->m_type) {
-                    case AccessorComponentType::Byte:
-                        indexType = GL_UNSIGNED_BYTE;
-                        break;
-                    case AccessorComponentType::UShort:
-                        indexType = GL_UNSIGNED_SHORT;
-                        break;
-                    case AccessorComponentType::UInt:
-                        indexType = GL_UNSIGNED_INT;
-                        break;
-                }
+                GLint indexType = ToOpenGL(primitive.m_indices->m_type);
 
                 glDrawElements(
                     GL_TRIANGLES,
                     static_cast<GLsizei>(primitive.m_indices->m_count),
                     indexType,
-                    (void*)currentMeshImpl->m_indexBufferOffset); OKAMI_CHK_GL;
+                    (void*)primitive.m_indices->m_offset); OKAMI_CHK_GL;
             } else {
                 glDrawArrays(
                     GL_TRIANGLES,

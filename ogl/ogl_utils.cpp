@@ -250,3 +250,57 @@ Error okami::GetGlError() {
     }
     return {};
 }
+
+GLint okami::ToOpenGL(AccessorComponentType type) {
+    switch (type) {
+        case AccessorComponentType::Double:
+            return GL_DOUBLE;
+        case AccessorComponentType::Float:
+            return GL_FLOAT;
+        case AccessorComponentType::Int:
+            return GL_INT;
+        case AccessorComponentType::UInt:
+            return GL_UNSIGNED_INT;
+        case AccessorComponentType::Short:
+            return GL_SHORT;
+        case AccessorComponentType::UShort:
+            return GL_UNSIGNED_SHORT;
+        case AccessorComponentType::Byte:
+            return GL_BYTE;
+        case AccessorComponentType::UByte:
+            return GL_UNSIGNED_BYTE;
+        default:
+            throw std::invalid_argument("Unknown AccessorComponentType");
+    }
+}
+
+void okami::SetupVertexArray(
+    GLVertexArray const& vao,
+    glsl::VertexShaderInputInfo const& inputInfo,
+    GLuint vertexBuffer,
+    std::optional<GLuint> indexBuffer) {
+    glBindVertexArray(vao.get()); OKAMI_DEFER(glBindVertexArray(0));
+
+    // Bind buffers
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    if (indexBuffer) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *indexBuffer);
+    }
+
+    for (const auto& [location, attribInfo] : inputInfo.locationToAttrib) {
+        glEnableVertexAttribArray(location);
+        glVertexAttribPointer(
+            location,
+            attribInfo.m_componentCount,
+            ToOpenGL(attribInfo.m_componentType),
+            attribInfo.m_type == okami::AttributeType::Color ? GL_TRUE : GL_FALSE,
+            attribInfo.m_stride,
+            static_cast<uint8_t*>(0) + attribInfo.m_offset
+        );
+        if (attribInfo.m_frequency == glsl::Frequency::PerInstance) {
+            glVertexAttribDivisor(location, 1);
+        } else {
+            glVertexAttribDivisor(location, 0);
+        }
+    }
+}

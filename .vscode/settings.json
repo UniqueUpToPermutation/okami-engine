@@ -111,6 +111,7 @@
         "xutility": "cpp",
         "*.glsl": "cpp",
         "resumable": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "*.vs": "cpp"
     }
 }

@@ -87,7 +87,7 @@ int main() {
     
     auto e7 = en.CreateEntity();
     en.AddComponent(e7, StaticMeshComponent{ geometryHandle });
-    en.AddComponent(e7, Transform::Translate(0.5f, 0.0f, 0.0f) * Transform::Scale(0.25f));
+    en.AddComponent(e7, Transform::Translate(0.5f, 0.1f, 0.1f) * Transform::Scale(0.25f));
 
     en.AddScript([e2, e3](Time const& t, ModuleInterface& mi) {
         static double angle = 0.0f;
