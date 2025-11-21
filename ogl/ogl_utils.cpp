@@ -304,3 +304,73 @@ void okami::SetupVertexArray(
         }
     }
 }
+
+void OGLPipelineState::GetFromGL() {
+    // Depth
+    depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+    glGetIntegerv(GL_DEPTH_FUNC, reinterpret_cast<GLint*>(&depthFunc));
+    glGetBooleanv(GL_DEPTH_WRITEMASK, reinterpret_cast<GLboolean*>(&depthMask));
+
+    // Blend
+    blendEnabled = glIsEnabled(GL_BLEND);
+    glGetIntegerv(GL_BLEND_EQUATION_RGB, reinterpret_cast<GLint*>(&blendEquationRGB));
+    glGetIntegerv(GL_BLEND_EQUATION_ALPHA, reinterpret_cast<GLint*>(&blendEquationAlpha));
+    glGetIntegerv(GL_BLEND_SRC_RGB, reinterpret_cast<GLint*>(&blendSrcRGB));
+    glGetIntegerv(GL_BLEND_DST_RGB, reinterpret_cast<GLint*>(&blendDstRGB));
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, reinterpret_cast<GLint*>(&blendSrcAlpha));
+    glGetIntegerv(GL_BLEND_DST_ALPHA, reinterpret_cast<GLint*>(&blendDstAlpha));
+    glGetFloatv(GL_BLEND_COLOR, &blendColor[0]);
+
+    // Cull
+    cullFaceEnabled = glIsEnabled(GL_CULL_FACE);
+    glGetIntegerv(GL_CULL_FACE_MODE, reinterpret_cast<GLint*>(&cullFaceMode));
+
+    // Stencil
+    stencilTestEnabled = glIsEnabled(GL_STENCIL_TEST);
+    glGetIntegerv(GL_STENCIL_FUNC, reinterpret_cast<GLint*>(&stencilFunc));
+    glGetIntegerv(GL_STENCIL_REF, &stencilRef);
+    glGetIntegerv(GL_STENCIL_VALUE_MASK, reinterpret_cast<GLint*>(&stencilMask));
+    glGetIntegerv(GL_STENCIL_FAIL, reinterpret_cast<GLint*>(&stencilFail));
+    glGetIntegerv(GL_STENCIL_PASS_DEPTH_FAIL, reinterpret_cast<GLint*>(&stencilPassDepthFail));
+    glGetIntegerv(GL_STENCIL_PASS_DEPTH_PASS, reinterpret_cast<GLint*>(&stencilPassDepthPass));
+
+    // Polygon Mode
+    glGetIntegerv(GL_POLYGON_MODE, reinterpret_cast<GLint*>(&polygonMode));
+
+    // Multisampling
+    sampleAlphaToCoverageEnabled = glIsEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE);
+
+    // Program
+    glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<GLint*>(&program));
+}
+
+void OGLPipelineState::SetToGL() const {
+    // Depth
+    if (depthTestEnabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+    glDepthFunc(depthFunc);
+    glDepthMask(depthMask);
+
+    // Blend
+    if (blendEnabled) glEnable(GL_BLEND); else glDisable(GL_BLEND);
+    glBlendEquationSeparate(blendEquationRGB, blendEquationAlpha);
+    glBlendFuncSeparate(blendSrcRGB, blendDstRGB, blendSrcAlpha, blendDstAlpha);
+    glBlendColor(blendColor.r, blendColor.g, blendColor.b, blendColor.a);
+
+    // Cull
+    if (cullFaceEnabled) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
+    glCullFace(cullFaceMode);
+
+    // Stencil
+    if (stencilTestEnabled) glEnable(GL_STENCIL_TEST); else glDisable(GL_STENCIL_TEST);
+    glStencilFunc(stencilFunc, stencilRef, stencilMask);
+    glStencilOp(stencilFail, stencilPassDepthFail, stencilPassDepthPass);
+
+    // Polygon Mode
+    glPolygonMode(GL_FRONT_AND_BACK, polygonMode);
+
+    // Multisampling
+    if (sampleAlphaToCoverageEnabled) glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE); else glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+
+    // Program
+    glUseProgram(program);
+}

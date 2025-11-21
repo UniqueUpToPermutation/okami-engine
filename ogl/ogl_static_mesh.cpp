@@ -58,6 +58,11 @@ OGLStaticMeshRenderer::OGLStaticMeshRenderer(OGLGeometryManager* geometryManager
 }
 
 Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
+    if (pass.m_type != OGLPassType::Forward &&
+        pass.m_type != OGLPassType::Transparent) {
+        return {};
+    }
+
     // Collect all sprites and their transforms
     std::vector<std::pair<ResHandle<Geometry>, glsl::StaticMeshInstance>> instances;
     

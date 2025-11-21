@@ -61,6 +61,10 @@ Error OGLSpriteRenderer::MergeImpl() {
 }
 
 Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
+    if (pass.m_type != OGLPassType::_2D) {
+        return {};
+    }
+
     // Collect all sprites and their transforms
     std::vector<std::pair<ResHandle<Texture>, glsl::SpriteInstance>> spriteInstances;
     

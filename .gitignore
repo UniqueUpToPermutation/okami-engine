@@ -3,3 +3,4 @@ build/
 .vs
 renders/
 wgpu-native/
+vcpkg_installed/

@@ -47,8 +47,23 @@
 #endif
 
 namespace okami {
+    enum class OGLPassType {
+        Shadow,
+        Forward,
+        Transparent,
+        PostProcess,
+        _2D,
+    };
+
+    struct OGL2DPayload {
+        int m_layer = 0;
+        std::function<Error(OGLPass const& pass)> m_payload = nullptr;
+    };
+
     struct OGLPass {
         glsl::SceneGlobals m_sceneGlobals;
+        OGLPassType m_type = OGLPassType::Forward;
+        std::vector<OGL2DPayload>* m_2DOutputs = nullptr;
     };
 
     class IOGLRenderModule {
@@ -465,5 +480,50 @@ namespace okami {
         BufferWriteMap<T> Map() {
             return BufferWriteMap<T>::Map(m_buffer);
         }
+    };
+
+    struct OGLPipelineState {
+        // Depth Testing
+        bool depthTestEnabled = false;
+        GLenum depthFunc = GL_LESS;
+        bool depthMask = true;
+
+        // Blending
+        bool blendEnabled = false;
+        GLenum blendEquationRGB = GL_FUNC_ADD;
+        GLenum blendEquationAlpha = GL_FUNC_ADD;
+        GLenum blendSrcRGB = GL_ONE;
+        GLenum blendDstRGB = GL_ZERO;
+        GLenum blendSrcAlpha = GL_ONE;
+        GLenum blendDstAlpha = GL_ZERO;
+        glm::vec4 blendColor = glm::vec4(0.0f);
+
+        // Culling
+        bool cullFaceEnabled = false;
+        GLenum cullFaceMode = GL_BACK;
+
+        // Stencil Testing
+        bool stencilTestEnabled = false;
+        GLenum stencilFunc = GL_ALWAYS;
+        GLint stencilRef = 0;
+        GLuint stencilMask = ~0;
+        GLenum stencilFail = GL_KEEP;
+        GLenum stencilPassDepthFail = GL_KEEP;
+        GLenum stencilPassDepthPass = GL_KEEP;
+
+        // Polygon Mode
+        GLenum polygonMode = GL_FILL;
+
+        // Multisampling
+        bool sampleAlphaToCoverageEnabled = false;
+
+        // Program
+        GLuint program = 0;
+
+        // Get current state from OpenGL
+        void GetFromGL();
+
+        // Set state to OpenGL
+        void SetToGL() const;
     };
 }

@@ -55,6 +55,11 @@ Error OGLTriangleRenderer::MergeImpl() {
 }
 
 Error OGLTriangleRenderer::Pass(OGLPass const& pass) {
+    if (pass.m_type != OGLPassType::Forward &&
+        pass.m_type != OGLPassType::Transparent) {
+        return {};
+    }
+
     glUseProgram(m_program.get());
 
     glDisable(GL_CULL_FACE);

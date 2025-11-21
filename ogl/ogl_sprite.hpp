@@ -17,6 +17,8 @@ namespace okami {
         public EngineModule,
         public IOGLRenderModule {
     protected:
+        OGLPipelineState m_pipelineState;
+
         GLProgram m_program;
         UploadVertexBuffer<glsl::SpriteInstance> m_instanceBuffer; // Instance buffer for sprite data
         

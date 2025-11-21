@@ -29,14 +29,11 @@ if(WIN32)
 else()
     set(DEFAULT_USE_D3D12 OFF)
 endif()
-set(DEFAULT_USE_WEBGPU OFF)
 set(DEFAULT_USE_OGL ON)
 option(USE_D3D12 "Enable D3D12 renderer and DirectX dependencies" ${DEFAULT_USE_D3D12})
 option(USE_OGL "Enable OpenGL renderer and dependencies" ${DEFAULT_USE_OGL})
-option(USE_WEBGPU "Enable WebGPU renderer and dependencies" ${DEFAULT_USE_WEBGPU})
 message(STATUS "USE_D3D12=${USE_D3D12}")
 message(STATUS "USE_OGL=${USE_OGL}")
-message(STATUS "USE_WEBGPU=${USE_WEBGPU}")
 
 # Find packages via vcpkg
 find_package(glfw3 CONFIG REQUIRED)
@@ -45,6 +42,10 @@ find_package(glog CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(Ktx CONFIG REQUIRED)
+
+# tmxlite doesn't provide CMake config, find manually
+set(TMXLITE_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include)
+find_library(TMXLITE_LIBRARY tmxlite PATHS ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/lib)
 
 # DirectX / D3D12 related packages are only needed when USE_D3D12 is enabled.
 if(USE_D3D12)
@@ -247,55 +248,6 @@ set_target_properties(ShaderPreprocessor PROPERTIES
 )
 
 #==============================================================================
-# WebGPU Shader Processing System
-#==============================================================================
-
-if (USE_WEBGPU)
-    # Find all WGSL shader files in webgpu/shaders folder
-    file(GLOB_RECURSE WEBGPU_SHADER_FILES 
-        "${CMAKE_SOURCE_DIR}/webgpu/shaders/*.wgsl"
-    )
-
-    if(WEBGPU_SHADER_FILES)
-        # Ensure webgpu shaders output directory exists
-        file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/webgpu/shaders)
-        
-        set(ALL_WEBGPU_PROCESSED_SHADERS "")
-        
-        # Process each shader file with the WGSL preprocessor
-        foreach(WEBGPU_SHADER_FILE ${WEBGPU_SHADER_FILES})
-            get_filename_component(SHADER_NAME ${WEBGPU_SHADER_FILE} NAME)
-            set(PROCESSED_SHADER_PATH "${CMAKE_BINARY_DIR}/webgpu/shaders/${SHADER_NAME}")
-            
-            # Create custom command to preprocess the shader file
-            add_custom_command(
-                OUTPUT ${PROCESSED_SHADER_PATH}
-                COMMAND ShaderPreprocessor ${WEBGPU_SHADER_FILE} ${PROCESSED_SHADER_PATH} "${CMAKE_SOURCE_DIR}/webgpu/shaders"
-                DEPENDS ${WEBGPU_SHADER_FILE} ShaderPreprocessor
-                COMMENT "Preprocessing WebGPU shader: ${SHADER_NAME}"
-            )
-            
-            list(APPEND ALL_WEBGPU_PROCESSED_SHADERS ${PROCESSED_SHADER_PATH})
-            message(STATUS "Will preprocess WebGPU shader: ${SHADER_NAME}")
-        endforeach()
-        
-        # Create a custom target that depends on all processed shaders
-        if(ALL_WEBGPU_PROCESSED_SHADERS)
-            list(LENGTH ALL_WEBGPU_PROCESSED_SHADERS WEBGPU_SHADER_COUNT)
-            add_custom_target(ProcessWebGPUShaders ALL
-                DEPENDS ${ALL_WEBGPU_PROCESSED_SHADERS}
-                COMMENT "Processing all WebGPU shaders"
-            )
-            
-            add_dependencies(Engine ProcessWebGPUShaders)
-            message(STATUS "Created ProcessWebGPUShaders target with ${WEBGPU_SHADER_COUNT} shaders")
-            message(STATUS "Processed WebGPU shaders will be available in: ${CMAKE_BINARY_DIR}/webgpu/shaders/")
-        endif()
-    endif()
-
-endif() # USE_WEBGPU
-
-#==============================================================================
 # OpenGL Shader Processing System
 #==============================================================================
 
@@ -440,7 +392,6 @@ file(GLOB ENGINE_LIB_SOURCES CONFIGURE_DEPENDS
     "ogl/*.cpp" "ogl/*.hpp"
     "ogl/glad/*.c" "ogl/glad/*.h"
     "glfw/*.cpp" "glfw/*.hpp"
-    "webgpu/*.cpp" "webgpu/*.hpp" "webgpu/*.mm"
 )
 list(REMOVE_ITEM ENGINE_LIB_SOURCES "${CMAKE_SOURCE_DIR}/main.cpp")
 
@@ -488,7 +439,7 @@ target_link_libraries(EngineLib PUBLIC
         glog::glog
         yaml-cpp::yaml-cpp
         KTX::ktx
-        ${WGPU_LIBRARY}
+        ${TMXLITE_LIBRARY}
 )
 
 # Add KTX library
@@ -501,18 +452,6 @@ else()
 endif()
 
 if(WIN32)
-    if (USE_WEBGPU)
-        # Add Windows system libraries required by wgpu-native
-        target_link_libraries(EngineLib PUBLIC
-            d3dcompiler
-            ws2_32
-            userenv
-            ntdll
-            bcrypt
-            opengl32
-        )
-    endif()
-    
     if(USE_D3D12)
         target_link_libraries(EngineLib PUBLIC
             Microsoft::DirectXTK12
@@ -522,13 +461,6 @@ if(WIN32)
             dxguid
         )
     endif()
-elseif(APPLE)
-    # Add macOS system frameworks required by WebGPU Metal backend
-    target_link_libraries(EngineLib PUBLIC
-        "-framework Metal"
-        "-framework QuartzCore"
-        "-framework Foundation"
-    )
 endif()
 
 # Set include directories for the library
@@ -536,6 +468,7 @@ target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR})
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/d3d12)
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/ogl)
 target_include_directories(EngineLib PRIVATE ${TINYGLTF_INCLUDE_DIRS})
+target_include_directories(EngineLib PUBLIC ${TMXLITE_INCLUDE_DIR})
 target_compile_definitions(EngineLib PRIVATE NOMINMAX)
 if(USE_D3D12)
     target_compile_definitions(EngineLib PUBLIC USE_D3D12=1)
