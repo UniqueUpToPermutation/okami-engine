@@ -74,6 +74,9 @@ namespace okami {
     struct PortIn {
         std::shared_ptr<MessagePort<T>> m_lane;
 
+        PortIn() = default;
+        PortIn(std::shared_ptr<MessagePort<T>> lane) : m_lane(std::move(lane)) {}
+
         inline void Handle(std::invocable<T const&> auto&& handler) {
             m_lane->Handle(handler);
         }
@@ -82,6 +85,9 @@ namespace okami {
     template <CopyableMessage T>
     struct PortOut {
         std::shared_ptr<MessagePort<T>> m_lane;
+
+        PortOut() = default;
+        PortOut(std::shared_ptr<MessagePort<T>> lane) : m_lane(std::move(lane)) {}
 
         inline void Send(const T& message) {
             m_lane->Send(message);
@@ -254,7 +260,7 @@ namespace okami {
             }, dependencies);
 
             // Populate message types
-            node->AddPortEnsure<Callable>();
+            node->template AddPortEnsure<Callable>();
             return node->m_id;
         }
 

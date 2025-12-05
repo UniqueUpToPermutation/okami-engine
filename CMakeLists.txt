@@ -44,8 +44,8 @@ find_package(GTest CONFIG REQUIRED)
 find_package(Ktx CONFIG REQUIRED)
 
 # tmxlite doesn't provide CMake config, find manually
-set(TMXLITE_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include)
-find_library(TMXLITE_LIBRARY tmxlite PATHS ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/lib)
+find_path(TMXLITE_INCLUDE_DIR tmxlite/Map.hpp PATHS ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/include ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include)
+find_library(TMXLITE_LIBRARY NAMES tmxlite libtmxlite tmxlite-s libtmxlite-s PATHS ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/lib ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/lib)
 
 # DirectX / D3D12 related packages are only needed when USE_D3D12 is enabled.
 if(USE_D3D12)
@@ -443,10 +443,10 @@ target_link_libraries(EngineLib PUBLIC
 )
 
 # Add KTX library
-find_library(KTX_LIBRARY ktx PATHS ${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/lib)
+find_library(KTX_LIBRARY ktx PATHS ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/lib)
 if(KTX_LIBRARY)
     target_link_libraries(EngineLib PUBLIC ${KTX_LIBRARY})
-    target_include_directories(EngineLib PUBLIC ${CMAKE_BINARY_DIR}/vcpkg_installed/x64-osx/include)
+    target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/include)
 else()
     message(WARNING "KTX library not found")
 endif()

@@ -136,6 +136,10 @@ namespace okami {
         GeometryViewIterator<T> m_begin;
         GeometryViewIterator<T> m_end;
 
+        GeometryView() = default;
+        GeometryView(GeometryViewIterator<T> begin, GeometryViewIterator<T> end) 
+            : m_begin(begin), m_end(end) {}
+
         GeometryViewIterator<T> begin() const {
             return m_begin;
         }
