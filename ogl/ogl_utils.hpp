@@ -55,6 +55,8 @@ namespace okami {
         _2D,
     };
 
+    struct OGLPass;
+
     struct OGL2DPayload {
         int m_layer = 0;
         std::function<Error(OGLPass const& pass)> m_payload = nullptr;
