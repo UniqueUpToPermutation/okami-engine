@@ -56,9 +56,17 @@ namespace okami {
     template <typename T>
     concept MoveableSignal = std::is_move_constructible_v<T> && std::is_move_assignable_v<T>;
 
+    class IMessagePort {    
+    public:
+        virtual void Clear() = 0;
+        virtual std::type_index GetMessageType() const = 0;
+
+        virtual ~IMessagePort() = default;
+    };
 
     template <CopyableMessage T>
-    struct MessagePort {
+    class MessagePort final : public IMessagePort {
+    public:
         std::shared_mutex m_mutex;
         std::vector<T> m_messages;
 
@@ -73,14 +81,23 @@ namespace okami {
                 handler(message);
             }
         }
+
+        std::type_index GetMessageType() const override {
+            return typeid(T);
+        }
+
+        void Clear() override {
+            std::unique_lock lock(m_mutex);
+            m_messages.clear();
+        }
     };
 
     template <CopyableMessage T>
     struct PortIn {
-        std::shared_ptr<MessagePort<T>> m_lane;
+        MessagePort<T>* m_lane;
 
         PortIn() = default;
-        PortIn(std::shared_ptr<MessagePort<T>> lane) : m_lane(std::move(lane)) {}
+        PortIn(MessagePort<T>* lane) : m_lane(lane) {}
 
         inline void Handle(std::invocable<T const&> auto&& handler) {
             m_lane->Handle(handler);
@@ -89,10 +106,9 @@ namespace okami {
 
     template <CopyableMessage T>
     struct PortOut {
-        std::shared_ptr<MessagePort<T>> m_lane;
-
+        MessagePort<T>* m_lane;
         PortOut() = default;
-        PortOut(std::shared_ptr<MessagePort<T>> lane) : m_lane(std::move(lane)) {}
+        PortOut(MessagePort<T>* lane) : m_lane(lane) {}
 
         inline void Send(const T& message) {
             m_lane->Send(message);
@@ -117,40 +133,41 @@ namespace okami {
     template <typename T>
     using MsgOut = PortOut<T>;
 
-    class MessageBus2 {
+    class MessageBus {
     private:
-        std::unordered_map<std::type_index, std::any> m_lanes;
+        std::unordered_map<std::type_index, std::unique_ptr<IMessagePort>> m_ports;
 
     public:
-        virtual ~MessageBus2() = default;
+        virtual ~MessageBus() = default;
 
         void Send(CopyableMessage auto const& message) const {
-            if (auto it = m_lanes.find(typeid(message)); it != m_lanes.end()) {
-                auto lane = std::any_cast<std::shared_ptr<MessagePort<std::decay_t<decltype(message)>>>>(it->second);
+            if (auto it = m_ports.find(typeid(message)); it != m_ports.end()) {
+                auto lane = dynamic_cast<MessagePort<std::decay_t<decltype(message)>>*>(it->second.get());
+                OKAMI_ASSERT(lane != nullptr, "Message port type mismatch");
                 lane->Send(message);
             }
         }
 
-        void EnsureLane(CopyableMessage auto const& message) {
+        void EnsurePort(CopyableMessage auto const& message) {
             std::type_index typeIdx = typeid(message);
-            if (m_lanes.find(typeIdx) == m_lanes.end()) {
-                m_lanes[typeIdx] = std::make_shared<MessagePort<std::decay_t<decltype(message)>>>();
+            if (m_ports.find(typeIdx) == m_ports.end()) {
+                m_ports[typeIdx] = std::make_unique<MessagePort<std::decay_t<decltype(message)>>>();
             }
         }
 
         template <CopyableMessage T>
-        void EnsureLane() {
+        void EnsurePort() {
             std::type_index typeIdx = typeid(T);
-            if (m_lanes.find(typeIdx) == m_lanes.end()) {
-                m_lanes[typeIdx] = std::make_shared<MessagePort<T>>();
+            if (m_ports.find(typeIdx) == m_ports.end()) {
+                m_ports[typeIdx] = std::make_unique<MessagePort<T>>();
             }
         }
 
         template <CopyableMessage T>
-        std::shared_ptr<MessagePort<std::decay_t<T>>> GetLane() const {
+        MessagePort<std::decay_t<T>>* GetPort() const {
             std::type_index typeIdx = typeid(T);
-            if (auto it = m_lanes.find(typeIdx); it != m_lanes.end()) {
-                return std::any_cast<std::shared_ptr<MessagePort<std::decay_t<T>>>>(it->second);
+            if (auto it = m_ports.find(typeIdx); it != m_ports.end()) {
+                return dynamic_cast<MessagePort<std::decay_t<T>>*>(it->second.get());
             }
             return nullptr;
         }
@@ -162,11 +179,11 @@ namespace okami {
             using msg_t = typename trait::message_type;
             if constexpr (trait::is_input) {
                 PortIn<msg_t> port;
-                port.m_lane = GetLane<msg_t>();
+                port.m_lane = GetPort<msg_t>();
                 return port;
             } else {
                 PortOut<msg_t> port;
-                port.m_lane = GetLane<msg_t>();
+                port.m_lane = GetPort<msg_t>();
                 return port;
             }
         }
@@ -183,14 +200,20 @@ namespace okami {
 
         template <CopyableMessage T>
         void Handle(std::invocable<T const&> auto&& handler) {
-            if (auto lane = GetLane<T>()) {
+            if (auto lane = GetPort<T>()) {
                 lane->Handle(handler);
+            }
+        }
+
+        void Clear() {
+            for (auto& [typeIdx, port] : m_ports) {
+                port->Clear();
             }
         }
     };
 
     struct JobContext {
-        MessageBus2& m_messageBus;
+        MessageBus& m_messageBus;
         // Context data for jobs can be added here
     };
     
@@ -200,7 +223,7 @@ namespace okami {
         std::vector<std::shared_ptr<JobGraphNode>> m_dependents;
         std::function<Error(JobContext&)> m_task = nullptr;
         std::atomic<int> m_pendingDependencies{ 0 };
-        std::function<void(MessageBus2&)> m_portEnsure = nullptr;
+        std::function<void(MessageBus&)> m_portEnsure = nullptr;
     
         // Helper to populate message types
         template <typename Callable>
@@ -211,12 +234,12 @@ namespace okami {
             static_assert(std::is_same_v<std::remove_reference_t<first_arg>, JobContext>, "First parameter must be JobContext&");
             using msg_args_tuple = typename tuple_drop_first<args_tuple>::type;
 
-            m_portEnsure = [](MessageBus2& bus) {
+            m_portEnsure = [](MessageBus& bus) {
                 auto ensure_helper = [&]<typename... Ts>(std::tuple<Ts...>*) {
                     ([&]<typename PortT>() {
                         using trait = message_type_trait<std::remove_reference_t<PortT>>;
                         using msg_t = typename trait::message_type;
-                        bus.EnsureLane<msg_t>();
+                        bus.EnsurePort<msg_t>();
                     }.template operator()<Ts>(), ...);
                 };
                 ensure_helper(static_cast<msg_args_tuple*>(nullptr));
@@ -270,11 +293,11 @@ namespace okami {
                 using msg_args_tuple = typename tuple_drop_first<args_tuple>::type;
 
                 // Create the ports
-                auto ports_tuple = []<typename... Ts>(std::tuple<Ts...>*, MessageBus2& bus) {
+                auto ports_tuple = []<typename... Ts>(std::tuple<Ts...>*, MessageBus& bus) {
                     return std::tuple<std::conditional_t<message_type_trait<std::remove_reference_t<Ts>>::is_input, 
                                                          PortIn<typename message_type_trait<std::remove_reference_t<Ts>>::message_type>, 
                                                          PortOut<typename message_type_trait<std::remove_reference_t<Ts>>::message_type>>... >{
-                        bus.GetLane<typename message_type_trait<std::remove_reference_t<Ts>>::message_type>()...
+                        bus.GetPort<typename message_type_trait<std::remove_reference_t<Ts>>::message_type>()...
                     };
                 }(static_cast<msg_args_tuple*>(nullptr), ctx.m_messageBus);
 
@@ -297,11 +320,11 @@ namespace okami {
     public:
         virtual ~IJobGraphExecutor() = default;
 
-        virtual Error Execute(JobGraph& graph, MessageBus2& bus) = 0;
+        virtual Error Execute(JobGraph& graph, MessageBus& bus) = 0;
     };
 
     class DefaultJobGraphExecutor : public IJobGraphExecutor {
     public:
-        Error Execute(JobGraph& graph, MessageBus2& bus) override;
+        Error Execute(JobGraph& graph, MessageBus& bus) override;
     };
 }

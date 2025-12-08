@@ -26,33 +26,33 @@ TEST(JobSystemTest, CopyableMessageConcept) {
     static_assert(!CopyableMessage<std::unique_ptr<int>>, "unique_ptr should not be copyable");
 }
 
-// Test MessageBus2
+// Test MessageBus
 TEST(JobSystemTest, MessageBusEnsureLane) {
-    MessageBus2 bus;
+    MessageBus bus;
     
     // Ensure lane for TestMessage
-    bus.EnsureLane(TestMessage{1, "test"});
+    bus.EnsurePort(TestMessage{1, "test"});
     
-    // Get the lane - note: GetLane is const, but bus is non-const, should work
-    auto lane = bus.GetLane<TestMessage>();
+    // Get the lane - note: GetPort is const, but bus is non-const, should work
+    auto lane = bus.GetPort<TestMessage>();
     ASSERT_NE(lane, nullptr);
     
     // Ensure another lane
-    bus.EnsureLane(AnotherMessage{3.14f});
-    auto anotherLane = bus.GetLane<AnotherMessage>();
+    bus.EnsurePort(AnotherMessage{3.14f});
+    auto anotherLane = bus.GetPort<AnotherMessage>();
     ASSERT_NE(anotherLane, nullptr);
 }
 
 TEST(JobSystemTest, MessageBusSendAndReceive) {
-    MessageBus2 bus;
-    bus.EnsureLane(TestMessage{});
+    MessageBus bus;
+    bus.EnsurePort(TestMessage{});
     
     // Send a message
     TestMessage sent{42, "hello"};
     bus.Send(sent);
     
     // Receive messages
-    auto lane = bus.GetLane<TestMessage>();
+    auto lane = bus.GetPort<TestMessage>();
     ASSERT_NE(lane, nullptr);
     
     std::vector<TestMessage> received;
@@ -112,7 +112,7 @@ TEST(JobSystemTest, JobGraphInvalidDependency) {
 
 TEST(JobSystemTest, JobGraphExecution) {
     JobGraph graph;
-    MessageBus2 bus;
+    MessageBus bus;
     DefaultJobGraphExecutor executor;
     
     // Track execution order
@@ -162,7 +162,7 @@ TEST(JobSystemTest, JobGraphExecution) {
 
 TEST(JobSystemTest, AddMessageNode) {
     JobGraph graph;
-    MessageBus2 bus;
+    MessageBus bus;
     
     // Track received messages
     std::vector<TestMessage> received;
@@ -197,7 +197,7 @@ TEST(JobSystemTest, AddMessageNode) {
 
 TEST(JobSystemTest, JobGraphCycleDetection) {
     JobGraph graph;
-    MessageBus2 bus;
+    MessageBus bus;
     DefaultJobGraphExecutor executor;
     
     // Create a cycle: A -> B -> A
@@ -262,7 +262,7 @@ TEST(JobSystemTest, JobGraphCycleDetection) {
 
 TEST(JobSystemTest, ChainedMessagePassing) {
     JobGraph graph;
-    MessageBus2 bus;
+    MessageBus bus;
     DefaultJobGraphExecutor executor;
     
     std::vector<std::string> log;
@@ -307,7 +307,7 @@ TEST(JobSystemTest, ChainedMessagePassing) {
 
 TEST(JobSystemTest, MultipleProducersSingleConsumer) {
     JobGraph graph;
-    MessageBus2 bus;
+    MessageBus bus;
     DefaultJobGraphExecutor executor;
     
     std::atomic<int> sum = 0;

@@ -107,7 +107,7 @@ namespace okami {
     };
 
     struct ModuleInterface {
-        MessageBus2 m_messages;
+        MessageBus m_messages;
         InterfaceCollection m_interfaces;
     };
 

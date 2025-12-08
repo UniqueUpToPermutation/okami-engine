@@ -163,6 +163,9 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 		m_updateModules.Merge(m_moduleInterface);
 		m_renderModules.Merge(m_moduleInterface);
 
+		// Clear message bus for this frame
+		m_moduleInterface.m_messages.Clear();
+
 		// Update frame and render
 		// Stage changes for next frame
         m_ioModules.ProcessFrame(time, m_moduleInterface);

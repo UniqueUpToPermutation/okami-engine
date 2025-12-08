@@ -62,10 +62,10 @@ namespace okami {
 
     protected:
         Error RegisterImpl(ModuleInterface& mi) override {
-            mi.m_messages.EnsureLane<AddComponentSignal<T>>();
-            mi.m_messages.EnsureLane<UpdateComponentSignal<T>>();
-            mi.m_messages.EnsureLane<RemoveComponentSignal<T>>();
-            mi.m_messages.EnsureLane<EntityRemoveSignal>();
+            mi.m_messages.EnsurePort<AddComponentSignal<T>>();
+            mi.m_messages.EnsurePort<UpdateComponentSignal<T>>();
+            mi.m_messages.EnsurePort<RemoveComponentSignal<T>>();
+            mi.m_messages.EnsurePort<EntityRemoveSignal>();
             mi.m_interfaces.Register<IComponentView<T>>(this);
             return {};
         }

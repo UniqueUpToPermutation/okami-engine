@@ -280,9 +280,9 @@ private:
 
 protected:
     Error RegisterImpl(ModuleInterface& a) override {
-		a.m_messages.EnsureLane<EntityRemoveSignal>();
-		a.m_messages.EnsureLane<EntityCreateSignal>();
-		a.m_messages.EnsureLane<EntityParentChangeSignal>();
+		a.m_messages.EnsurePort<EntityRemoveSignal>();
+		a.m_messages.EnsurePort<EntityCreateSignal>();
+		a.m_messages.EnsurePort<EntityParentChangeSignal>();
         a.m_interfaces.Register<IEntityManager>(this);
         return {};
     }

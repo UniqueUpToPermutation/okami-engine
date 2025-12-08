@@ -26,7 +26,7 @@ Error ExecuteSerial(
     return err;
 }
 
-Error okami::DefaultJobGraphExecutor::Execute(JobGraph& graph, MessageBus2& bus) {
+Error okami::DefaultJobGraphExecutor::Execute(JobGraph& graph, MessageBus& bus) {
     JobContext context{ .m_messageBus = bus };
     Error err;
 
