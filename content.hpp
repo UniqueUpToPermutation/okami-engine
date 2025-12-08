@@ -99,14 +99,14 @@ namespace okami {
     };
 
 	template <ResourceType T>
-	struct LoadResourceMessage {
+	struct LoadResourceSignal {
 		std::filesystem::path m_path;
 		typename T::LoadParams m_params;
 		ResHandle<T> m_handle;
 	};
 
 	template <typename T>
-	struct OnResourceLoadedMessage {
+	struct OnResourceLoadedSignal {
 		Expected<T> m_data;
 		ResHandle<T> m_handle;
 	};
@@ -130,9 +130,10 @@ namespace okami {
 		// Only accessed from the main thread
         std::unordered_map<Resource<T>*, std::unique_ptr<ImplPair>> m_res_to_impl;
 
+
 		// Consumes messages regarding newly loaded resources
 		// These are sent by the IO thread
-		DefaultSignalHandler<OnResourceLoadedMessage<T>> m_loaded_handler;
+		DefaultSignalHandler<OnResourceLoadedSignal<T>> m_loaded_handler;
 
 		// Consumes messages regarding new resources to be created
 		DefaultSignalHandler<std::unique_ptr<ImplPair>> m_new_resources;
@@ -142,7 +143,7 @@ namespace okami {
 
 		Error RegisterImpl(ModuleInterface& mi) override {
 			mi.m_interfaces.Register<IContentManager<T>>(this);
-			mi.m_interfaces.RegisterSignalHandler<OnResourceLoadedMessage<T>>(&m_loaded_handler);
+			mi.m_interfaces.RegisterSignalHandler<OnResourceLoadedSignal<T>>(&m_loaded_handler);
 			
 			return {};
 		}
@@ -193,7 +194,7 @@ namespace okami {
 			});
 
 			// Process all just loaded resources
-			m_loaded_handler.Handle([this, &e, &userData](OnResourceLoadedMessage<T> msg) {
+			m_loaded_handler.Handle([this, &e, &userData](OnResourceLoadedSignal<T> msg) {
 				if (!msg.m_data) {
 					e += msg.m_data.error();
 					return;
@@ -245,7 +246,8 @@ namespace okami {
 			impl->m_resource.m_path = path.string();
 			auto res = ResHandle<T>(&impl->m_resource);
 
-			mi.m_messages.Send(LoadResourceMessage<T>{
+			// Ask IO thread to load the resource data
+			mi.m_interfaces.SendSignal(LoadResourceSignal<T>{
 				.m_path = path,
 				.m_params = std::move(params),
 				.m_handle = res,
@@ -259,7 +261,7 @@ namespace okami {
 			auto impl = std::make_unique<ImplPair>();
 			auto res = ResHandle<T>(&impl->m_resource);
 			m_new_resources.Send(std::move(impl));
-			m_loaded_handler.Send(OnResourceLoadedMessage<T>{
+			m_loaded_handler.Send(OnResourceLoadedSignal<T>{
 				.m_data = std::move(data),
 				.m_handle = res,
 			});
