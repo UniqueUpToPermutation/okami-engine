@@ -60,17 +60,12 @@ namespace okami {
         std::vector<entity_t> m_removed;
         std::vector<entity_t> m_added;
 
-        IMessageQueue<AddComponentSignal<T>>* m_addQueue = nullptr;
-        IMessageQueue<UpdateComponentSignal<T>>* m_updateQueue = nullptr;
-        IMessageQueue<RemoveComponentSignal<T>>* m_removeQueue = nullptr;
-        IMessageQueue<EntityRemoveSignal>* m_entityRemoveQueue = nullptr;
-
     protected:
         Error RegisterImpl(ModuleInterface& mi) override {
-            m_addQueue = mi.m_messages.CreateQueue<AddComponentSignal<T>>().get();
-            m_updateQueue = mi.m_messages.CreateQueue<UpdateComponentSignal<T>>().get();
-            m_removeQueue = mi.m_messages.CreateQueue<RemoveComponentSignal<T>>().get();
-            m_entityRemoveQueue = mi.m_messages.CreateQueue<EntityRemoveSignal>().get();
+            mi.m_messages.EnsureLane<AddComponentSignal<T>>();
+            mi.m_messages.EnsureLane<UpdateComponentSignal<T>>();
+            mi.m_messages.EnsureLane<RemoveComponentSignal<T>>();
+            mi.m_messages.EnsureLane<EntityRemoveSignal>();
             mi.m_interfaces.Register<IComponentView<T>>(this);
             return {};
         }
@@ -90,15 +85,13 @@ namespace okami {
             return {};
         }
 
-        Error MergeImpl() override {
-            while (auto msg = m_addQueue->GetMessage()) {
-                auto& signal = *msg;
+        Error MergeImpl(ModuleInterface& mi) override {
+            mi.m_messages.Handle<AddComponentSignal<T>>([this](AddComponentSignal<T> const& signal) {
                 m_storage[signal.m_entity] = signal.m_component;
                 m_added.push_back(signal.m_entity);
-            }
+            });
 
-            while (auto msg = m_updateQueue->GetMessage()) {
-                auto& signal = *msg;
+            mi.m_messages.Handle<UpdateComponentSignal<T>>([this](UpdateComponentSignal<T> const& signal) {
                 auto it = m_storage.find(signal.m_entity);
                 if (it != m_storage.end()) {
                     it->second = signal.m_component;
@@ -106,10 +99,9 @@ namespace okami {
                 } else {
                     OKAMI_LOG_WARNING("Attempted to update non-existent entity: " + std::to_string(signal.m_entity));
                 }
-            }
+            });
 
-            while (auto msg = m_removeQueue->GetMessage()) {
-                auto& signal = *msg;
+            mi.m_messages.Handle<RemoveComponentSignal<T>>([this](RemoveComponentSignal<T> const& signal) {
                 auto it = m_storage.find(signal.m_entity);
                 if (it != m_storage.end()) {
                     m_storage.erase(it);
@@ -117,17 +109,16 @@ namespace okami {
                 } else {
                     OKAMI_LOG_WARNING("Attempted to remove non-existent entity: " + std::to_string(signal.m_entity));
                 }
-            }
+            });
 
-            while (auto msg = m_entityRemoveQueue->GetMessage()) {
-                auto& signal = *msg;
+            mi.m_messages.Handle<EntityRemoveSignal>([this](EntityRemoveSignal const& signal) {
                 auto it = m_storage.find(signal.m_entity);
                 if (it != m_storage.end()) {
                     m_storage.erase(it);
                     m_removed.push_back(signal.m_entity);
                 }
-            }
-
+            });
+            
             return {};
         }
 

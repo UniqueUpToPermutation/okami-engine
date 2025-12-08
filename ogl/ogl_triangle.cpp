@@ -50,7 +50,7 @@ Error OGLTriangleRenderer::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
     return {};
 }
 
-Error OGLTriangleRenderer::MergeImpl() {
+Error OGLTriangleRenderer::MergeImpl(ModuleInterface&) {
     return {};
 }
 

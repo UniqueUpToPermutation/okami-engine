@@ -49,7 +49,8 @@ Engine::Engine(EngineParams params) :
 
 entity_t Engine::CreateEntity(entity_t parent) {
     if (m_entityManager) {
-        return m_entityManager->CreateEntity(parent);
+		auto port = m_moduleInterface.m_messages.CreatePortOut<EntityCreateSignal>();
+        return m_entityManager->CreateEntity(port, parent);
     } else {
         throw std::runtime_error("No IEntityManager available in Engine. Call Startup first!");
     }
@@ -74,7 +75,7 @@ Engine::~Engine() {
 Error Engine::Startup() {
 	LOG(INFO) << "Starting Okami Engine";
 
-	m_exitHandler = m_moduleInterface.m_messages.CreateQueue<SignalExit>();
+	m_moduleInterface.m_interfaces.RegisterSignalHandler<SignalExit>(&m_exitHandler);
 
     Error e;
     e += m_ioModules.Register(m_moduleInterface);
@@ -145,7 +146,7 @@ struct FrameTimeEstimator {
 };
 
 void Engine::Run(std::optional<size_t> runFrameCount) {
-	m_shouldExit.store(false);
+	bool shouldExit = false;
 
 	auto beginTick = std::chrono::high_resolution_clock::now();
 	auto lastTick = beginTick;
@@ -154,13 +155,13 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 
 	FrameTimeEstimator timeEstimator;
 
-	while (!m_shouldExit.load()) {
+	while (!shouldExit) {
 		auto time = timeEstimator.GetTime();
 
 		// Merge staged changes for this frame
-		m_ioModules.Merge();
-		m_updateModules.Merge();
-		m_renderModules.Merge();
+		m_ioModules.Merge(m_moduleInterface);
+		m_updateModules.Merge(m_moduleInterface);
+		m_renderModules.Merge(m_moduleInterface);
 
 		// Update frame and render
 		// Stage changes for next frame
@@ -171,11 +172,11 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 		timeEstimator = timeEstimator.Step();
 
 		if (maxFrames && timeEstimator.m_nextFrame >= *maxFrames) {
-			m_shouldExit.store(true);
+			shouldExit = true;
 		}
 
-		while (m_exitHandler && m_exitHandler->GetMessage()) {
-			m_shouldExit.store(true);
+		if (m_exitHandler.FetchAndReset() > 0) {
+			shouldExit = true;
 		}
 	}
 }
@@ -197,7 +198,8 @@ void Engine::AddScript(
 				m_script(t, mi);
 				return {};
 			}
-			Error MergeImpl() override { return {}; }
+			Error MergeImpl(ModuleInterface& a) override { return {}; }
+
 		public:
 			ScriptModule(
 				std::function<void(Time const&, ModuleInterface&)> script,

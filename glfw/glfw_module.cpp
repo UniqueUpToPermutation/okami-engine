@@ -114,7 +114,7 @@ protected:
         return {};
     }
 
-    Error MergeImpl() override {
+    Error MergeImpl(ModuleInterface& a) override {
         return {};
     }
 

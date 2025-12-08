@@ -302,7 +302,7 @@ protected:
         return {};
     }
 
-    Error MergeImpl() override { return {}; }
+    Error MergeImpl(ModuleInterface& a) override { return {}; }
 
     void Register(std::string_view name, std::function<std::any(IConfigDeserializer&)> func) override {
 		m_deserializers[name] = func;

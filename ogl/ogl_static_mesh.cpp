@@ -48,7 +48,7 @@ Error OGLStaticMeshRenderer::ProcessFrameImpl(Time const&, ModuleInterface&) {
     return {};
 }
 
-Error OGLStaticMeshRenderer::MergeImpl() {
+Error OGLStaticMeshRenderer::MergeImpl(ModuleInterface&) {
     return {};
 }
 

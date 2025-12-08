@@ -7,13 +7,13 @@ namespace okami {
     template <ResourceType T> 
     class IOModule : public EngineModule {
     private:
-        std::shared_ptr<IMessageQueue<LoadResourceMessage<T>>> m_load_queue;
+        DefaultSignalHandler<LoadResourceMessage<T>> m_load_handler;
 
     protected:
         virtual OnResourceLoadedMessage<T> LoadResource(LoadResourceMessage<T>&& msg) = 0;
 
         Error RegisterImpl(ModuleInterface& mi) override {
-            m_load_queue = mi.m_messages.CreateQueue<LoadResourceMessage<T>>();
+            mi.m_interfaces.RegisterSignalHandler<LoadResourceMessage<T>>(&m_load_handler);
             return {};
         }
         Error StartupImpl(ModuleInterface&) override {
@@ -23,15 +23,15 @@ namespace okami {
         }
 
         Error ProcessFrameImpl(Time const&, ModuleInterface& mi) override {
-            while (auto msg = m_load_queue->GetMessage()) {
-                auto result = LoadResource(std::move(*msg));
-                mi.m_messages.Send(std::move(result));
-            }
+            m_load_handler.Handle([this, &mi](LoadResourceMessage<T> const& msg) {
+                auto result = LoadResource(LoadResourceMessage<T>{msg});
+                mi.m_interfaces.SendSignal(std::move(result));
+            });
 
             return {};
         }
 
-        Error MergeImpl() override {
+        Error MergeImpl(ModuleInterface& a) override {
             return {};
         }
 

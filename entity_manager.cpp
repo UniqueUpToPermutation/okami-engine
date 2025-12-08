@@ -274,35 +274,16 @@ entity_t EntityTree::ReserveEntityId() {
     return m_impl->m_nextEntityId.fetch_add(1);
 }
 
-struct EntityCreate {
-    entity_t m_entity;
-    entity_t m_parent;
-};
-
-struct EntityRemove {
-    entity_t m_entity;
-};
-
-struct EntityParentChange {
-    entity_t m_entity;
-    entity_t m_oldParent;
-    entity_t m_newParent;
-};
-
 class EntityManager : public EngineModule, public IEntityManager {
 private:
     EntityTree m_tree;
-    std::queue<EntityCreate> m_createQueue;
-    std::mutex m_createMutex;
-    std::queue<EntityParentChange> m_parentChangeQueue;
-    std::mutex m_parentChangeMutex;
-
-	IMessageQueue<EntityRemove>* m_removeQueue = nullptr;
 
 protected:
     Error RegisterImpl(ModuleInterface& a) override {
+		a.m_messages.EnsureLane<EntityRemoveSignal>();
+		a.m_messages.EnsureLane<EntityCreateSignal>();
+		a.m_messages.EnsureLane<EntityParentChangeSignal>();
         a.m_interfaces.Register<IEntityManager>(this);
-		m_removeQueue = a.m_messages.CreateQueue<EntityRemove>().get();
         return {};
     }
     
@@ -310,29 +291,18 @@ protected:
     void ShutdownImpl(ModuleInterface&) override { }
 
     Error ProcessFrameImpl(Time const& t, ModuleInterface& a) override { return {}; }
-    Error MergeImpl() override { 
-        {
-            std::lock_guard lock(m_createMutex);
-            while (!m_createQueue.empty()) {
-                auto& req = m_createQueue.front();
-                m_tree.AddReservedEntity(req.m_entity, req.m_parent);
-                m_createQueue.pop();
-            }
-        }
+    Error MergeImpl(ModuleInterface& a) override {
+		a.m_messages.Handle<EntityCreateSignal>([this](EntityCreateSignal const& msg) {
+			m_tree.AddReservedEntity(msg.m_entity, msg.m_parent);
+		});
 
-        {
-            std::lock_guard lock(m_parentChangeMutex);
-            while (!m_parentChangeQueue.empty()) {
-                auto& req = m_parentChangeQueue.front();
-                m_tree.SetParent(req.m_entity, req.m_newParent);
-                m_parentChangeQueue.pop();
-            }
-        }
+		a.m_messages.Handle<EntityParentChangeSignal>([this](EntityParentChangeSignal const& msg) {
+			m_tree.SetParent(msg.m_entity, msg.m_newParent);
+		});
 
-		while (auto msg = m_removeQueue->GetMessage()) {
-			auto& signal = *msg;
-			m_tree.RemoveEntity(signal.m_entity);
-		}
+		a.m_messages.Handle<EntityRemoveSignal>([this](EntityRemoveSignal const& msg) {
+			m_tree.RemoveEntity(msg.m_entity);
+		});
 
         return {};
     }
@@ -346,21 +316,10 @@ public:
         return m_tree;
     }
 
-    entity_t CreateEntity(entity_t parent = kRoot) override {
+    entity_t CreateEntity(PortOut<EntityCreateSignal> port, entity_t parent = kRoot) override {
         entity_t newEntity = m_tree.ReserveEntityId();
-        std::lock_guard lock(m_createMutex);
-        m_createQueue.push({newEntity, parent});
+		port.Send(EntityCreateSignal{newEntity, parent});
         return newEntity;
-    }
-
-    void RemoveEntity(entity_t entity) override {
-        m_removeQueue->Send(EntityRemove{entity});
-    }
-
-    void SetParent(entity_t entity, entity_t parent = kRoot) override { 
-        entity_t oldParent = m_tree.GetParent(entity);
-        std::lock_guard lock(m_parentChangeMutex);
-        m_parentChangeQueue.push({entity, oldParent, parent});
     }
 };
 

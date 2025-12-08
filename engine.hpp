@@ -7,6 +7,7 @@
 #include "module.hpp"
 #include "content.hpp"
 #include "entity_manager.hpp"
+#include "jobs.hpp"
 
 namespace okami {
     struct SignalExit {};
@@ -30,7 +31,7 @@ namespace okami {
 
         ModuleInterface m_moduleInterface;
 
-        std::shared_ptr<IMessageQueue<SignalExit>> m_exitHandler = nullptr;
+        CountSignalHandler<SignalExit> m_exitHandler;
 
 		std::atomic<bool> m_shouldExit{ false };
 

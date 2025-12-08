@@ -132,20 +132,21 @@ namespace okami {
 
 		// Consumes messages regarding newly loaded resources
 		// These are sent by the IO thread
-		std::shared_ptr<IMessageQueue<OnResourceLoadedMessage<T>>> m_loaded_queue;
+		DefaultSignalHandler<OnResourceLoadedMessage<T>> m_loaded_handler;
 
 		// Consumes messages regarding new resources to be created
-		MessageQueue<std::unique_ptr<ImplPair>> m_new_resources;
+		DefaultSignalHandler<std::unique_ptr<ImplPair>> m_new_resources;
 
 	protected:
 		virtual Expected<std::pair<typename T::Desc, TImpl>> CreateResource(T&& data, std::any userData) = 0;
 
 		Error RegisterImpl(ModuleInterface& mi) override {
 			mi.m_interfaces.Register<IContentManager<T>>(this);
-			m_loaded_queue = mi.m_messages.CreateQueue<OnResourceLoadedMessage<T>>();
+			mi.m_interfaces.RegisterSignalHandler<OnResourceLoadedMessage<T>>(&m_loaded_handler);
 			
 			return {};
 		}
+
         Error StartupImpl(ModuleInterface& mi) override {
 			return {};
 		}
@@ -156,13 +157,13 @@ namespace okami {
 			}
 
 			m_res_to_impl.clear();
-			m_loaded_queue.reset();
+			m_loaded_handler.Clear();
 			m_new_resources.Clear();
 		}
         Error ProcessFrameImpl(Time const&, ModuleInterface& mi) override {
 			return {};
 		}
-        Error MergeImpl() override {
+        Error MergeImpl(ModuleInterface& mi) override {
 			return {};
 		}
 
@@ -183,27 +184,25 @@ namespace okami {
 			Error e;
 
 			// Move everything from the new resources queue to the Resource* -> Impl map
-			while (auto msgOpt = m_new_resources.GetMessage()) {
-				auto& msg = *msgOpt;
+			m_new_resources.Handle([this](std::unique_ptr<ImplPair> msg) {
 				auto implIt = m_res_to_impl.find(&msg->m_resource);
 				if (implIt == m_res_to_impl.end()) {
 					// New resource, add to map
 					m_res_to_impl.emplace_hint(implIt, &msg->m_resource, std::move(msg));
 				}
-			}
+			});
 
 			// Process all just loaded resources
-			while (auto msgOpt = m_loaded_queue->GetMessage()) {
-				auto& msg = *msgOpt;
+			m_loaded_handler.Handle([this, &e, &userData](OnResourceLoadedMessage<T> msg) {
 				if (!msg.m_data) {
 					e += msg.m_data.error();
-					continue;
+					return;
 				}
 
 				auto implIt = m_res_to_impl.find(msg.m_handle.Ptr());
 				if (implIt == m_res_to_impl.end()) {
 					e += OKAMI_ERROR("Loaded resource not found in implementation map");
-					continue;
+					return;
 				}
 
 				auto& impl = implIt->second;
@@ -211,13 +210,13 @@ namespace okami {
 				auto result = CreateResource(std::move(*msg.m_data), userData);
 				if (!result) {
 					e += result.error();
-					continue;
+					return;
 				}
 
 				impl->m_impl = std::move(result->second);
 				msg.m_handle.Ptr()->m_desc = std::move(result->first);
 				msg.m_handle.Ptr()->m_loaded.store(true, std::memory_order_release);
-			}
+			});
 
 			return e;
 		}
@@ -260,7 +259,7 @@ namespace okami {
 			auto impl = std::make_unique<ImplPair>();
 			auto res = ResHandle<T>(&impl->m_resource);
 			m_new_resources.Send(std::move(impl));
-			m_loaded_queue->Send(OnResourceLoadedMessage<T>{
+			m_loaded_handler.Send(OnResourceLoadedMessage<T>{
 				.m_data = std::move(data),
 				.m_handle = res,
 			});

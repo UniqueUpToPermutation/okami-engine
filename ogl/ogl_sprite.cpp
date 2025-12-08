@@ -56,7 +56,7 @@ Error OGLSpriteRenderer::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
     return {};
 }
 
-Error OGLSpriteRenderer::MergeImpl() {
+Error OGLSpriteRenderer::MergeImpl(ModuleInterface&) {
     return {};
 }
 

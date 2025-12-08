@@ -88,14 +88,14 @@ Error EngineModule::ProcessFrame(Time const& t, ModuleInterface& a) {
     return {};
 }
 
-Error EngineModule::Merge() {
+Error EngineModule::Merge(ModuleInterface& a) {
     OKAMI_ASSERT(b_started, "Module must be started before processing frames");
 
-    Error e = MergeImpl();
+    Error e = MergeImpl(a);
     OKAMI_ERROR_RETURN(e);
 
     for (auto& mod : m_submodules) {
-        e += mod->Merge();
+        e += mod->Merge(a);
         OKAMI_ERROR_RETURN(e);
     }
     return {};

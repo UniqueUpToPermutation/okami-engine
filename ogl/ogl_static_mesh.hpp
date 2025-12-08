@@ -31,7 +31,7 @@ namespace okami {
         void ShutdownImpl(ModuleInterface&) override;
 
         Error ProcessFrameImpl(Time const&, ModuleInterface&) override;
-        Error MergeImpl() override;
+        Error MergeImpl(ModuleInterface&) override;
     
     public:
         OGLStaticMeshRenderer(OGLGeometryManager* geometryManager);

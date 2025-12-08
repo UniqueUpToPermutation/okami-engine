@@ -52,6 +52,11 @@ namespace okami {
     template <typename T>
     concept CopyableMessage = std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>;
 
+    // Make a concept for copyable messages
+    template <typename T>
+    concept MoveableSignal = std::is_move_constructible_v<T> && std::is_move_assignable_v<T>;
+
+
     template <CopyableMessage T>
     struct MessagePort {
         std::shared_mutex m_mutex;
@@ -163,6 +168,23 @@ namespace okami {
                 PortOut<msg_t> port;
                 port.m_lane = GetLane<msg_t>();
                 return port;
+            }
+        }
+
+        template <CopyableMessage T>
+        PortOut<T> CreatePortOut() {
+            return CreatePort<PortOut<T>>();
+        }
+
+        template <CopyableMessage T>
+        PortIn<T> CreatePortIn() {
+            return CreatePort<PortIn<T>>();
+        }
+
+        template <CopyableMessage T>
+        void Handle(std::invocable<T const&> auto&& handler) {
+            if (auto lane = GetLane<T>()) {
+                lane->Handle(handler);
             }
         }
     };

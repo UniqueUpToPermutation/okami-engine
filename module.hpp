@@ -9,77 +9,56 @@
 
 #include "common.hpp"
 #include "log.hpp"
+#include "jobs.hpp"
 
 namespace okami {
-    template <typename T>
-    class IMessageSink {
+    template <MoveableSignal T>
+    class ISignalHandler {
     public:
+        virtual ~ISignalHandler() = default;
+
+        // Should be thread safe
         virtual void Send(T message) = 0;
-        virtual ~IMessageSink() = default;
     };
 
-    template <typename T>
-    class IMessageQueue : public IMessageSink<T> {
-    public:
-        virtual std::optional<T> GetMessage() = 0;
-        virtual ~IMessageQueue() = default;
-    };
+    template <MoveableSignal T>
+    class DefaultSignalHandler : public ISignalHandler<T> {
+    private:
+        std::mutex m_mutex;
+        std::queue<T> m_messages;
 
-    template <typename T>
-    class MessageQueue final : 
-        public IMessageQueue<T>
-    {
     public:
-        std::optional<T> GetMessage() override {
-            std::lock_guard<std::mutex> lock(m_mtx);
-            if (!m_messages.empty()) {
-                T msg = std::move(m_messages.front());
-                m_messages.pop();
-                return msg;
-            }
-            return std::nullopt;
-        }
-
         void Send(T message) override {
-            std::lock_guard<std::mutex> lock(m_mtx);
+            std::lock_guard lock(m_mutex);
             m_messages.push(std::move(message));
         }
 
-        void Clear() {
-            std::lock_guard<std::mutex> lock(m_mtx);
-            std::queue<T> empty;
-            std::swap(m_messages, empty);
-        }
-
-    private:
-        std::mutex m_mtx;
-        std::queue<T> m_messages;
-    };
-
-    class MessageBus final {
-    public:
-        template <typename T>
-        std::shared_ptr<IMessageQueue<T>> CreateQueue() {
-            auto queue = std::make_shared<MessageQueue<T>>();
-            sinks.emplace(typeid(T), static_cast<std::shared_ptr<IMessageSink<T>>>(queue));
-            return queue;
-        }
-
-        template <typename T>
-        void Send(T message) {
-            auto range = sinks.equal_range(typeid(T));
-            for (auto it = range.first; it != range.second; ++it) {
-                auto sink = std::any_cast<std::shared_ptr<IMessageSink<T>>>(it->second);
-                if (sink) {
-                    sink->Send(std::move(message));
-                } else {
-                    
-                }
+        void Handle(std::invocable<T> auto&& handler) {
+            std::lock_guard lock(m_mutex);
+            while (!m_messages.empty()) {
+                handler(std::move(m_messages.front()));
+                m_messages.pop();
             }
         }
 
-    private:
-        std::unordered_multimap<std::type_index, std::any> sinks;
+        void Clear() {
+            Handle([](T) {});
+        }
+    };
+
+    // Counts the number of times a message has been received
+    template <MoveableSignal T>
+    class CountSignalHandler : public ISignalHandler<T> {
+    public:
+        std::atomic<size_t> m_count{ 0 };
+
+        void Send(T message) override {
+            m_count += 1;
+        }
+
+        size_t FetchAndReset() {
+            return m_count.exchange(0);
+        }
     };
 
     class InterfaceCollection final {
@@ -108,12 +87,27 @@ namespace okami {
         auto cbegin() const;
         auto cend() const;
 
+        template <MoveableSignal T>
+        void RegisterSignalHandler(ISignalHandler<T>* handler) {
+            Register<ISignalHandler<T>>(handler);
+        }
+
+        template <MoveableSignal T>
+        void SendSignal(T message) const {
+            auto handler = Query<ISignalHandler<T>>();
+            if (handler) {
+                handler->Send(std::move(message));
+            } else {
+                OKAMI_LOG_WARNING("No signal handler registered for message type: " + std::string{typeid(T).name()});
+            }
+        }
+
     protected:
         std::unordered_map<std::type_index, std::any> m_interfaces;
     };
 
     struct ModuleInterface {
-        MessageBus m_messages;
+        MessageBus2 m_messages;
         InterfaceCollection m_interfaces;
     };
 
@@ -148,7 +142,7 @@ namespace okami {
         virtual void ShutdownImpl(ModuleInterface&) = 0;
 
         virtual Error ProcessFrameImpl(Time const&, ModuleInterface&) = 0;
-        virtual Error MergeImpl() = 0;
+        virtual Error MergeImpl(ModuleInterface&) = 0;
 
     public:
 		auto begin();
@@ -175,7 +169,7 @@ namespace okami {
         Error Register(ModuleInterface& a);
         Error Startup(ModuleInterface& a);
         Error ProcessFrame(Time const& t, ModuleInterface& a);
-        Error Merge();
+        Error Merge(ModuleInterface& a);
 
         void Shutdown(ModuleInterface& a);
 
@@ -197,7 +191,7 @@ namespace okami {
         void ShutdownImpl(ModuleInterface&) override { }
 
         virtual Error ProcessFrameImpl(Time const&, ModuleInterface&) override { return {}; }
-        virtual Error MergeImpl() override { return {}; }
+        virtual Error MergeImpl(ModuleInterface&) override { return {}; }
 
 		std::string GetName() const override;
     };
