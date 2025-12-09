@@ -49,7 +49,7 @@ Engine::Engine(EngineParams params) :
 
 entity_t Engine::CreateEntity(entity_t parent) {
     if (m_entityManager) {
-		auto port = m_moduleInterface.m_messages.CreatePortOut<EntityCreateSignal>();
+		auto port = m_messages.CreatePortOut<EntityCreateSignal>();
         return m_entityManager->CreateEntity(port, parent);
     } else {
         throw std::runtime_error("No IEntityManager available in Engine. Call Startup first!");
@@ -57,11 +57,11 @@ entity_t Engine::CreateEntity(entity_t parent) {
 }
 
 void Engine::RemoveEntity(entity_t entity) {
-	m_moduleInterface.m_messages.Send(EntityRemoveSignal{entity});
+	m_messages.Send(EntityRemoveSignal{entity});
 }
 
 void Engine::SetActiveCamera(entity_t e) {
-	auto* renderer = m_moduleInterface.m_interfaces.Query<IRenderer>();
+	auto* renderer = m_interfaces.Query<IRenderer>();
 	if (renderer) {
 		renderer->SetActiveCamera(e);
 	}
@@ -72,23 +72,32 @@ Engine::~Engine() {
 	google::ShutdownGoogleLogging();
 }
 
+InitContext Engine::GetInitContext() {
+	return InitContext{
+		.m_messages = m_messages,
+		.m_interfaces = m_interfaces
+	};
+}
+
 Error Engine::Startup() {
 	LOG(INFO) << "Starting Okami Engine";
 
-	m_moduleInterface.m_interfaces.RegisterSignalHandler<SignalExit>(&m_exitHandler);
+	m_interfaces.RegisterSignalHandler<SignalExit>(&m_exitHandler);
+
+	auto initContext = GetInitContext();
 
     Error e;
-    e += m_ioModules.Register(m_moduleInterface);
-    e += m_updateModules.Register(m_moduleInterface);
-    e += m_renderModules.Register(m_moduleInterface);
+    e += m_ioModules.Register(m_interfaces);
+    e += m_updateModules.Register(m_interfaces);
+    e += m_renderModules.Register(m_interfaces);
     OKAMI_ERROR_RETURN(e);
 
-    m_entityManager = m_moduleInterface.m_interfaces.Query<IEntityManager>();
+    m_entityManager = m_interfaces.Query<IEntityManager>();
 	OKAMI_ERROR_RETURN_IF(!m_entityManager, "No IEntityManager registered after registering modules");
 
-    e += m_ioModules.Startup(m_moduleInterface);
-    e += m_updateModules.Startup(m_moduleInterface);
-    e += m_renderModules.Startup(m_moduleInterface);
+    e += m_ioModules.Startup(initContext);
+    e += m_updateModules.Startup(initContext);
+    e += m_renderModules.Startup(initContext);
     OKAMI_ERROR_RETURN(e);
 
 	return {};
@@ -97,9 +106,11 @@ Error Engine::Startup() {
 void Engine::Shutdown() {
 	LOG(INFO) << "Shutting down Okami Engine";
 
-    m_renderModules.Shutdown(m_moduleInterface);
-    m_updateModules.Shutdown(m_moduleInterface);
-    m_ioModules.Shutdown(m_moduleInterface);
+	auto initContext = GetInitContext();
+
+    m_renderModules.Shutdown(initContext);
+    m_updateModules.Shutdown(initContext);
+    m_ioModules.Shutdown(initContext);
 }
 
 struct FrameTimeEstimator {
@@ -153,24 +164,55 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 
 	std::optional<size_t> maxFrames = runFrameCount;
 
+	ExecutionContext ioExecContext{
+		.m_graph = nullptr,
+		.m_messages = nullptr,
+		.m_interfaces = m_interfaces,
+	};
+
+	ExecutionContext updateExecContext{
+		.m_graph = nullptr,
+		.m_messages = &m_messages,
+		.m_interfaces = m_interfaces,
+	};
+
+	ExecutionContext renderExecContext{
+		.m_graph = nullptr,
+		.m_messages = &m_messages,
+		.m_interfaces = m_interfaces,
+	};
+
+	MergeContext mergeContext{
+		.m_messages = m_messages,
+		.m_interfaces = m_interfaces,
+	};
+
+	// IO modules process first to stage any initial data
+	m_ioModules.ProcessFrame(Time{}, ioExecContext);
+
 	FrameTimeEstimator timeEstimator;
+	DefaultJobGraphExecutor executor;
 
 	while (!shouldExit) {
 		auto time = timeEstimator.GetTime();
 
 		// Merge staged changes for this frame
-		m_ioModules.Merge(m_moduleInterface);
-		m_updateModules.Merge(m_moduleInterface);
-		m_renderModules.Merge(m_moduleInterface);
+		m_updateModules.Merge(mergeContext);
+		m_renderModules.Merge(mergeContext);
 
 		// Clear message bus for this frame
-		m_moduleInterface.m_messages.Clear();
+		m_messages.Clear();
 
 		// Update frame and render
 		// Stage changes for next frame
-        m_ioModules.ProcessFrame(time, m_moduleInterface);
-		m_updateModules.ProcessFrame(time, m_moduleInterface);
-        m_renderModules.ProcessFrame(time, m_moduleInterface);
+        m_ioModules.ProcessFrame(time, ioExecContext);
+        m_renderModules.ProcessFrame(time, renderExecContext);
+
+		// Execute the update job graph
+		JobGraph updateJobGraph;
+		updateExecContext.m_graph = &updateJobGraph;
+		m_updateModules.ProcessFrame(time, updateExecContext);
+		executor.Execute(updateJobGraph, m_messages);
 
 		timeEstimator = timeEstimator.Step();
 
@@ -185,27 +227,27 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 }
 
 void Engine::AddScript(
-	std::function<void(Time const&, ModuleInterface&)> script, 
+	std::function<void(Time const&, ExecutionContext const&)> script, 
 	std::string_view name) {
 	CreateUpdateModule([script = std::move(script), name = std::string{name}]() {
 		class ScriptModule : public EngineModule {
 		private:
-			std::function<void(Time const&, ModuleInterface&)> m_script;
+			std::function<void(Time const&, ExecutionContext const&)> m_script;
 			std::string m_name;
 		protected:
-			Error RegisterImpl(ModuleInterface&) override { return {}; }
-			Error StartupImpl(ModuleInterface&) override { return {}; }
-			void ShutdownImpl(ModuleInterface&) override { }
+			Error RegisterImpl(InterfaceCollection&) override { return {}; }
+			Error StartupImpl(InitContext const&) override { return {}; }
+			void ShutdownImpl(InitContext const&) override { }
 
-			Error ProcessFrameImpl(Time const& t, ModuleInterface& mi) override {
-				m_script(t, mi);
+			Error ProcessFrameImpl(Time const& t, ExecutionContext const& ec) override {
+				m_script(t, ec);
 				return {};
 			}
-			Error MergeImpl(ModuleInterface& a) override { return {}; }
+			Error MergeImpl(MergeContext const& a) override { return {}; }
 
 		public:
 			ScriptModule(
-				std::function<void(Time const&, ModuleInterface&)> script,
+				std::function<void(Time const&, ExecutionContext const&)> script,
 				std::string name)
 				: m_script(std::move(script)), m_name(std::move(name)) {}
 
@@ -215,5 +257,5 @@ void Engine::AddScript(
 		};
 
 		return std::make_unique<ScriptModule>(script, name);
-	})->Startup(m_moduleInterface);
+	})->Startup(GetInitContext());
 }

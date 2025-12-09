@@ -125,7 +125,7 @@ namespace okami {
 	public:
 		virtual ~IRenderModule() = default;
 
-		virtual Error Pass(Time const& time, ModuleInterface& mi, RenderPassInfo info) = 0;
+		virtual Error Pass(Time const& time, InterfaceCollection& ic, RenderPassInfo info) = 0;
 	};
 
 	struct RendererParams {

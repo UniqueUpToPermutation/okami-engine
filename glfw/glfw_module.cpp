@@ -57,15 +57,15 @@ public:
     }
 
 protected:
-    Error RegisterImpl(ModuleInterface& mi) override {
-        mi.m_interfaces.Register<INativeWindowProvider>(this);
-        mi.m_interfaces.Register<IGLProvider>(this);
-        RegisterConfig<WindowConfig>(mi.m_interfaces, LOG_WRAP(WARNING));
+    Error RegisterImpl(InterfaceCollection& interfaces) override {
+        interfaces.Register<INativeWindowProvider>(this);
+        interfaces.Register<IGLProvider>(this);
+        RegisterConfig<WindowConfig>(interfaces, LOG_WRAP(WARNING));
         return {};
     }
 
-    Error StartupImpl(ModuleInterface& mi) override {
-        m_config = ReadConfig<WindowConfig>(mi.m_interfaces, LOG_WRAP(WARNING));
+    Error StartupImpl(InitContext const& context) override {
+        m_config = ReadConfig<WindowConfig>(context.m_interfaces, LOG_WRAP(WARNING));
 
         glfwSetErrorCallback(glfw_errorCallback);
         
@@ -95,7 +95,7 @@ protected:
         return {};
     }
 
-    void ShutdownImpl(ModuleInterface&) override {
+    void ShutdownImpl(InitContext const& context) override {
         if (m_window) {
             glfwDestroyWindow(m_window);
             m_window = nullptr;
@@ -104,17 +104,17 @@ protected:
         glfwTerminate();
     }
 
-    Error ProcessFrameImpl(Time const&, ModuleInterface& mi) override {
+    Error ProcessFrameImpl(Time const&, ExecutionContext const& context) override {
         glfwPollEvents();
 
         if (glfwWindowShouldClose(m_window)) {
-            mi.m_interfaces.SendSignal(SignalExit{});
+            context.m_interfaces.SendSignal(SignalExit{});
         }
 
         return {};
     }
 
-    Error MergeImpl(ModuleInterface& a) override {
+    Error MergeImpl(MergeContext const& context) override {
         return {};
     }
 

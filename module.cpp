@@ -42,7 +42,7 @@ auto EngineModule::end() { return m_submodules.end(); }
 auto EngineModule::begin() const { return m_submodules.begin(); }
 auto EngineModule::end() const { return m_submodules.end(); }
 
-Error EngineModule::Register(ModuleInterface& a) {
+Error EngineModule::Register(InterfaceCollection& a) {
     Error e = RegisterImpl(a);
     OKAMI_ERROR_RETURN(e); 
 
@@ -53,7 +53,7 @@ Error EngineModule::Register(ModuleInterface& a) {
     return {};
 }
 
-Error EngineModule::Startup(ModuleInterface& a) {
+Error EngineModule::Startup(InitContext const& a) {
     LOG(INFO) << "Starting " << GetName() << "...\n";
 
     Error e = StartupImpl(a);
@@ -71,7 +71,7 @@ Error EngineModule::Startup(ModuleInterface& a) {
     return {};
 }
 
-Error EngineModule::ProcessFrame(Time const& t, ModuleInterface& a) {
+Error EngineModule::ProcessFrame(Time const& t, ExecutionContext const& a) {
     OKAMI_ASSERT(b_started, "Module must be started before processing frames");
 
     Error e = ProcessFrameImpl(t, a);
@@ -88,7 +88,7 @@ Error EngineModule::ProcessFrame(Time const& t, ModuleInterface& a) {
     return {};
 }
 
-Error EngineModule::Merge(ModuleInterface& a) {
+Error EngineModule::Merge(MergeContext const& a) {
     OKAMI_ASSERT(b_started, "Module must be started before processing frames");
 
     Error e = MergeImpl(a);
@@ -101,7 +101,7 @@ Error EngineModule::Merge(ModuleInterface& a) {
     return {};
 }
 
-void EngineModule::Shutdown(ModuleInterface& a) {
+void EngineModule::Shutdown(InitContext const& a) {
     if (b_shutdown) {
         return;
     }

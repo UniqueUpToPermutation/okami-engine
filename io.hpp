@@ -12,26 +12,26 @@ namespace okami {
     protected:
         virtual OnResourceLoadedSignal<T> LoadResource(LoadResourceSignal<T>&& msg) = 0;
 
-        Error RegisterImpl(ModuleInterface& mi) override {
-            mi.m_interfaces.RegisterSignalHandler<LoadResourceSignal<T>>(&m_load_handler);
+        Error RegisterImpl(InterfaceCollection& interfaces) override {
+            interfaces.RegisterSignalHandler<LoadResourceSignal<T>>(&m_load_handler);
             return {};
         }
-        Error StartupImpl(ModuleInterface&) override {
+        Error StartupImpl(InitContext const&) override {
             return {};
         }
-        void ShutdownImpl(ModuleInterface&) override {
+        void ShutdownImpl(InitContext const&) override {
         }
 
-        Error ProcessFrameImpl(Time const&, ModuleInterface& mi) override {
-            m_load_handler.Handle([this, &mi](LoadResourceSignal<T> const& msg) {
+        Error ProcessFrameImpl(Time const&, ExecutionContext const& a) override {
+            m_load_handler.Handle([this, &a](LoadResourceSignal<T> const& msg) {
                 auto result = LoadResource(LoadResourceSignal<T>{msg});
-                mi.m_interfaces.SendSignal(std::move(result));
+                a.m_interfaces.SendSignal(std::move(result));
             });
 
             return {};
         }
 
-        Error MergeImpl(ModuleInterface& a) override {
+        Error MergeImpl(MergeContext const& a) override {
             return {};
         }
 

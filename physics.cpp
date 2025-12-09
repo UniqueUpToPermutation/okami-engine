@@ -10,22 +10,22 @@ private:
     StorageModule<Transform>* m_transformStorage = nullptr;
 
 protected:
-    Error RegisterImpl(ModuleInterface& mi) override {
+    Error RegisterImpl(InterfaceCollection& interfaces) override {
         return {};
     }
 
-    Error StartupImpl(ModuleInterface&) override {
+    Error StartupImpl(InitContext const& context) override {
         return {};
     }
 
-    void ShutdownImpl(ModuleInterface&) override {
+    void ShutdownImpl(InitContext const& context) override {
     }
 
-    Error ProcessFrameImpl(Time const& t, ModuleInterface&) override {
+    Error ProcessFrameImpl(Time const& t, ExecutionContext const& context) override {
         return {};
     }
 
-    Error MergeImpl(ModuleInterface&) override {
+    Error MergeImpl(MergeContext const& context) override {
         return {};
     }
 

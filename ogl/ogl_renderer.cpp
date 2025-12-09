@@ -38,15 +38,15 @@ private:
     IComponentView<Transform>* m_transformView = nullptr;
 
 protected:
-    Error RegisterImpl(ModuleInterface& mi) override {
-        mi.m_interfaces.Register<IRenderer>(this);
-        mi.m_interfaces.Register<IGLShaderCache>(m_shaderCache.get());
-        RegisterConfig<RendererConfig>(mi.m_interfaces, LOG_WRAP(WARNING));
+    Error RegisterImpl(InterfaceCollection& interfaces) override {
+        interfaces.Register<IRenderer>(this);
+        interfaces.Register<IGLShaderCache>(m_shaderCache.get());
+        RegisterConfig<RendererConfig>(interfaces, LOG_WRAP(WARNING));
 
-        m_glProvider = mi.m_interfaces.Query<IGLProvider>();
+        m_glProvider = interfaces.Query<IGLProvider>();
         OKAMI_ERROR_RETURN_IF(!m_glProvider, "IGLProvider interface not available for OpenGL renderer");
 
-        m_transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
+        m_transformView = interfaces.Query<IComponentView<Transform>>();
         OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OpenGL renderer");
 
         m_glProvider->NotifyNeedGLContext();
@@ -54,7 +54,7 @@ protected:
         return {};
     }
 
-    Error StartupImpl(ModuleInterface& mi) override {
+    Error StartupImpl(InitContext const& context) override {
         int version = gladLoadGL(m_glProvider->GetGLLoaderFunction());
 
         OKAMI_ERROR_RETURN_IF(version == 0, "Failed to initialize OpenGL context via GLAD");
@@ -64,7 +64,7 @@ protected:
         return {};
     }
 
-    void ShutdownImpl(ModuleInterface&) override {
+    void ShutdownImpl(InitContext const& context) override {
     }
 
     glsl::SceneGlobals GetSceneGlobals() {
@@ -97,7 +97,7 @@ protected:
         };
     }
 
-    Error ProcessFrameImpl(Time const&, ModuleInterface&) override {
+    Error ProcessFrameImpl(Time const&, ExecutionContext const& context) override {
         // Upload textures and geometry created this frame
         m_textureManager->ProcessNewResources({});
         m_geometryManager->ProcessNewResources({});
@@ -121,7 +121,7 @@ protected:
         return {};
     }
 
-    Error MergeImpl(ModuleInterface&) override {
+    Error MergeImpl(MergeContext const& context) override {
         return {};
     }
 

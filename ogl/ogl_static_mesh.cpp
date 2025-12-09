@@ -4,17 +4,17 @@
 
 using namespace okami;
 
-Error OGLStaticMeshRenderer::RegisterImpl(ModuleInterface& mi) {
+Error OGLStaticMeshRenderer::RegisterImpl(InterfaceCollection& interfaces) {
     m_geometryManager->SetStaticMeshVSInput(glsl::__get_vs_input_infoStaticMeshVertex());
 
     return {};
 }
 
-Error OGLStaticMeshRenderer::StartupImpl(ModuleInterface& mi) {
-    auto* cache = mi.m_interfaces.Query<IGLShaderCache>();
+Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
+    auto* cache = context.m_interfaces.Query<IGLShaderCache>();
     OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLSpriteRenderer");
 
-    m_transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
+    m_transformView = context.m_interfaces.Query<IComponentView<Transform>>();
     OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OGLSpriteRenderer");
 
     // Create shader program with vertex, geometry, and fragment shaders
@@ -40,15 +40,15 @@ Error OGLStaticMeshRenderer::StartupImpl(ModuleInterface& mi) {
     return {};
 }
 
-void OGLStaticMeshRenderer::ShutdownImpl(ModuleInterface& mi) {
+void OGLStaticMeshRenderer::ShutdownImpl(InitContext const& context) {
 
 }
 
-Error OGLStaticMeshRenderer::ProcessFrameImpl(Time const&, ModuleInterface&) {
+Error OGLStaticMeshRenderer::ProcessFrameImpl(Time const&, ExecutionContext const& context) {
     return {};
 }
 
-Error OGLStaticMeshRenderer::MergeImpl(ModuleInterface&) {
+Error OGLStaticMeshRenderer::MergeImpl(MergeContext const& context) {
     return {};
 }
 

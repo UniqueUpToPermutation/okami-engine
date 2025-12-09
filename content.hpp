@@ -94,7 +94,7 @@ namespace okami {
         virtual ResHandle<T> Load(
 			const std::filesystem::path& path,
 			typename T::LoadParams params,
-			ModuleInterface& mi) = 0;
+			InterfaceCollection& mi) = 0;
         virtual ResHandle<T> Create(T&& data) = 0;
     };
 
@@ -141,17 +141,17 @@ namespace okami {
 	protected:
 		virtual Expected<std::pair<typename T::Desc, TImpl>> CreateResource(T&& data, std::any userData) = 0;
 
-		Error RegisterImpl(ModuleInterface& mi) override {
-			mi.m_interfaces.Register<IContentManager<T>>(this);
-			mi.m_interfaces.RegisterSignalHandler<OnResourceLoadedSignal<T>>(&m_loaded_handler);
+		Error RegisterImpl(InterfaceCollection& ic) override {
+			ic.Register<IContentManager<T>>(this);
+			ic.RegisterSignalHandler<OnResourceLoadedSignal<T>>(&m_loaded_handler);
 			
 			return {};
 		}
 
-        Error StartupImpl(ModuleInterface& mi) override {
+        Error StartupImpl(InitContext const& ic) override {
 			return {};
 		}
-        void ShutdownImpl(ModuleInterface& mi) override {
+        void ShutdownImpl(InitContext const& ic) override {
 			{
 				std::lock_guard<std::mutex> lock(m_path_mtx);
 				m_path_to_res.clear();
@@ -161,10 +161,10 @@ namespace okami {
 			m_loaded_handler.Clear();
 			m_new_resources.Clear();
 		}
-        Error ProcessFrameImpl(Time const&, ModuleInterface& mi) override {
+        Error ProcessFrameImpl(Time const&, ExecutionContext const& ec) override {
 			return {};
 		}
-        Error MergeImpl(ModuleInterface& mi) override {
+        Error MergeImpl(MergeContext const& mc) override {
 			return {};
 		}
 
@@ -225,7 +225,7 @@ namespace okami {
 		ResHandle<T> Load(
 			const std::filesystem::path& path,
 			typename T::LoadParams params,
-			ModuleInterface& mi) override {
+			InterfaceCollection& ic) override {
 			
 			std::unique_ptr<ImplPair> impl;
 
@@ -247,7 +247,7 @@ namespace okami {
 			auto res = ResHandle<T>(&impl->m_resource);
 
 			// Ask IO thread to load the resource data
-			mi.m_interfaces.SendSignal(LoadResourceSignal<T>{
+			ic.SendSignal(LoadResourceSignal<T>{
 				.m_path = path,
 				.m_params = std::move(params),
 				.m_handle = res,

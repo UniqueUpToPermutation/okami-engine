@@ -20,12 +20,12 @@ namespace okami {
         StorageModule<DummyTriangleComponent>* m_storage = nullptr;
         IComponentView<Transform>* m_transformView = nullptr;
 
-        Error RegisterImpl(ModuleInterface&) override;
-        Error StartupImpl(ModuleInterface&) override;
-        void ShutdownImpl(ModuleInterface&) override;
+        Error RegisterImpl(InterfaceCollection&) override;
+        Error StartupImpl(InitContext const&) override;
+        void ShutdownImpl(InitContext const&) override;
 
-        Error ProcessFrameImpl(Time const&, ModuleInterface&) override;
-        Error MergeImpl(ModuleInterface&) override;
+        Error ProcessFrameImpl(Time const&, ExecutionContext const&) override;
+        Error MergeImpl(MergeContext const&) override;
     
     public:
         OGLTriangleRenderer();

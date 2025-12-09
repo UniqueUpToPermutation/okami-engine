@@ -7,15 +7,15 @@
 
 using namespace okami;
 
-Error OGLSpriteRenderer::RegisterImpl(ModuleInterface& mi) {
+Error OGLSpriteRenderer::RegisterImpl(InterfaceCollection& interfaces) {
     return {};
 }
 
-Error OGLSpriteRenderer::StartupImpl(ModuleInterface& mi) {
-    auto* cache = mi.m_interfaces.Query<IGLShaderCache>();
+Error OGLSpriteRenderer::StartupImpl(InitContext const& context) {
+    auto* cache = context.m_interfaces.Query<IGLShaderCache>();
     OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLSpriteRenderer");
 
-    m_transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
+    m_transformView = context.m_interfaces.Query<IComponentView<Transform>>();
     OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OGLSpriteRenderer");
 
     // Create shader program with vertex, geometry, and fragment shaders
@@ -48,15 +48,15 @@ Error OGLSpriteRenderer::StartupImpl(ModuleInterface& mi) {
     return {};
 }
 
-void OGLSpriteRenderer::ShutdownImpl(ModuleInterface& mi) {
+void OGLSpriteRenderer::ShutdownImpl(InitContext const& context) {
     // OpenGL resources are automatically cleaned up by RAII wrappers
 }
 
-Error OGLSpriteRenderer::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
+Error OGLSpriteRenderer::ProcessFrameImpl(Time const&, ExecutionContext const& context) {
     return {};
 }
 
-Error OGLSpriteRenderer::MergeImpl(ModuleInterface&) {
+Error OGLSpriteRenderer::MergeImpl(MergeContext const& context) {
     return {};
 }
 

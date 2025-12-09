@@ -69,17 +69,21 @@ int main() {
     en.AddComponent(e7, StaticMeshComponent{ geometryHandle });
     en.AddComponent(e7, Transform::Translate(0.5f, 0.1f, 0.1f) * Transform::Scale(0.25f));
 
-    en.AddScript([e2, e3](Time const& t, ModuleInterface& mi) {
-        static double angle = 0.0f;
-        angle += t.m_deltaTime;
-
-        mi.m_messages.Send(UpdateComponentSignal<Transform>{
-            e3, Transform::LookAt(
-                glm::vec3(sin(angle), -1.0f, cos(angle)),
-                glm::vec3(0.0f, 0.0f, 0.0f),
-                glm::vec3(0.0f, 1.0f, 0.0f)
-            )
-        });
+    en.AddScript([e2, e3](Time const& t, ExecutionContext const& context) {
+        context.m_graph->AddMessageNode([t, e3](JobContext& ctx, PortOut<UpdateComponentSignal<Transform>>& outTransform) -> Error {
+            static double angle = 0.0f;
+            angle += t.m_deltaTime;
+            
+            Transform newTransform = Transform::RotateY(static_cast<float>(angle)) * Transform::Translate(0.0f, 0.0f, 0.0f);
+            outTransform.Send(UpdateComponentSignal<Transform>{
+                e3, Transform::LookAt(
+                    glm::vec3(sin(angle), -1.0f, cos(angle)),
+                    glm::vec3(0.0f, 0.0f, 0.0f),
+                    glm::vec3(0.0f, 1.0f, 0.0f)
+                )
+            });
+            return {};
+        }, {});
     });
 
     en.Run();

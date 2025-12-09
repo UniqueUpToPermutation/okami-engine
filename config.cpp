@@ -246,13 +246,13 @@ public:
 	}
 
 protected:
-	Error RegisterImpl(ModuleInterface& a) override {
-        a.m_interfaces.Register<IConfigModule>(this);
+	Error RegisterImpl(InterfaceCollection& interfaces) override {
+        interfaces.Register<IConfigModule>(this);
 
         return {};
 	}
 
-	Error StartupImpl(ModuleInterface& a) override {
+	Error StartupImpl(InitContext const& a) override {
         YAML::Node config;
         
         try {
@@ -292,17 +292,17 @@ protected:
 		return {};
 	}
 
-	void ShutdownImpl(ModuleInterface& a) override {
+	void ShutdownImpl(InitContext const& a) override {
 	}
 
-    Error ProcessFrameImpl(Time const& t, ModuleInterface& a) override {
+    Error ProcessFrameImpl(Time const& t, ExecutionContext const& a) override {
         m_deserializers.clear();
         m_configs.clear();
 
         return {};
     }
 
-    Error MergeImpl(ModuleInterface& a) override { return {}; }
+    Error MergeImpl(MergeContext const& a) override { return {}; }
 
     void Register(std::string_view name, std::function<std::any(IConfigDeserializer&)> func) override {
 		m_deserializers[name] = func;

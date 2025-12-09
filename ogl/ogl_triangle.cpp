@@ -2,15 +2,15 @@
 
 using namespace okami;
 
-Error OGLTriangleRenderer::RegisterImpl(ModuleInterface& mi) {
+Error OGLTriangleRenderer::RegisterImpl(InterfaceCollection& interfaces) {
     return {};
 }
 
-Error OGLTriangleRenderer::StartupImpl(ModuleInterface& mi) {
-    auto* cache = mi.m_interfaces.Query<IGLShaderCache>();
+Error OGLTriangleRenderer::StartupImpl(InitContext const& context) {
+    auto* cache = context.m_interfaces.Query<IGLShaderCache>();
     OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLTriangleRenderer");
 
-    m_transformView = mi.m_interfaces.Query<IComponentView<Transform>>();
+    m_transformView = context.m_interfaces.Query<IComponentView<Transform>>();
     OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OGLTriangleRenderer");
 
     auto program = CreateProgram(ProgramShaderPaths{
@@ -42,15 +42,15 @@ Error OGLTriangleRenderer::StartupImpl(ModuleInterface& mi) {
     return {};
 }
 
-void OGLTriangleRenderer::ShutdownImpl(ModuleInterface& mi) {
+void OGLTriangleRenderer::ShutdownImpl(InitContext const& context) {
 
 }
 
-Error OGLTriangleRenderer::ProcessFrameImpl(Time const&, ModuleInterface& mi) {
+Error OGLTriangleRenderer::ProcessFrameImpl(Time const&, ExecutionContext const& context) {
     return {};
 }
 
-Error OGLTriangleRenderer::MergeImpl(ModuleInterface&) {
+Error OGLTriangleRenderer::MergeImpl(MergeContext const& context) {
     return {};
 }
 

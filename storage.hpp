@@ -61,37 +61,37 @@ namespace okami {
         std::vector<entity_t> m_added;
 
     protected:
-        Error RegisterImpl(ModuleInterface& mi) override {
-            mi.m_messages.EnsurePort<AddComponentSignal<T>>();
-            mi.m_messages.EnsurePort<UpdateComponentSignal<T>>();
-            mi.m_messages.EnsurePort<RemoveComponentSignal<T>>();
-            mi.m_messages.EnsurePort<EntityRemoveSignal>();
-            mi.m_interfaces.Register<IComponentView<T>>(this);
+        Error RegisterImpl(InterfaceCollection& ic) override {
+            ic.Register<IComponentView<T>>(this);
             return {};
         }
 
-        Error StartupImpl(ModuleInterface& mi) override {
+        Error StartupImpl(InitContext const& ic) override {
+            ic.m_messages.EnsurePort<AddComponentSignal<T>>();
+            ic.m_messages.EnsurePort<UpdateComponentSignal<T>>();
+            ic.m_messages.EnsurePort<RemoveComponentSignal<T>>();
+            ic.m_messages.EnsurePort<EntityRemoveSignal>();
             return {};
         }
 
-        void ShutdownImpl(ModuleInterface& mi) override {
+        void ShutdownImpl(InitContext const& ic) override {
             m_storage.clear();
             m_modified.clear();
             m_removed.clear();
             m_added.clear();
         }
 
-        Error ProcessFrameImpl(Time const&, ModuleInterface&) override {
+        Error ProcessFrameImpl(Time const&, ExecutionContext const& context) override {
             return {};
         }
 
-        Error MergeImpl(ModuleInterface& mi) override {
-            mi.m_messages.Handle<AddComponentSignal<T>>([this](AddComponentSignal<T> const& signal) {
+        Error MergeImpl(MergeContext const& context) override {
+            context.m_messages.Handle<AddComponentSignal<T>>([this](AddComponentSignal<T> const& signal) {
                 m_storage[signal.m_entity] = signal.m_component;
                 m_added.push_back(signal.m_entity);
             });
 
-            mi.m_messages.Handle<UpdateComponentSignal<T>>([this](UpdateComponentSignal<T> const& signal) {
+            context.m_messages.Handle<UpdateComponentSignal<T>>([this](UpdateComponentSignal<T> const& signal) {
                 auto it = m_storage.find(signal.m_entity);
                 if (it != m_storage.end()) {
                     it->second = signal.m_component;
@@ -101,7 +101,7 @@ namespace okami {
                 }
             });
 
-            mi.m_messages.Handle<RemoveComponentSignal<T>>([this](RemoveComponentSignal<T> const& signal) {
+            context.m_messages.Handle<RemoveComponentSignal<T>>([this](RemoveComponentSignal<T> const& signal) {
                 auto it = m_storage.find(signal.m_entity);
                 if (it != m_storage.end()) {
                     m_storage.erase(it);
@@ -111,7 +111,7 @@ namespace okami {
                 }
             });
 
-            mi.m_messages.Handle<EntityRemoveSignal>([this](EntityRemoveSignal const& signal) {
+            context.m_messages.Handle<EntityRemoveSignal>([this](EntityRemoveSignal const& signal) {
                 auto it = m_storage.find(signal.m_entity);
                 if (it != m_storage.end()) {
                     m_storage.erase(it);

@@ -279,19 +279,22 @@ private:
     EntityTree m_tree;
 
 protected:
-    Error RegisterImpl(ModuleInterface& a) override {
-		a.m_messages.EnsurePort<EntityRemoveSignal>();
-		a.m_messages.EnsurePort<EntityCreateSignal>();
-		a.m_messages.EnsurePort<EntityParentChangeSignal>();
-        a.m_interfaces.Register<IEntityManager>(this);
+    Error RegisterImpl(InterfaceCollection& interfaces) override {
+        interfaces.Register<IEntityManager>(this);
         return {};
     }
     
-    Error StartupImpl(ModuleInterface&) override { return {}; }
-    void ShutdownImpl(ModuleInterface&) override { }
+    Error StartupImpl(InitContext const& a) override {
+		a.m_messages.EnsurePort<EntityRemoveSignal>();
+		a.m_messages.EnsurePort<EntityCreateSignal>();
+		a.m_messages.EnsurePort<EntityParentChangeSignal>();
 
-    Error ProcessFrameImpl(Time const& t, ModuleInterface& a) override { return {}; }
-    Error MergeImpl(ModuleInterface& a) override {
+		return {};
+	}
+    void ShutdownImpl(InitContext const&) override { }
+
+    Error ProcessFrameImpl(Time const& t, ExecutionContext const& a) override { return {}; }
+    Error MergeImpl(MergeContext const& a) override {
 		a.m_messages.Handle<EntityCreateSignal>([this](EntityCreateSignal const& msg) {
 			m_tree.AddReservedEntity(msg.m_entity, msg.m_parent);
 		});

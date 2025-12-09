@@ -29,13 +29,16 @@ namespace okami {
         EmptyModule m_updateModules;
         EmptyModule m_renderModules;
 
-        ModuleInterface m_moduleInterface;
+        InterfaceCollection m_interfaces;
+        MessageBus m_messages;
 
         CountSignalHandler<SignalExit> m_exitHandler;
 
 		std::atomic<bool> m_shouldExit{ false };
 
         IEntityManager* m_entityManager = nullptr;
+
+        InitContext GetInitContext();
 
 	public:
 		Error Startup();
@@ -48,7 +51,7 @@ namespace okami {
 
         template <typename T>
         void AddComponent(entity_t entity, T component) {
-            m_moduleInterface.m_messages.Send(AddComponentSignal<T>{entity, std::move(component)});
+            m_messages.Send(AddComponentSignal<T>{entity, std::move(component)});
         }
 
         template <typename FactoryT, typename... TArgs>
@@ -68,26 +71,22 @@ namespace okami {
 
         template <typename T>
         T* QueryInterface() const {
-            return m_moduleInterface.m_interfaces.Query<T>();
-        }
-
-		ModuleInterface& GetModuleInterface() {
-            return m_moduleInterface;
+            return m_interfaces.Query<T>();
         }
 
         template <ResourceType T>
         ResHandle<T> LoadResource(const std::filesystem::path& path, typename T::LoadParams params = {}) {
-            auto* cm = m_moduleInterface.m_interfaces.Query<IContentManager<T>>();
+            auto* cm = m_interfaces.Query<IContentManager<T>>();
             if (!cm) {
                 OKAMI_LOG_ERROR("No IContentManager<" + std::string(typeid(T).name()) + "> registered in Engine");
                 return ResHandle<T>();
             }
-            return cm->Load(path, params, m_moduleInterface);
+            return cm->Load(path, params, m_interfaces);
         }
 
         template <ResourceType T>
         ResHandle<T> CreateResource(T&& data) {
-            auto* cm = m_moduleInterface.m_interfaces.Query<IContentManager<T>>();
+            auto* cm = m_interfaces.Query<IContentManager<T>>();
             if (!cm) {
                 throw std::runtime_error("No IContentManager<" + std::string(typeid(T).name()) + "> registered in Engine");
             }
@@ -95,7 +94,7 @@ namespace okami {
         }
 
         void AddScript(
-            std::function<void(Time const&, ModuleInterface&)> script, 
+            std::function<void(Time const&, ExecutionContext const&)> script, 
             std::string_view name = "Unnamed Script");
 
 		std::filesystem::path GetRenderOutputPath(size_t frameIndex);

@@ -31,12 +31,12 @@ namespace okami {
         IComponentView<Transform>* m_transformView = nullptr;
         OGLTextureManager* m_textureManager = nullptr;
         
-        Error RegisterImpl(ModuleInterface&) override;
-        Error StartupImpl(ModuleInterface&) override;
-        void ShutdownImpl(ModuleInterface&) override;
+        Error RegisterImpl(InterfaceCollection& interfaces) override;
+        Error StartupImpl(InitContext const& context) override;
+        void ShutdownImpl(InitContext const& context) override;
 
-        Error ProcessFrameImpl(Time const&, ModuleInterface&) override;
-        Error MergeImpl(ModuleInterface&) override;
+        Error ProcessFrameImpl(Time const& time, ExecutionContext const& context) override;
+        Error MergeImpl(MergeContext const& context) override;
     
     public:
         OGLSpriteRenderer(OGLTextureManager* textureManager);

@@ -106,9 +106,20 @@ namespace okami {
         std::unordered_map<std::type_index, std::any> m_interfaces;
     };
 
-    struct ModuleInterface {
-        MessageBus m_messages;
-        InterfaceCollection m_interfaces;
+    struct InitContext {
+        MessageBus& m_messages;
+        InterfaceCollection& m_interfaces;
+    };
+
+    struct ExecutionContext {
+        JobGraph* m_graph = nullptr;
+        MessageBus* m_messages = nullptr;
+        InterfaceCollection& m_interfaces;
+    };
+
+    struct MergeContext {
+        MessageBus& m_messages;
+        InterfaceCollection& m_interfaces;
     };
 
     struct Time {
@@ -137,12 +148,13 @@ namespace okami {
             b_children_process_startup = enable;
         }
 
-        virtual Error RegisterImpl(ModuleInterface&) = 0;
-        virtual Error StartupImpl(ModuleInterface&) = 0;
-        virtual void ShutdownImpl(ModuleInterface&) = 0;
+        virtual Error RegisterImpl(InterfaceCollection&) = 0;
 
-        virtual Error ProcessFrameImpl(Time const&, ModuleInterface&) = 0;
-        virtual Error MergeImpl(ModuleInterface&) = 0;
+        virtual Error StartupImpl(InitContext const&) = 0;
+        virtual void ShutdownImpl(InitContext const&) = 0;
+
+        virtual Error ProcessFrameImpl(Time const&, ExecutionContext const&) = 0;
+        virtual Error MergeImpl(MergeContext const&) = 0;
 
     public:
 		auto begin();
@@ -166,12 +178,12 @@ namespace okami {
             return result;
         }
 
-        Error Register(ModuleInterface& a);
-        Error Startup(ModuleInterface& a);
-        Error ProcessFrame(Time const& t, ModuleInterface& a);
-        Error Merge(ModuleInterface& a);
+        Error Register(InterfaceCollection&);
+        Error Startup(InitContext const&);
+        Error ProcessFrame(Time const& t, ExecutionContext const&);
+        Error Merge(MergeContext const&);
 
-        void Shutdown(ModuleInterface& a);
+        void Shutdown(InitContext const& a);
 
         virtual std::string GetName() const = 0;
 
@@ -186,12 +198,12 @@ namespace okami {
         inline EmptyModule(std::string name = "Empty Module") : m_name(name) {}
 
     protected:
-        Error RegisterImpl(ModuleInterface&) override { return {};}
-        Error StartupImpl(ModuleInterface&) override { return {}; }
-        void ShutdownImpl(ModuleInterface&) override { }
+        Error RegisterImpl(InterfaceCollection&) override { return {};}
+        Error StartupImpl(InitContext const&) override { return {}; }
+        void ShutdownImpl(InitContext const&) override { }
 
-        virtual Error ProcessFrameImpl(Time const&, ModuleInterface&) override { return {}; }
-        virtual Error MergeImpl(ModuleInterface&) override { return {}; }
+        virtual Error ProcessFrameImpl(Time const&, ExecutionContext const&) override { return {}; }
+        virtual Error MergeImpl(MergeContext const&) override { return {}; }
 
 		std::string GetName() const override;
     };
