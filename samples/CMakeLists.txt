@@ -75,3 +75,4 @@ function(add_engine_sample TARGET_NAME)
 endfunction()
 
 add_subdirectory(01_hello_world)
+add_subdirectory(02_zoo)
