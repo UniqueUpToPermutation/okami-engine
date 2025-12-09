@@ -60,12 +60,12 @@
             "preLaunchTask": "Build Tests"
         },
         {
-            "name": "Engine (Debug)",
+            "name": "01_hello_world (Debug)",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/out/build/x64-debug/Debug/Engine.exe",
+            "program": "${workspaceFolder}/out/build/x64-debug/samples/01_hello_world/Debug/01_hello_world.exe",
             "args": [],
-            "cwd": "${workspaceFolder}/out/build/x64-debug/Debug",
+            "cwd": "${workspaceFolder}/out/build/x64-debug/samples/01_hello_world/Debug",
             "console": "integratedTerminal",
             "preLaunchTask": "Build All"
         }

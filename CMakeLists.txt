@@ -148,13 +148,6 @@ set(SHADER_ENTRY_POINTS
 )
 
 #==============================================================================
-# Main Engine Executable
-#==============================================================================
-
-# Engine executable only contains main.cpp and links to EngineLib
-add_executable(Engine main.cpp)
-
-#==============================================================================
 # PNG to KTX2 Converter Tool
 #==============================================================================
 
@@ -224,7 +217,7 @@ if(USE_D3D12)
     if(ALL_COMPILED_SHADERS)
         list(LENGTH ALL_COMPILED_SHADERS SHADER_COUNT)
         add_custom_target(CompileShaders ALL DEPENDS ${ALL_COMPILED_SHADERS})
-        add_dependencies(Engine CompileShaders)
+        # add_dependencies(Engine CompileShaders)
         message(STATUS "Created CompileShaders target with ${SHADER_COUNT} shaders")
         message(STATUS "Compiled shaders will be available in: ${CMAKE_BINARY_DIR}/shaders/")
     endif()
@@ -295,7 +288,7 @@ if (USE_OGL)
                 COMMENT "Processing all OpenGL shaders"
             )
             
-            add_dependencies(Engine ProcessOpenGLShaders)
+            # add_dependencies(Engine ProcessOpenGLShaders)
             message(STATUS "Created ProcessOpenGLShaders target with ${OGL_SHADER_COUNT} shaders")
             message(STATUS "Processed OpenGL shaders will be available in: ${CMAKE_BINARY_DIR}/ogl/shaders/")
         endif()
@@ -369,7 +362,7 @@ if(IMAGE_FILES)
             COMMENT "Converting all PNG images to KTX2 format"
         )
         
-        add_dependencies(Engine CompileKTXTextures)
+        # add_dependencies(Engine CompileKTXTextures)
         message(STATUS "Created CompileKTXTextures target with ${KTX_TEXTURE_COUNT} PNG textures")
         message(STATUS "Converted KTX2 textures will be available in: ${CMAKE_BINARY_DIR}/assets/")
         message(STATUS "Note: png2ktx generates uncompressed RGBA8 textures with full mipmap chains")
@@ -377,7 +370,7 @@ if(IMAGE_FILES)
 endif()
 
 # Link Engine executable to EngineLib (all dependencies are handled by EngineLib)
-target_link_libraries(Engine PRIVATE EngineLib)
+# target_link_libraries(Engine PRIVATE EngineLib)
 
 # Create engine library
 
@@ -513,7 +506,7 @@ target_link_libraries(EngineTests PRIVATE
 
 # Set C++ standard for both targets
 if (CMAKE_VERSION VERSION_GREATER 3.12)
-    set_property(TARGET Engine PROPERTY CXX_STANDARD 23)
+    # set_property(TARGET Engine PROPERTY CXX_STANDARD 23)
     set_property(TARGET EngineLib PROPERTY CXX_STANDARD 23)
     set_property(TARGET EngineTests PROPERTY CXX_STANDARD 23)
 endif()
@@ -534,107 +527,17 @@ set_tests_properties(EngineUnitTests PROPERTIES
 # Collect all files in config/ directory
 file(GLOB CONFIG_FILES "${CMAKE_SOURCE_DIR}/config/*")
 
-add_custom_command(
-    TARGET Engine POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Engine>/config
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CONFIG_FILES}
-        $<TARGET_FILE_DIR:Engine>/config/
-    COMMENT "Copying config files to output directory if newer"
-)
-
-if(USE_D3D12 AND ALL_COMPILED_SHADERS)
-    add_custom_command(
-        TARGET Engine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Engine>/d3d12/shaders
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_BINARY_DIR}/d3d12/shaders
-            $<TARGET_FILE_DIR:Engine>/d3d12/shaders
-        COMMENT "Copying compiled shaders to output directory"
-        DEPENDS CompileShaders
-    )
-endif()
-
-# Copy compiled KTX textures to output directory
-if(ALL_KTX_TEXTURES)
-    add_custom_command(
-        TARGET Engine POST_BUILD
-        COMMENT "Copying KTX texture files to Engine output directory"
-    )
-    
-    # Copy all generated KTX files to the Engine assets directory
-    foreach(KTX_FILE ${ALL_KTX_TEXTURES})
-        # Get relative path from build directory to determine target location
-        file(RELATIVE_PATH KTX_REL_PATH ${CMAKE_BINARY_DIR} ${KTX_FILE})
-        
-        # Determine target path - main assets go to assets/, test assets stay in tests/
-        if("${KTX_REL_PATH}" MATCHES "^tests/")
-            # Skip test KTX files for Engine target (they'll be handled by EngineTests)
-        else()
-            get_filename_component(KTX_NAME ${KTX_FILE} NAME)
-            add_custom_command(
-                TARGET Engine POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${KTX_FILE}
-                    $<TARGET_FILE_DIR:Engine>/assets/${KTX_NAME}
-                COMMENT "Copying ${KTX_NAME} to Engine output directory"
-            )
-        endif()
-    endforeach()
-endif()
-
-# Copy .glb files and other assets to output directory
-file(GLOB_RECURSE GLB_FILES 
-    "${CMAKE_SOURCE_DIR}/assets/*.glb"
-)
-file(GLOB_RECURSE OTHER_ASSET_FILES 
-    "${CMAKE_SOURCE_DIR}/assets/*.json"
-    "${CMAKE_SOURCE_DIR}/assets/*.xml"
-    "${CMAKE_SOURCE_DIR}/assets/*.txt"
-    "${CMAKE_SOURCE_DIR}/assets/*.bin"
-)
-
-if(GLB_FILES OR OTHER_ASSET_FILES)
-    add_custom_command(
-        TARGET Engine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Engine>/assets
-        COMMENT "Copying asset files to output directory"
-    )
-    
-    # Copy GLB files
-    foreach(GLB_FILE ${GLB_FILES})
-        get_filename_component(GLB_NAME ${GLB_FILE} NAME)
-        add_custom_command(
-            TARGET Engine POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${GLB_FILE}
-                $<TARGET_FILE_DIR:Engine>/assets/${GLB_NAME}
-            COMMENT "Copying ${GLB_NAME} to output directory"
-        )
-    endforeach()
-    
-    # Copy other asset files
-    foreach(ASSET_FILE ${OTHER_ASSET_FILES})
-        get_filename_component(ASSET_NAME ${ASSET_FILE} NAME)
-        add_custom_command(
-            TARGET Engine POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${ASSET_FILE}
-                $<TARGET_FILE_DIR:Engine>/assets/${ASSET_NAME}
-            COMMENT "Copying ${ASSET_NAME} to output directory"
-        )
-    endforeach()
-endif()
-
 # Copy config files for tests as well
-add_custom_command(
-    TARGET EngineTests POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/config
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CONFIG_FILES}
-        $<TARGET_FILE_DIR:EngineTests>/config/
-    COMMENT "Copying config files to test output directory if newer"
-)
+if(CONFIG_FILES)
+    add_custom_command(
+        TARGET EngineTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/config
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CONFIG_FILES}
+            $<TARGET_FILE_DIR:EngineTests>/config/
+        COMMENT "Copying config files to test output directory if newer"
+    )
+endif()
 
 # Copy compiled KTX textures for tests as well
 if(ALL_KTX_TEXTURES)
@@ -669,6 +572,17 @@ if(ALL_KTX_TEXTURES)
         endif()
     endforeach()
 endif()
+
+# Copy .glb files and other assets to output directory
+file(GLOB_RECURSE GLB_FILES 
+    "${CMAKE_SOURCE_DIR}/assets/*.glb"
+)
+file(GLOB_RECURSE OTHER_ASSET_FILES 
+    "${CMAKE_SOURCE_DIR}/assets/*.json"
+    "${CMAKE_SOURCE_DIR}/assets/*.xml"
+    "${CMAKE_SOURCE_DIR}/assets/*.txt"
+    "${CMAKE_SOURCE_DIR}/assets/*.bin"
+)
 
 # Copy .glb files and other assets for tests as well
 file(GLOB_RECURSE TEST_GLB_FILES 
@@ -785,3 +699,5 @@ message(STATUS "  - run_world_tests: Run World class tests only")
 message(STATUS "  - run_engine_tests: Run Engine class tests only") 
 message(STATUS "  - run_performance_tests: Run performance tests only")
 message(STATUS "Use 'cmake --build . --target <target_name>' to run specific test suites")
+
+add_subdirectory(samples)
