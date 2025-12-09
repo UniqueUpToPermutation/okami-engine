@@ -1,19 +1,9 @@
-#include <iostream>
-#include <unordered_map>
-#include <any>
-#include <typeindex>
-#include <filesystem>
-
-#include "common.hpp"
-#include "module.hpp"
 #include "engine.hpp"
 
 #include "ogl/ogl_renderer.hpp"
 #include "glfw/glfw_module.hpp"
 
-#include "renderer.hpp"
 #include "transform.hpp"
-#include "texture.hpp"
 #include "paths.hpp"
 #include "geometry.hpp"
 
