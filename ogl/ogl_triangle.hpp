@@ -11,6 +11,8 @@ namespace okami {
         public EngineModule,
         public IOGLRenderModule {
     protected:
+        OGLPipelineState m_pipelineState;
+
         GLProgram m_program;
         GLVertexArray m_vao;  // Vertex Array Object
 

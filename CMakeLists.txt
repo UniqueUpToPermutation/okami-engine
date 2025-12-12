@@ -42,6 +42,7 @@ find_package(glog CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(Ktx CONFIG REQUIRED)
+find_package(unofficial-im3d CONFIG REQUIRED)
 
 # tmxlite doesn't provide CMake config, find manually
 find_path(TMXLITE_INCLUDE_DIR tmxlite/Map.hpp PATHS ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/include ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include)
@@ -385,6 +386,7 @@ file(GLOB ENGINE_LIB_SOURCES CONFIGURE_DEPENDS
     "ogl/*.cpp" "ogl/*.hpp"
     "ogl/glad/*.c" "ogl/glad/*.h"
     "glfw/*.cpp" "glfw/*.hpp"
+    "physics/*.cpp" "physics/*.hpp"
 )
 list(REMOVE_ITEM ENGINE_LIB_SOURCES "${CMAKE_SOURCE_DIR}/main.cpp")
 
@@ -438,6 +440,7 @@ target_link_libraries(EngineLib PUBLIC
         yaml-cpp::yaml-cpp
         KTX::ktx
         ${TMXLITE_LIBRARY}
+        unofficial::im3d::im3d
 )
 
 # Add KTX library
@@ -463,6 +466,7 @@ endif()
 
 # Set include directories for the library
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR})
+target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/physics)
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/d3d12)
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/ogl)
 target_include_directories(EngineLib PRIVATE ${TINYGLTF_INCLUDE_DIRS})

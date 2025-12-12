@@ -55,7 +55,11 @@ Error okami::DefaultJobGraphExecutor::Execute(JobGraph& graph, MessageBus& bus) 
         executedCount++;
 
         // Execute the job
-        Error jobErr = node->m_task(context);
+        Error jobErr = {};
+        if (node->m_task) {
+            jobErr = node->m_task(context);
+        }
+
         if (!jobErr.IsOk()) {
             err += jobErr;
             continue; // Continue with other jobs even if one fails?

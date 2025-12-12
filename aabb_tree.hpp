@@ -13,9 +13,9 @@
 namespace okami {
 	constexpr int kInvalidNodeIndex = -1;
 
-	template <typename LeafData>
+	template <typename LeafData, typename AABBType>
 	struct AABBNode {
-		AABB aabb;
+		AABBType aabb;
 		LeafData data;
 		int parent = kInvalidNodeIndex;
 		int left = kInvalidNodeIndex;
@@ -27,21 +27,23 @@ namespace okami {
 	};
 
 	struct DefaultCostFunction {
-		inline float operator()(const AABB& aabb) const {
+		template <typename AABBType>
+		inline float operator()(const AABBType& aabb) const {
 			return SurfaceArea(aabb);
 		}
 	};
 
 	template <
 		typename LeafData = unsigned int,
+		typename AABBType = AABB,
 		typename CostFunction = DefaultCostFunction
 	>
 	class AABBTree {
 	private:
-		Pool<AABBNode<LeafData>> m_nodes;
+		Pool<AABBNode<LeafData, AABBType>> m_nodes;
 		int m_root = kInvalidNodeIndex;
 
-		AABBNode<LeafData>& Balance(int nodeIndex) {
+		AABBNode<LeafData, AABBType>& Balance(int nodeIndex) {
 			auto& node = m_nodes[nodeIndex];
 			auto parentIndex = node.parent;
 			if (parentIndex == kInvalidNodeIndex) {
@@ -135,11 +137,11 @@ namespace okami {
 			return ValidateNode(m_root);
 		}
 
-		int Insert(const AABB& aabb, LeafData data) {
+		int Insert(const AABBType& aabb, LeafData data) {
 			// Allocate root node if tree is empty
 			if (m_root == kInvalidNodeIndex) {
 				m_root = m_nodes.Allocate();
-				m_nodes[m_root] = AABBNode<LeafData>{
+				m_nodes[m_root] = AABBNode<LeafData, AABBType>{
 					.aabb = aabb,
 					.data = std::move(data),
 				};
@@ -150,7 +152,7 @@ namespace okami {
 			auto newNodeIndex = m_nodes.Allocate();
 			auto newParentIndex = m_nodes.Allocate();
 
-			m_nodes[newNodeIndex] = AABBNode<LeafData>{
+			m_nodes[newNodeIndex] = AABBNode<LeafData, AABBType>{
 				.aabb = aabb,
 				.data = std::move(data),
 			};
@@ -195,7 +197,21 @@ namespace okami {
 			return newNodeIndex;
 		}
 
-		int FindBestSibling(const AABB& aabb) {
+		static AABBTree Build(std::span<AABBType const> aabbs, std::span<LeafData const> datas) {
+			// TODO: Implement a bulk-build algorithm (e.g., top-down or bottom-up)
+			// For now, just insert one by one
+			if (aabbs.size() != datas.size()) {
+				throw std::invalid_argument("AABBs and datas size mismatch");
+			}
+
+			AABBTree tree;
+			for (size_t i = 0; i < aabbs.size(); ++i) {
+				tree.Insert(aabbs[i], datas[i]);
+			}
+			return tree;
+		}
+
+		int FindBestSibling(const AABBType& aabb) {
 			// First entry is inheritance cost
 			typedef std::pair<double, int> NodeCostPair;
 

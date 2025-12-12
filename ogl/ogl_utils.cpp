@@ -293,7 +293,7 @@ void okami::SetupVertexArray(
             location,
             attribInfo.m_componentCount,
             ToOpenGL(attribInfo.m_componentType),
-            attribInfo.m_type == okami::AttributeType::Color ? GL_TRUE : GL_FALSE,
+            attribInfo.m_isNormalized ? GL_TRUE : GL_FALSE,
             attribInfo.m_stride,
             static_cast<uint8_t*>(0) + attribInfo.m_offset
         );

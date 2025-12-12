@@ -259,7 +259,7 @@ struct LinearCostFunction {
 };
 
 TEST_F(AABBTreeTest, CustomCostFunctionTest) {
-    AABBTree<int, LinearCostFunction> customTree;
+    AABBTree<int, AABB, LinearCostFunction> customTree;
     
     for (int i = 0; i < 10; ++i) {
         AABB box = CreateUnitAABB(static_cast<float>(i), 0.0f, 0.0f);
@@ -353,4 +353,37 @@ TEST_F(AABBTreeTest, BalancedInsertionTest) {
     // The tree should be reasonably balanced
     // This is hard to test without exposing internal structure,
     // but validation should pass
+}
+
+// 2D AABB Tree Tests
+class AABBTree2DTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        tree = std::make_unique<AABBTree<int, AABB2>>();
+    }
+
+    void TearDown() override {
+        tree.reset();
+    }
+
+    std::unique_ptr<AABBTree<int, AABB2>> tree;
+
+    AABB2 CreateAABB2(float minX, float minY, float maxX, float maxY) {
+        return AABB2{
+            glm::vec2(minX, minY),
+            glm::vec2(maxX, maxY)
+        };
+    }
+};
+
+TEST_F(AABBTree2DTest, InsertAndValidate) {
+    tree->Insert(CreateAABB2(0, 0, 1, 1), 1);
+    tree->Insert(CreateAABB2(2, 2, 3, 3), 2);
+    EXPECT_TRUE(tree->Validate());
+}
+
+TEST_F(AABBTree2DTest, OverlapTest) {
+    tree->Insert(CreateAABB2(0, 0, 2, 2), 1);
+    tree->Insert(CreateAABB2(1, 1, 3, 3), 2);
+    EXPECT_TRUE(tree->Validate());
 }

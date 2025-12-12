@@ -12,7 +12,9 @@
 namespace okami {
     // Message type trait
     template <typename T>
-    struct message_type_trait;
+    struct message_type_trait {
+        static constexpr bool is_valid = false;
+    };
 
     // Function traits for extracting parameter types
     template <typename T, typename = void>
@@ -119,12 +121,14 @@ namespace okami {
     struct message_type_trait<PortIn<T>> {
         using message_type = T;
         static constexpr bool is_input = true;
+        static constexpr bool is_valid = true;
     };
 
     template <typename T>
     struct message_type_trait<PortOut<T>> {
         using message_type = T;
         static constexpr bool is_input = false;
+        static constexpr bool is_valid = true;
     };
 
     template <typename T>
@@ -174,7 +178,7 @@ namespace okami {
 
         // Helper to create and bind a port
         template <typename T>
-        auto CreatePort() {
+        auto GetPortWrapper() {
             using trait = message_type_trait<std::remove_reference_t<T>>;
             using msg_t = typename trait::message_type;
             if constexpr (trait::is_input) {
@@ -189,13 +193,13 @@ namespace okami {
         }
 
         template <CopyableMessage T>
-        PortOut<T> CreatePortOut() {
-            return CreatePort<PortOut<T>>();
+        PortOut<T> GetPortOut() {
+            return GetPortWrapper<PortOut<T>>();
         }
 
         template <CopyableMessage T>
-        PortIn<T> CreatePortIn() {
-            return CreatePort<PortIn<T>>();
+        PortIn<T> GetPortIn() {
+            return GetPortWrapper<PortIn<T>>();
         }
 
         template <CopyableMessage T>
@@ -250,6 +254,7 @@ namespace okami {
     class JobGraph {
     private:
         std::vector<std::shared_ptr<JobGraphNode>> m_nodes;
+        std::unordered_map<std::type_index, std::shared_ptr<JobGraphNode>> m_messageBarriers;
 
         std::shared_ptr<JobGraphNode> AddNodeInternal(
             std::function<Error(JobContext&)> task, 
@@ -274,35 +279,79 @@ namespace okami {
             return node;
         }
 
+        std::shared_ptr<JobGraphNode> EnsureBarrier(std::type_index type) {
+            if (m_messageBarriers.find(type) == m_messageBarriers.end()) {
+                auto node = AddNodeInternal(nullptr, {});
+                m_messageBarriers[type] = node;
+                return node;
+            }
+            return m_messageBarriers[type];
+        }
+
+        void AddEdgeInternal(std::shared_ptr<JobGraphNode> from, std::shared_ptr<JobGraphNode> to) {
+            from->m_dependents.push_back(to);
+            to->m_dependencies.push_back(from);
+            to->m_pendingDependencies = static_cast<int>(to->m_dependencies.size());
+        }
+
+        template <typename PortWrapperT>
+        void ConnectBarrierIn(std::shared_ptr<JobGraphNode> node) {
+            if constexpr (message_type_trait<PortWrapperT>::is_input) {
+                auto barrier = EnsureBarrier(typeid(message_type_trait<PortWrapperT>::message_type));
+                AddEdgeInternal(barrier, node);
+            }
+        }
+
+        template <typename PortWrapperT>
+        void ConnectBarrierOut(std::shared_ptr<JobGraphNode> node) {
+            if constexpr (!message_type_trait<PortWrapperT>::is_input) {
+                auto barrier = EnsureBarrier(typeid(message_type_trait<PortWrapperT>::message_type));
+                AddEdgeInternal(node, barrier);
+            }
+        }
+
     public:
-        int AddNode(std::function<Error(JobContext&)> task, std::span<int const> dependencies) {
+        int AddNode(std::function<Error(JobContext&)> task, std::span<int const> dependencies = {}) {
             auto node = AddNodeInternal(task, dependencies);
             return node->m_id;
         }
 
+        void AddDepencyEdge(int from, int to) {
+            if (from < 0 || from >= static_cast<int>(m_nodes.size()) || to < 0 || to >= static_cast<int>(m_nodes.size())) {
+                throw std::out_of_range("Invalid node ID(s) for dependency edge");
+            }
+            AddEdgeInternal(m_nodes[from], m_nodes[to]);
+        }
+
         // New AddMessageNode method
         template <typename Callable>
-        int AddMessageNode(Callable task, std::span<int const> dependencies) {
-            // Ensure the callable signature is correct
-            static_assert(std::invocable<Callable, JobContext&> || std::tuple_size_v<typename function_traits<Callable>::args_tuple> > 1,
-                          "Callable must be invocable with JobContext& and message ports");
+        int AddMessageNode(Callable task, std::span<int const> dependencies = {}) {
+            // For all of the PortIn arguments, add the 
+            using args_tuple = typename function_traits<Callable>::args_tuple;
+            using msg_args_tuple = typename tuple_drop_first<args_tuple>::type;
+
+            static_assert(std::is_same_v<std::tuple_element_t<0, args_tuple>, JobContext&>,
+                          "First argument of the callable must be JobContext&");
 
             // Create the node
             auto node = AddNodeInternal([task](JobContext& ctx) mutable -> Error {
                 using args_tuple = typename function_traits<Callable>::args_tuple;
-                using msg_args_tuple = typename tuple_drop_first<args_tuple>::type;
 
                 // Create the ports
                 auto ports_tuple = []<typename... Ts>(std::tuple<Ts...>*, MessageBus& bus) {
-                    return std::tuple<std::conditional_t<message_type_trait<std::remove_reference_t<Ts>>::is_input, 
-                                                         PortIn<typename message_type_trait<std::remove_reference_t<Ts>>::message_type>, 
-                                                         PortOut<typename message_type_trait<std::remove_reference_t<Ts>>::message_type>>... >{
-                        bus.GetPort<typename message_type_trait<std::remove_reference_t<Ts>>::message_type>()...
+                    return std::tuple<Ts...>{
+                        bus.GetPortWrapper<Ts>()...
                     };
                 }(static_cast<msg_args_tuple*>(nullptr), ctx.m_messageBus);
 
                 return std::apply([&](auto&... ports) { return task(ctx, ports...); }, ports_tuple);
             }, dependencies);
+
+            // Connect barriers
+            []<std::size_t... Is>(std::index_sequence<Is...>, JobGraph& graph, std::shared_ptr<JobGraphNode> node) {
+                (graph.ConnectBarrierIn<std::tuple_element_t<Is, msg_args_tuple>>(node), ...);
+                (graph.ConnectBarrierOut<std::tuple_element_t<Is, msg_args_tuple>>(node), ...);
+            }(std::make_index_sequence<std::tuple_size_v<msg_args_tuple>>{}, *this, node);
 
             // Populate message types
             node->template AddPortEnsure<Callable>();

@@ -8,11 +8,11 @@
         static constexpr Frequency __frequency = sFrequency;
 
 #define IN_MEMBER(type_name, member_name, location, attribute_type) \
-        type_name member_name; \
-        static constexpr uint32_t __##member_name##_location = location; \
-        static constexpr okami::AttributeType __##member_name##_type = attribute_type; \
-        static constexpr okami::AccessorComponentType __##member_name##_componentType = ComponentTypeTrait<type_name>::componentType; \
-        static constexpr int __##member_name##_componentCount = ComponentCount<type_name>::value;
+    type_name member_name; \
+    static constexpr uint32_t __##member_name##_location = location; \
+    static constexpr okami::AttributeType __##member_name##_type = attribute_type; \
+    static constexpr okami::AccessorComponentType __##member_name##_componentType = ComponentTypeTrait<type_name>::componentType; \
+    static constexpr int __##member_name##_componentCount = ComponentCount<type_name>::value; 
 
 #define END_INPUT_STRUCT() \
     };
@@ -30,7 +30,8 @@
         .m_componentCount = type_t::__##member_name##_componentCount, \
         .m_offset = offsetof(type_t, member_name), \
         .m_stride = sizeof(type_t), \
-        .m_frequency = type_t::__frequency \
+        .m_frequency = type_t::__frequency, \
+        .m_isNormalized = (type_t::__##member_name##_type == okami::AttributeType::Color) \
     }; \
 
 #define VERTEX_ARRAY_DEF_END() \

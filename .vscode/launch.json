@@ -68,6 +68,16 @@
             "cwd": "${workspaceFolder}/out/build/x64-debug/samples/01_hello_world/Debug",
             "console": "integratedTerminal",
             "preLaunchTask": "Build All"
+        },
+        {
+            "name": "im3d_sample (Debug)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/build/x64-debug/samples/im3d/Debug/im3d_sample.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/out/build/x64-debug/samples/im3d/Debug",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build All"
         }
     ]
 }

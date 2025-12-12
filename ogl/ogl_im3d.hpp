@@ -1,32 +1,25 @@
 #pragma once
 
-#include "ogl_utils.hpp"
-#include "ogl_geometry.hpp"
-
-#include "../content.hpp"
-#include "../storage.hpp"
-#include "../transform.hpp"
 #include "../renderer.hpp"
+#include "../im3d.hpp"
 
-#include "shaders/scene.glsl"
-#include "shaders/static_mesh.glsl"
+#include "ogl_utils.hpp"
+
+#include "shaders/im3d.glsl"
 
 namespace okami {
-    class OGLStaticMeshRenderer final :
+    class OGLIm3D final :
         public EngineModule,
         public IOGLRenderModule {
     protected:
-        OGLPipelineState m_pipelineState;
+        IIm3dDataProvider* m_dataProvider;
 
+        OGLPipelineState m_pipelineState;
         GLProgram m_program;
+        
+        UploadVertexBuffer<glsl::Im3dVertex> m_vertexBuffer; // Instance buffer for sprite data
 
         UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
-        UniformBuffer<glsl::StaticMeshInstance> m_instanceUBO;
-
-        // Component storage and views
-        StorageModule<StaticMeshComponent>* m_storage = nullptr;
-        IComponentView<Transform>* m_transformView = nullptr;
-        OGLGeometryManager* m_geometryManager = nullptr;
 
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
@@ -36,8 +29,6 @@ namespace okami {
         Error MergeImpl(MergeContext const& context) override;
     
     public:
-        OGLStaticMeshRenderer(OGLGeometryManager* geometryManager);
-
         Error Pass(OGLPass const& pass) override;
 
         std::string GetName() const override;

@@ -39,6 +39,11 @@ Error OGLTriangleRenderer::StartupImpl(InitContext const& context) {
     OKAMI_ERROR_RETURN(sceneUBO);
     m_sceneUBO = std::move(*sceneUBO);
 
+    m_pipelineState = OGLPipelineState{
+        .depthTestEnabled = true,
+        .program = m_program,
+    };
+
     return {};
 }
 
@@ -55,17 +60,11 @@ Error OGLTriangleRenderer::MergeImpl(MergeContext const& context) {
 }
 
 Error OGLTriangleRenderer::Pass(OGLPass const& pass) {
-    if (pass.m_type != OGLPassType::Forward &&
-        pass.m_type != OGLPassType::Transparent) {
+    if (pass.m_type != OGLPassType::Forward) {
         return {};
     }
 
-    glUseProgram(m_program.get());
-
-    glDisable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    glDepthMask(GL_TRUE);
+    m_pipelineState.SetToGL();
 
     // Bind VAO
     glBindVertexArray(m_vao.get());

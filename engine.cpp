@@ -49,7 +49,7 @@ Engine::Engine(EngineParams params) :
 
 entity_t Engine::CreateEntity(entity_t parent) {
     if (m_entityManager) {
-		auto port = m_messages.CreatePortOut<EntityCreateSignal>();
+		auto port = m_messages.GetPortOut<EntityCreateSignal>();
         return m_entityManager->CreateEntity(port, parent);
     } else {
         throw std::runtime_error("No IEntityManager available in Engine. Call Startup first!");

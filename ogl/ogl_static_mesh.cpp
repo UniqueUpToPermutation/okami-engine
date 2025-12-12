@@ -36,6 +36,12 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
     OKAMI_ERROR_RETURN(sceneUBO);
     m_sceneUBO = std::move(*sceneUBO);
 
+    m_pipelineState.depthTestEnabled = true;
+    m_pipelineState.blendEnabled = false;
+    m_pipelineState.cullFaceEnabled = true;
+    m_pipelineState.depthMask = true;
+    m_pipelineState.program = m_program.get();
+
     LOG(INFO) << "OGL Static Mesh Renderer initialized successfully";
     return {};
 }
@@ -83,13 +89,7 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
         });
 
     // Set up rendering state
-    glUseProgram(m_program.get()); 
-    OKAMI_DEFER(glUseProgram(0)); OKAMI_CHK_GL;
-
-    glDisable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    glDepthMask(GL_TRUE);
+    m_pipelineState.SetToGL(); OKAMI_CHK_GL;
 
     m_instanceUBO.Bind();
     OKAMI_DEFER(m_instanceUBO.Unbind());

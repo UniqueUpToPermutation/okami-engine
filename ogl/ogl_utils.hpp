@@ -303,9 +303,9 @@ namespace okami {
 			}
 
             glGenBuffers(1, m_buffer.ptr()); OKAMI_CHK_GL;
-            glBindBuffer(GL_ARRAY_BUFFER, m_buffer.get()); OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0)); OKAMI_CHK_GL;
+            glBindBuffer(GL_ARRAY_BUFFER, m_buffer.get()); 
+            OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0)); OKAMI_CHK_GL;
             glBufferData(GL_ARRAY_BUFFER, SizeOf(elementCount), nullptr, GL_DYNAMIC_DRAW); OKAMI_CHK_GL;
-			glBindBuffer(GL_ARRAY_BUFFER, 0); OKAMI_CHK_GL;
 
             if (wasResized) {
                 *wasResized = true;
@@ -373,7 +373,8 @@ namespace okami {
                 return {};
             }
 
-            glBindBuffer(GL_ARRAY_BUFFER, m_buffer.GetBuffer()); OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0));
+            glBindBuffer(GL_ARRAY_BUFFER, m_buffer.GetBuffer()); 
+            OKAMI_DEFER(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
             // Setup vertex attributes after buffer is bound
             SetupVertexArray(m_vao, m_vsInputInfo, m_buffer.GetBuffer(), std::nullopt);
@@ -508,7 +509,7 @@ namespace okami {
         bool stencilTestEnabled = false;
         GLenum stencilFunc = GL_ALWAYS;
         GLint stencilRef = 0;
-        GLuint stencilMask = ~0;
+        GLuint stencilMask = ~0u;
         GLenum stencilFail = GL_KEEP;
         GLenum stencilPassDepthFail = GL_KEEP;
         GLenum stencilPassDepthPass = GL_KEEP;

@@ -159,7 +159,6 @@ TEST(JobSystemTest, JobGraphExecution) {
     EXPECT_EQ(middle, std::set<int>({2, 3}));
 }
 
-
 TEST(JobSystemTest, AddMessageNode) {
     JobGraph graph;
     MessageBus bus;
@@ -168,21 +167,20 @@ TEST(JobSystemTest, AddMessageNode) {
     std::vector<TestMessage> received;
     
     // Producer job
-    auto producer = [&](JobContext& ctx, PortOut<TestMessage>& out) mutable {
+    auto producer = [&](JobContext& ctx, PortOut<TestMessage> out) {
         out.Send(TestMessage{42, "produced"});
         return Error{};
     };
-    int producerNode = graph.AddMessageNode(producer, {});
+    int producerNode = graph.AddMessageNode(producer);
     
     // Consumer job
-    auto consumer = [&](JobContext& ctx, PortIn<TestMessage>& in) mutable {
+    auto consumer = [&](JobContext& ctx, PortIn<TestMessage> in) {
         in.Handle([&](const TestMessage& msg) {
             received.push_back(msg);
         });
         return Error{};
     };
-    std::vector<int> deps = {producerNode};
-    int consumerNode = graph.AddMessageNode(consumer, deps);
+    int consumerNode = graph.AddMessageNode(consumer);
     
     // Execute
     DefaultJobGraphExecutor executor;
@@ -200,61 +198,14 @@ TEST(JobSystemTest, JobGraphCycleDetection) {
     MessageBus bus;
     DefaultJobGraphExecutor executor;
     
-    // Create a cycle: A -> B -> A
     auto taskA = [](JobContext&) { return Error{}; };
-    int nodeA = graph.AddNode(taskA, {});
+    int nodeA = graph.AddNode(taskA);
     
     auto taskB = [](JobContext&) { return Error{}; };
-    // B depends on A
-    std::vector<int> depsB = {nodeA};
-    int nodeB = graph.AddNode(taskB, depsB);
-    
-    // Make A depend on B (manually, since AddNode checks for existing nodes, but we need to hack it or use a new node that closes the loop)
-    // Actually, AddNode doesn't allow adding dependencies to future nodes directly.
-    // But we can add a third node C that depends on B, and then somehow make A depend on C?
-    // The current API AddNode takes dependencies as indices of *already added* nodes.
-    // So we can't easily create a cycle with AddNode unless we modify the graph structure directly or if AddNode allows forward references (it takes ints, so maybe?)
-    
-    // Wait, AddNode takes `std::span<int const> dependencies`. If I pass an index that hasn't been returned yet, it might be invalid or just an index.
-    // But `AddNode` implementation looks up the nodes immediately.
-    
-    // Let's try to create a cycle by hacking the dependencies after creation, since the public API enforces DAG construction order (mostly).
-    // Actually, `AddNode` validates that dependencies exist.
-    
-    // However, if I have A and B. A depends on nothing. B depends on A.
-    // If I can add a dependency to A *after* B is created... but the API doesn't expose that.
-    
-    // Wait, `JobGraphNode` has `m_dependencies` which is `vector<shared_ptr<JobGraphNode>>`.
-    // I can get the nodes and modify them if I have access. `GetNodes()` returns `const vector&`.
-    // So I can't modify them easily through the public API.
-    
-    // But wait, `AddNode` takes indices. If I pass an index that is out of range, it throws.
-    // So I can only depend on existing nodes.
-    // This means `AddNode` enforces a topological ordering during construction!
-    // So it's impossible to create a cycle using `AddNode` alone unless I can make a node depend on itself.
-    
-    // Let's try self-dependency.
-    // int nodeA = graph.AddNode(taskA, {0}); // This would throw because node 0 doesn't exist yet when calling AddNode for the first time.
-    
-    // What if I do:
-    // int nodeA = graph.AddNode(taskA, {});
-    // int nodeB = graph.AddNode(taskB, {nodeA});
-    // And then I want A to depend on B.
-    // I can't do that with `AddNode`.
-    
-    // So the only way to have a cycle is if the graph is corrupted or modified internally.
-    // OR if I use `const_cast` to modify the nodes returned by `GetNodes()`.
-    // Let's do that for the sake of testing the executor's robustness.
-    
-    const auto& nodes = graph.GetNodes();
-    auto& mutableNodeA = const_cast<JobGraphNode&>(*nodes[nodeA]);
-    auto& mutableNodeB = const_cast<JobGraphNode&>(*nodes[nodeB]);
-    
-    // Add B as dependency to A
-    mutableNodeA.m_dependencies.push_back(nodes[nodeB]);
-    mutableNodeB.m_dependents.push_back(nodes[nodeA]);
-    
-    // Now we have A -> B -> A
+    int nodeB = graph.AddNode(taskB);
+
+    graph.AddDepencyEdge(nodeA, nodeB);
+    graph.AddDepencyEdge(nodeB, nodeA);
     
     Error result = executor.Execute(graph, bus);
     EXPECT_TRUE(result.IsError());
@@ -268,33 +219,31 @@ TEST(JobSystemTest, ChainedMessagePassing) {
     std::vector<std::string> log;
     
     // Job A: Produces Msg1
-    auto jobA = [&](JobContext&, PortOut<TestMessage>& out) {
+    auto jobA = [&](JobContext&, PortOut<TestMessage> out) {
         log.push_back("A");
         out.Send(TestMessage{1, "from A"});
         return Error{};
     };
-    int nodeA = graph.AddMessageNode(jobA, {});
+    int nodeA = graph.AddMessageNode(jobA);
     
     // Job B: Consumes Msg1, Produces Msg2
-    auto jobB = [&](JobContext&, PortIn<TestMessage>& in, PortOut<AnotherMessage>& out) {
+    auto jobB = [&](JobContext&, PortIn<TestMessage> in, PortOut<AnotherMessage> out) {
         in.Handle([&](const TestMessage& msg) {
             log.push_back("B received " + msg.text);
         });
         out.Send(AnotherMessage{2.0f});
         return Error{};
     };
-    std::vector<int> depsB = {nodeA};
-    int nodeB = graph.AddMessageNode(jobB, depsB);
+    int nodeB = graph.AddMessageNode(jobB);
     
     // Job C: Consumes Msg2
-    auto jobC = [&](JobContext&, PortIn<AnotherMessage>& in) {
+    auto jobC = [&](JobContext&, PortIn<AnotherMessage> in) {
         in.Handle([&](const AnotherMessage& msg) {
             log.push_back("C received " + std::to_string(static_cast<int>(msg.data)));
         });
         return Error{};
     };
-    std::vector<int> depsC = {nodeB};
-    int nodeC = graph.AddMessageNode(jobC, depsC);
+    int nodeC = graph.AddMessageNode(jobC);
     
     Error result = executor.Execute(graph, bus);
     EXPECT_TRUE(result.IsOk());
@@ -313,28 +262,27 @@ TEST(JobSystemTest, MultipleProducersSingleConsumer) {
     std::atomic<int> sum = 0;
     
     // Producer 1
-    auto prod1 = [](JobContext&, PortOut<TestMessage>& out) {
+    auto prod1 = [](JobContext&, PortOut<TestMessage> out) {
         out.Send(TestMessage{10, "p1"});
         return Error{};
     };
-    int nodeP1 = graph.AddMessageNode(prod1, {});
+    int nodeP1 = graph.AddMessageNode(prod1);
     
     // Producer 2
-    auto prod2 = [](JobContext&, PortOut<TestMessage>& out) {
+    auto prod2 = [](JobContext&, PortOut<TestMessage> out) {
         out.Send(TestMessage{20, "p2"});
         return Error{};
     };
-    int nodeP2 = graph.AddMessageNode(prod2, {});
+    int nodeP2 = graph.AddMessageNode(prod2);
     
     // Consumer
-    auto consumer = [&](JobContext&, PortIn<TestMessage>& in) {
+    auto consumer = [&](JobContext&, PortIn<TestMessage> in) {
         in.Handle([&](const TestMessage& msg) {
             sum += msg.value;
         });
         return Error{};
     };
-    std::vector<int> deps = {nodeP1, nodeP2};
-    int nodeC = graph.AddMessageNode(consumer, deps);
+    int nodeC = graph.AddMessageNode(consumer);
     
     Error result = executor.Execute(graph, bus);
     EXPECT_TRUE(result.IsOk());

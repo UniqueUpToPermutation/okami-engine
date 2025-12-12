@@ -47,6 +47,24 @@ namespace okami
 		entity_t m_entity;
 	};
 
+	template <typename T>
+	struct OnAddComponentEvent {
+		entity_t m_entity;
+		T m_component;
+	};
+
+	template <typename T>
+	struct OnUpdateComponentEvent {
+		entity_t m_entity;
+		T m_component;
+	};
+
+	template <typename T>
+	struct OnRemoveComponentEvent {
+		entity_t m_entity;
+		T m_component;
+	};
+
 	// Forward declarations
 	struct EntityTreeImpl;
 	class EntityTree;

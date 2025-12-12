@@ -29,7 +29,8 @@
     },
     "ktx",
     "tinygltf",
+    "tmxlite",
     "yaml-cpp",
-    "tmxlite"
+    "im3d"
   ]
 }
