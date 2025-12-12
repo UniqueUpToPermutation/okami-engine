@@ -56,25 +56,32 @@ Error OGLIm3D::Pass(OGLPass const& pass) {
         return {};
     }
 
+    auto const& im3dData = m_dataProvider->GetIm3dContext();
+    if (!im3dData.m_context) {
+        return {};
+    }
+
     m_pipelineState.SetToGL(); OKAMI_CHK_GL;
 
-    auto const& im3dData = m_dataProvider->GetIm3dContext();
-
     size_t vertexCount = 0;
-    for (uint32_t i = 0; i < im3dData.getDrawListCount(); ++i) {
-        auto const& drawCall = im3dData.getDrawLists()[i];
+    for (uint32_t i = 0; i < im3dData->getDrawListCount(); ++i) {
+        auto const& drawCall = im3dData->getDrawLists()[i];
         vertexCount += drawCall.m_vertexCount;
     }
 
     // Upload data to GPU
     m_vertexBuffer.Reserve(vertexCount); OKAMI_CHK_GL;
+    if (vertexCount == 0) {
+        return {};
+    }
+    
     {
         auto map = m_vertexBuffer.Map();
         OKAMI_ERROR_RETURN_IF(!map, "Failed to map vertex buffer");
 
         vertexCount = 0;
-        for (uint32_t i = 0; i < im3dData.getDrawListCount(); ++i) {
-            auto const& drawCall = im3dData.getDrawLists()[i];
+        for (uint32_t i = 0; i < im3dData->getDrawListCount(); ++i) {
+            auto const& drawCall = im3dData->getDrawLists()[i];
             std::memcpy(map->Data() + vertexCount, drawCall.m_vertexData, drawCall.m_vertexCount * sizeof(glsl::Im3dVertex));
             vertexCount += drawCall.m_vertexCount;
         }
@@ -89,8 +96,8 @@ Error OGLIm3D::Pass(OGLPass const& pass) {
     OKAMI_DEFER(glBindVertexArray(0));
 
     GLint currentVertex = 0;
-    for (uint32_t i = 0; i < im3dData.getDrawListCount(); ++i) {
-        auto const& drawCall = im3dData.getDrawLists()[i];
+    for (uint32_t i = 0; i < im3dData->getDrawListCount(); ++i) {
+        auto const& drawCall = im3dData->getDrawLists()[i];
 
         GLint primitiveType = GL_POINTS;
         switch (drawCall.m_primType) {

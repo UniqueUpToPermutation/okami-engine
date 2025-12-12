@@ -21,9 +21,21 @@ namespace okami {
         }
     };
 
+    struct Im3dContext {
+        std::unique_ptr<Im3d::Context> m_context;
+
+        inline Im3d::Context* operator->() {
+            return m_context.get();
+        }
+
+        inline Im3d::Context const* operator->() const {
+            return m_context.get();
+        }
+    };
+
     class IIm3dProvider {
     public:
         // Thread-safe
-        virtual Im3d::Context const& GetIm3dContext() const = 0;
+        virtual Im3dContext const& GetIm3dContext() const = 0;
     };
 }

@@ -32,13 +32,13 @@ int main() {
     en.SetActiveCamera(cameraEntity);
 
     en.AddScript([](Time const& time, ExecutionContext const& context) {
-        context.m_graph->AddMessageNode([](JobContext& jc, Pipe<::Im3d::Context> im3d) -> Error {
-            im3d.HandleSingle([&](::Im3d::Context& im3dc) {
-                im3dc.begin(Im3d::PrimitiveMode_Triangles);
-                im3dc.vertex(Im3d::Vec3(-0.5f, -0.5f, 0.0f), 1.0, Im3d::Color_Magenta);
-                im3dc.vertex(Im3d::Vec3(0.0f, 0.5f, 0.0f), 1.0, Im3d::Color_Yellow);
-                im3dc.vertex(Im3d::Vec3(0.5f, -0.5f, 0.0f), 1.0, Im3d::Color_Cyan);
-                im3dc.end();
+        context.m_graph->AddMessageNode([](JobContext& jc, Pipe<Im3dContext> im3d) -> Error {
+            im3d.HandleSingle([&](Im3dContext& im3dc) {
+                im3dc->begin(Im3d::PrimitiveMode_Triangles);
+                im3dc->vertex(Im3d::Vec3(-0.5f, -0.5f, 0.0f), 1.0, Im3d::Color_Magenta);
+                im3dc->vertex(Im3d::Vec3(0.0f, 0.5f, 0.0f), 1.0, Im3d::Color_Yellow);
+                im3dc->vertex(Im3d::Vec3(0.5f, -0.5f, 0.0f), 1.0, Im3d::Color_Cyan);
+                im3dc->end();
             });
 
             return {};
