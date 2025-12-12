@@ -8,10 +8,10 @@ Error OGLIm3D::RegisterImpl(InterfaceCollection& interfaces) {
     return {};
 }
 Error OGLIm3D::StartupImpl(InitContext const& context) {
-    m_dataProvider = context.m_interfaces.Query<IIm3dDataProvider>();
+    m_dataProvider = context.m_interfaces.Query<IIm3dProvider>();
 
     if (!m_dataProvider) {
-        OKAMI_LOG_WARNING("IIm3dDataProvider interface not available for OGLIm3D");
+        OKAMI_LOG_WARNING("IIm3dProvider interface not available for OGLIm3D");
         return {};
     }
 
@@ -58,14 +58,26 @@ Error OGLIm3D::Pass(OGLPass const& pass) {
 
     m_pipelineState.SetToGL(); OKAMI_CHK_GL;
 
-    auto& im3dData = m_dataProvider->GetIm3dData();
+    auto const& im3dData = m_dataProvider->GetIm3dContext();
+
+    size_t vertexCount = 0;
+    for (uint32_t i = 0; i < im3dData.getDrawListCount(); ++i) {
+        auto const& drawCall = im3dData.getDrawLists()[i];
+        vertexCount += drawCall.m_vertexCount;
+    }
 
     // Upload data to GPU
-    m_vertexBuffer.Reserve(im3dData.m_data.size()); OKAMI_CHK_GL;
+    m_vertexBuffer.Reserve(vertexCount); OKAMI_CHK_GL;
     {
         auto map = m_vertexBuffer.Map();
         OKAMI_ERROR_RETURN_IF(!map, "Failed to map vertex buffer");
-        std::memcpy(map->Data(), im3dData.m_data.data(), im3dData.m_data.size() * sizeof(glsl::Im3dVertex));
+
+        vertexCount = 0;
+        for (uint32_t i = 0; i < im3dData.getDrawListCount(); ++i) {
+            auto const& drawCall = im3dData.getDrawLists()[i];
+            std::memcpy(map->Data() + vertexCount, drawCall.m_vertexData, drawCall.m_vertexCount * sizeof(glsl::Im3dVertex));
+            vertexCount += drawCall.m_vertexCount;
+        }
     }
 
     // Set uniforms
@@ -77,7 +89,9 @@ Error OGLIm3D::Pass(OGLPass const& pass) {
     OKAMI_DEFER(glBindVertexArray(0));
 
     GLint currentVertex = 0;
-    for (auto const& drawCall : im3dData.m_drawLists) {
+    for (uint32_t i = 0; i < im3dData.getDrawListCount(); ++i) {
+        auto const& drawCall = im3dData.getDrawLists()[i];
+
         GLint primitiveType = GL_POINTS;
         switch (drawCall.m_primType) {
             case Im3d::DrawPrimitive_Points:

@@ -2,6 +2,7 @@
 
 #include <unordered_set>
 #include <queue>
+#include <algorithm>
 
 using namespace okami;
 
@@ -27,6 +28,8 @@ Error ExecuteSerial(
 }
 
 Error okami::DefaultJobGraphExecutor::Execute(JobGraph& graph, MessageBus& bus) {
+    graph.Finalize();
+
     JobContext context{ .m_messageBus = bus };
     Error err;
 
@@ -77,4 +80,28 @@ Error okami::DefaultJobGraphExecutor::Execute(JobGraph& graph, MessageBus& bus) 
         "Cycle detected or unreachable nodes in JobGraph");
 
     return err;
+}
+
+void JobGraph::Finalize() {
+    if (m_finalized) return;
+
+    for (auto& [type, pipe] : m_message_pipes) {
+        // Sort pipes by priority
+        std::sort(pipe.m_nodes.begin(), pipe.m_nodes.end(), [](const auto& a, const auto& b) {
+            return a.m_priority > b.m_priority;
+        });
+
+        // Add edges to pipes
+        if (pipe.m_nodes.empty()) {
+            AddEdgeInternal(pipe.m_pipeStart, pipe.m_pipeEnd);
+        } else {
+            AddEdgeInternal(pipe.m_pipeStart, pipe.m_nodes.front().m_node);
+            for (size_t i = 0; i < pipe.m_nodes.size() - 1; ++i) {
+                AddEdgeInternal(pipe.m_nodes[i].m_node, pipe.m_nodes[i + 1].m_node);
+            }
+            AddEdgeInternal(pipe.m_nodes.back().m_node, pipe.m_pipeEnd);
+        }
+    }
+
+    m_finalized = true;
 }

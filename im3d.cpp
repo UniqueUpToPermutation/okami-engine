@@ -2,17 +2,17 @@
 
 using namespace okami;
 
-class Im3dModule final : public EngineModule, public IIm3dDataProvider {
+class Im3dModule final : public EngineModule, public IIm3dProvider {
 protected:
-    Im3dData m_stage;
-    Im3dData m_merged;
+    ::Im3d::Context m_contextToRender;
 
     Error RegisterImpl(InterfaceCollection& interfaces) override {
-        interfaces.Register<IIm3dDataProvider>(this);
+        interfaces.Register<IIm3dProvider>(this);
         return {};
     }
 
     Error StartupImpl(InitContext const& context) override {
+        context.m_messages.EnsurePort<::Im3d::Context>();
         return {};
     }
 
@@ -20,36 +20,30 @@ protected:
     }
 
     Error ProcessFrameImpl(Time const& time, ExecutionContext const& ec) override {
-        // Combine all Im3d data into one list
-        ec.m_graph->AddMessageNode([this](JobContext& jc, PortIn<Im3dRenderMessage> input) -> Error {
-            input.Handle([this](Im3dRenderMessage const& message) {
-                for (uint32_t i = 0; i < message.m_context->getDrawListCount(); ++i) {
-                    Im3d::DrawList drawList = message.m_context->getDrawLists()[i];
-                    std::copy(drawList.m_vertexData, 
-                        drawList.m_vertexData + drawList.m_vertexCount, std::back_inserter(m_stage.m_data));
-                    drawList.m_vertexData = nullptr;
-                    m_stage.m_drawLists.push_back(drawList);
-                }
-            });
-
-            return {};
-        });
+        // Send a context for next frame
+        // People will pipe and write to this context
+        ec.m_messages->Send(::Im3d::Context{});
         return {};
     }
 
     Error MergeImpl(MergeContext const& context) override {
-        std::swap(m_stage, m_merged);
-        m_stage.Clear();
+        auto port = context.m_messages.GetPort<::Im3d::Context>();
+
+        // This context now becomes the one to render
+        port->HandlePipeSingle([this](::Im3d::Context& context) {
+            m_contextToRender = std::move(context);
+        });
+
         return {};
     }
 
 public:
     std::string GetName() const override {
-        return "Im3d Handler Module";
+        return "Im3d Provider Module";
     }
 
-    Im3dData const& GetIm3dData() const override {
-        return m_merged;
+    Im3d::Context const& GetIm3dContext() const override {
+        return m_contextToRender;
     }
 };
 

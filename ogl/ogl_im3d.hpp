@@ -12,11 +12,11 @@ namespace okami {
         public EngineModule,
         public IOGLRenderModule {
     protected:
-        IIm3dDataProvider* m_dataProvider;
+        IIm3dProvider* m_dataProvider;
 
         OGLPipelineState m_pipelineState;
         GLProgram m_program;
-        
+
         UploadVertexBuffer<glsl::Im3dVertex> m_vertexBuffer; // Instance buffer for sprite data
 
         UniformBuffer<glsl::SceneGlobals> m_sceneUBO;

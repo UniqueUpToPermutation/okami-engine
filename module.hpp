@@ -12,7 +12,7 @@
 #include "jobs.hpp"
 
 namespace okami {
-    template <MoveableSignal T>
+    template <SignalConcept T>
     class ISignalHandler {
     public:
         virtual ~ISignalHandler() = default;
@@ -21,7 +21,7 @@ namespace okami {
         virtual void Send(T message) = 0;
     };
 
-    template <MoveableSignal T>
+    template <SignalConcept T>
     class DefaultSignalHandler : public ISignalHandler<T> {
     private:
         std::mutex m_mutex;
@@ -47,7 +47,7 @@ namespace okami {
     };
 
     // Counts the number of times a message has been received
-    template <MoveableSignal T>
+    template <SignalConcept T>
     class CountSignalHandler : public ISignalHandler<T> {
     public:
         std::atomic<size_t> m_count{ 0 };
@@ -87,12 +87,12 @@ namespace okami {
         auto cbegin() const;
         auto cend() const;
 
-        template <MoveableSignal T>
+        template <SignalConcept T>
         void RegisterSignalHandler(ISignalHandler<T>* handler) {
             Register<ISignalHandler<T>>(handler);
         }
 
-        template <MoveableSignal T>
+        template <SignalConcept T>
         void SendSignal(T message) const {
             auto handler = Query<ISignalHandler<T>>();
             if (handler) {

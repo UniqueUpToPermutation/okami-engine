@@ -18,34 +18,26 @@ struct AnotherMessage {
     float data;
 };
 
-// Test for CopyableMessage concept
-TEST(JobSystemTest, CopyableMessageConcept) {
-    // Test that TestMessage satisfies CopyableMessage
-    static_assert(CopyableMessage<TestMessage>, "TestMessage should be copyable");
-    static_assert(CopyableMessage<AnotherMessage>, "AnotherMessage should be copyable");
-    static_assert(!CopyableMessage<std::unique_ptr<int>>, "unique_ptr should not be copyable");
-}
-
 // Test MessageBus
 TEST(JobSystemTest, MessageBusEnsureLane) {
     MessageBus bus;
     
     // Ensure lane for TestMessage
-    bus.EnsurePort(TestMessage{1, "test"});
+    bus.EnsurePort<TestMessage>();
     
     // Get the lane - note: GetPort is const, but bus is non-const, should work
     auto lane = bus.GetPort<TestMessage>();
     ASSERT_NE(lane, nullptr);
     
     // Ensure another lane
-    bus.EnsurePort(AnotherMessage{3.14f});
+    bus.EnsurePort<AnotherMessage>();
     auto anotherLane = bus.GetPort<AnotherMessage>();
     ASSERT_NE(anotherLane, nullptr);
 }
 
 TEST(JobSystemTest, MessageBusSendAndReceive) {
     MessageBus bus;
-    bus.EnsurePort(TestMessage{});
+    bus.EnsurePort<TestMessage>();
     
     // Send a message
     TestMessage sent{42, "hello"};
@@ -288,4 +280,71 @@ TEST(JobSystemTest, MultipleProducersSingleConsumer) {
     EXPECT_TRUE(result.IsOk());
     
     EXPECT_EQ(sum, 30);
+}
+
+TEST(JobSystemTest, PipeTest) {
+    JobGraph graph;
+    MessageBus bus;
+    DefaultJobGraphExecutor executor;
+
+    struct TestPipe {};
+
+    auto prod2 = [](JobContext&, Pipe<TestPipe>, PortOut<TestMessage> outMsg) {
+        outMsg.Send(TestMessage{20, "p2"});
+        return Error{};
+    };
+    int nodeP2 = graph.AddPipeNode(prod2, {}, 0);
+
+    auto prod1 = [](JobContext&, Pipe<TestPipe>, PortOut<TestMessage> outMsg) {
+        outMsg.Send(TestMessage{10, "p1"});
+        return Error{};
+    };
+    int nodeP1 = graph.AddPipeNode(prod1, {}, 1);
+    
+    Error result = executor.Execute(graph, bus);
+    EXPECT_TRUE(result.IsOk());
+
+    auto msg = bus.GetPort<TestMessage>();
+
+    EXPECT_EQ(msg->m_messages.size(), 2);
+    EXPECT_EQ(msg->m_messages[0].value, 10);
+    EXPECT_EQ(msg->m_messages[0].text, "p1");
+    EXPECT_EQ(msg->m_messages[1].value, 20);
+    EXPECT_EQ(msg->m_messages[1].text, "p2");
+}
+
+TEST(JobSystemTest, PipeTest2) {
+    JobGraph graph;
+    MessageBus bus;
+    DefaultJobGraphExecutor executor;
+
+    bus.EnsurePort<TestMessage>();
+    bus.Send(TestMessage{.value = 0, .text = ""});
+
+    auto prod2 = [](JobContext&, Pipe<TestMessage> pipe) {
+        pipe.HandleSingle([&](TestMessage& msg) {
+            msg.text = "2";
+            msg.value += 1;
+        });
+        return Error{};
+    };
+    int nodeP2 = graph.AddPipeNode(prod2, {}, 0);
+
+    auto prod1 = [](JobContext&, Pipe<TestMessage> pipe) {
+        pipe.HandleSingle([&](TestMessage& msg) {
+            msg.text = "1";
+            msg.value += 1;
+        });
+        return Error{};
+    };
+    int nodeP1 = graph.AddPipeNode(prod1, {}, 1);
+    
+    Error result = executor.Execute(graph, bus);
+    EXPECT_TRUE(result.IsOk());
+
+    auto msg = bus.GetPort<TestMessage>();
+
+    EXPECT_EQ(msg->m_messages.size(), 1);
+    EXPECT_EQ(msg->m_messages[0].text, "2");
+    EXPECT_EQ(msg->m_messages[0].value, 2);
 }

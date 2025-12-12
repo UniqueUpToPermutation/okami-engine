@@ -7,10 +7,6 @@
 #include <memory>
 
 namespace okami {
-    struct Im3dRenderMessage {
-        std::shared_ptr<::Im3d::Context> m_context; 
-    };
-
     struct Im3dModuleFactory {
         std::unique_ptr<EngineModule> operator()();
     };
@@ -25,9 +21,9 @@ namespace okami {
         }
     };
 
-    class IIm3dDataProvider {
+    class IIm3dProvider {
     public:
         // Thread-safe
-        virtual Im3dData const& GetIm3dData() const = 0;
+        virtual Im3d::Context const& GetIm3dContext() const = 0;
     };
 }
