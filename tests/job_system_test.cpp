@@ -159,14 +159,14 @@ TEST(JobSystemTest, AddMessageNode) {
     std::vector<TestMessage> received;
     
     // Producer job
-    auto producer = [&](JobContext& ctx, PortOut<TestMessage> out) {
+    auto producer = [&](JobContext& ctx, Out<TestMessage> out) {
         out.Send(TestMessage{42, "produced"});
         return Error{};
     };
     int producerNode = graph.AddMessageNode(producer);
     
     // Consumer job
-    auto consumer = [&](JobContext& ctx, PortIn<TestMessage> in) {
+    auto consumer = [&](JobContext& ctx, In<TestMessage> in) {
         in.Handle([&](const TestMessage& msg) {
             received.push_back(msg);
         });
@@ -211,7 +211,7 @@ TEST(JobSystemTest, ChainedMessagePassing) {
     std::vector<std::string> log;
     
     // Job A: Produces Msg1
-    auto jobA = [&](JobContext&, PortOut<TestMessage> out) {
+    auto jobA = [&](JobContext&, Out<TestMessage> out) {
         log.push_back("A");
         out.Send(TestMessage{1, "from A"});
         return Error{};
@@ -219,7 +219,7 @@ TEST(JobSystemTest, ChainedMessagePassing) {
     int nodeA = graph.AddMessageNode(jobA);
     
     // Job B: Consumes Msg1, Produces Msg2
-    auto jobB = [&](JobContext&, PortIn<TestMessage> in, PortOut<AnotherMessage> out) {
+    auto jobB = [&](JobContext&, In<TestMessage> in, Out<AnotherMessage> out) {
         in.Handle([&](const TestMessage& msg) {
             log.push_back("B received " + msg.text);
         });
@@ -229,7 +229,7 @@ TEST(JobSystemTest, ChainedMessagePassing) {
     int nodeB = graph.AddMessageNode(jobB);
     
     // Job C: Consumes Msg2
-    auto jobC = [&](JobContext&, PortIn<AnotherMessage> in) {
+    auto jobC = [&](JobContext&, In<AnotherMessage> in) {
         in.Handle([&](const AnotherMessage& msg) {
             log.push_back("C received " + std::to_string(static_cast<int>(msg.data)));
         });
@@ -254,21 +254,21 @@ TEST(JobSystemTest, MultipleProducersSingleConsumer) {
     std::atomic<int> sum = 0;
     
     // Producer 1
-    auto prod1 = [](JobContext&, PortOut<TestMessage> out) {
+    auto prod1 = [](JobContext&, Out<TestMessage> out) {
         out.Send(TestMessage{10, "p1"});
         return Error{};
     };
     int nodeP1 = graph.AddMessageNode(prod1);
     
     // Producer 2
-    auto prod2 = [](JobContext&, PortOut<TestMessage> out) {
+    auto prod2 = [](JobContext&, Out<TestMessage> out) {
         out.Send(TestMessage{20, "p2"});
         return Error{};
     };
     int nodeP2 = graph.AddMessageNode(prod2);
     
     // Consumer
-    auto consumer = [&](JobContext&, PortIn<TestMessage> in) {
+    auto consumer = [&](JobContext&, In<TestMessage> in) {
         in.Handle([&](const TestMessage& msg) {
             sum += msg.value;
         });
@@ -289,17 +289,17 @@ TEST(JobSystemTest, PipeTest) {
 
     struct TestPipe {};
 
-    auto prod2 = [](JobContext&, Pipe<TestPipe>, PortOut<TestMessage> outMsg) {
+    auto prod2 = [](JobContext&, Pipe<TestPipe, 0>, Out<TestMessage> outMsg) {
         outMsg.Send(TestMessage{20, "p2"});
         return Error{};
     };
-    int nodeP2 = graph.AddPipeNode(prod2, {}, 0);
+    int nodeP2 = graph.AddMessageNode(prod2);
 
-    auto prod1 = [](JobContext&, Pipe<TestPipe>, PortOut<TestMessage> outMsg) {
+    auto prod1 = [](JobContext&, Pipe<TestPipe, 1>, Out<TestMessage> outMsg) {
         outMsg.Send(TestMessage{10, "p1"});
         return Error{};
     };
-    int nodeP1 = graph.AddPipeNode(prod1, {}, 1);
+    int nodeP1 = graph.AddMessageNode(prod1);
     
     Error result = executor.Execute(graph, bus);
     EXPECT_TRUE(result.IsOk());
@@ -321,23 +321,23 @@ TEST(JobSystemTest, PipeTest2) {
     bus.EnsurePort<TestMessage>();
     bus.Send(TestMessage{.value = 0, .text = ""});
 
-    auto prod2 = [](JobContext&, Pipe<TestMessage> pipe) {
+    auto prod2 = [](JobContext&, Pipe<TestMessage, 0> pipe) {
         pipe.HandleSingle([&](TestMessage& msg) {
             msg.text = "2";
             msg.value += 1;
         });
         return Error{};
     };
-    int nodeP2 = graph.AddPipeNode(prod2, {}, 0);
+    int nodeP2 = graph.AddMessageNode(prod2);
 
-    auto prod1 = [](JobContext&, Pipe<TestMessage> pipe) {
+    auto prod1 = [](JobContext&, Pipe<TestMessage, 1> pipe) {
         pipe.HandleSingle([&](TestMessage& msg) {
             msg.text = "1";
             msg.value += 1;
         });
         return Error{};
     };
-    int nodeP1 = graph.AddPipeNode(prod1, {}, 1);
+    int nodeP1 = graph.AddMessageNode(prod1);
     
     Error result = executor.Execute(graph, bus);
     EXPECT_TRUE(result.IsOk());

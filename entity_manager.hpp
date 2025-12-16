@@ -152,11 +152,11 @@ namespace okami
     class IEntityManager {
     public:
         virtual EntityTree const& GetTree() const = 0;
-        virtual entity_t CreateEntity(PortOut<EntityCreateSignal> port, entity_t parent = kRoot) = 0;
-        inline void RemoveEntity(PortOut<EntityRemoveSignal> port, entity_t entity) {
+        virtual entity_t CreateEntity(Out<EntityCreateSignal> port, entity_t parent = kRoot) = 0;
+        inline void RemoveEntity(Out<EntityRemoveSignal> port, entity_t entity) {
 			port.Send(EntityRemoveSignal{entity});
 		}
-        inline void SetParent(PortOut<EntityParentChangeSignal> port, entity_t entity, entity_t parent = kRoot) {
+        inline void SetParent(Out<EntityParentChangeSignal> port, entity_t entity, entity_t parent = kRoot) {
 			port.Send(EntityParentChangeSignal{entity, GetTree().GetParent(entity), parent});
 		}
         virtual ~IEntityManager() = default;

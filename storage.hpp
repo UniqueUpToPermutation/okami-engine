@@ -83,7 +83,7 @@ namespace okami {
 
         Error ProcessFrameImpl(Time const&, ExecutionContext const& ec) override {
             if (m_publishOnAddEvent) {
-                ec.m_graph->AddMessageNode([this](JobContext& context, PortOut<OnAddComponentEvent<T>> port) {
+                ec.m_graph->AddMessageNode([this](JobContext& context, Out<OnAddComponentEvent<T>> port) {
                     for (auto msg : m_added) {
                         port.Send(msg);
                     }
@@ -93,7 +93,7 @@ namespace okami {
             }
 
             if (m_publishOnUpdateEvent) {
-                ec.m_graph->AddMessageNode([this](JobContext& context, PortOut<OnUpdateComponentEvent<T>> port) {
+                ec.m_graph->AddMessageNode([this](JobContext& context, Out<OnUpdateComponentEvent<T>> port) {
                     for (auto msg : m_modified) {
                         port.Send(msg);
                     }
@@ -103,7 +103,7 @@ namespace okami {
             }
 
             if (m_publishOnRemoveEvent) {
-                ec.m_graph->AddMessageNode([this](JobContext& context, PortOut<OnRemoveComponentEvent<T>> port) {
+                ec.m_graph->AddMessageNode([this](JobContext& context, Out<OnRemoveComponentEvent<T>> port) {
                     for (auto msg : m_removed) {
                         port.Send(msg);
                     }

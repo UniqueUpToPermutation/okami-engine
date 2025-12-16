@@ -210,8 +210,13 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 
 		// Execute the update job graph
 		JobGraph updateJobGraph;
+
+		// Send time signal
+		m_messages.Send(time);
 		updateExecContext.m_graph = &updateJobGraph;
 		m_updateModules.ProcessFrame(time, updateExecContext);
+
+		// Execute the update job graph
 		executor.Execute(updateJobGraph, m_messages);
 
 		timeEstimator = timeEstimator.Step();

@@ -31,14 +31,15 @@ protected:
     }
 
     Error ProcessFrameImpl(Time const& t, ExecutionContext const& ec) override {
-        ec.m_graph->AddMessageNode([this, t](
+        ec.m_graph->AddMessageNode([this](
             JobContext& jobContext,
-            PortIn<AddVelocity2DMessage> inAddVelocity,
-            PortOut<TransformSolveMessage> outStagedTransforms) -> Error {
+            In<Time> time,
+            In<AddVelocity2DMessage> inAddVelocity,
+            Out<TransformSolveMessage> outStagedTransforms) -> Error {
 
             inAddVelocity.Handle([&](AddVelocity2DMessage const& msg) {
                 if (auto* transformPtr = m_transformStorage->TryGet(msg.m_entity)) {
-                    auto dt = static_cast<float>(t.m_deltaTime);
+                    auto dt = static_cast<float>(time->m_deltaTime);
                     auto transform = *transformPtr;
                     transform.m_position += glm::vec3(msg.m_velocity * dt, 0.0);
                     transform.m_rotation = glm::rotate(transform.m_rotation, msg.m_angular * dt, glm::vec3(0.0, 0.0, 1.0));
@@ -49,14 +50,14 @@ protected:
             return {};
         });
 
-        ec.m_graph->AddMessageNode([this, t](
+        ec.m_graph->AddMessageNode([this](
             JobContext& jobContext,
-            PortIn<AddVelocityMessage> inAddVelocity,
-            PortOut<TransformSolveMessage> outStagedTransforms) -> Error {
-
+            In<Time> time,
+            In<AddVelocityMessage> inAddVelocity,
+            Out<TransformSolveMessage> outStagedTransforms) -> Error {
             inAddVelocity.Handle([&](AddVelocityMessage const& msg) {
                 if (auto* transformPtr = m_transformStorage->TryGet(msg.m_entity)) {
-                    auto dt = static_cast<float>(t.m_deltaTime);
+                    auto dt = static_cast<float>(time->m_deltaTime);
                     auto transform = *transformPtr;
                     transform.m_position += msg.m_velocity * dt;
                     transform.m_rotation = glm::rotate(transform.m_rotation, dt, msg.m_angular);

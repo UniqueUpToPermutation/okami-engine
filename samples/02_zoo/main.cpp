@@ -71,7 +71,9 @@ int main() {
     en.AddComponent(geometryEntity, Transform::Translate(0.5f, 0.1f, 0.1f) * Transform::Scale(0.25f));
 
     en.AddScript([tri1Entity, cameraEntity](Time const& t, ExecutionContext const& context) {
-        context.m_graph->AddMessageNode([t, cameraEntity](JobContext& ctx, PortOut<AddVelocityMessage> outVelocity) -> Error {
+        context.m_graph->AddMessageNode([cameraEntity](
+            JobContext& ctx,
+            Out<AddVelocityMessage> outVelocity) -> Error {
             outVelocity.Send(AddVelocityMessage{ .m_entity = cameraEntity, .m_velocity = glm::vec3(0.0f, 0.0f, 0.0f) });
             return Error{};
         });

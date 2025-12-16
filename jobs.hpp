@@ -85,23 +85,38 @@ namespace okami {
             m_messages.push_back(std::move(message));
         }
 
-        void Handle(std::invocable<T const&> auto&& handler) {
+        inline void HandleNoLock(std::invocable<T const&> auto&& handler) {
             std::shared_lock lock(m_mutex);
             for (const auto& message : m_messages) {
                 handler(message);
             }
         }
 
-        void HandlePipe(std::invocable<std::span<T>> auto&& handler) {
+        inline void HandlePipeNoLock(std::invocable<std::span<T>> auto&& handler) {
             std::shared_lock lock(m_mutex);
             handler(std::span<T>(m_messages.data(), m_messages.size()));
         }
 
-        void HandlePipeSingle(std::invocable<T&> auto&& handler) {
+        inline void HandlePipeSingleNoLock(std::invocable<T&> auto&& handler) {
             std::shared_lock lock(m_mutex);
             if (!m_messages.empty()) {
                 handler(m_messages[0]);
             }
+        }
+
+        inline void Handle(std::invocable<T const&> auto&& handler) {
+            std::shared_lock lock(m_mutex);
+            HandleNoLock(std::move(handler));
+        }
+
+        inline void HandlePipe(std::invocable<std::span<T>> auto&& handler) {
+            std::shared_lock lock(m_mutex);
+            HandlePipeNoLock(std::move(handler));
+        }
+
+        inline void HandlePipeSingle(std::invocable<T&> auto&& handler) {
+            std::shared_lock lock(m_mutex);
+            HandlePipeSingleNoLock(std::move(handler));
         }
 
         std::type_index GetMessageType() const override {
@@ -115,53 +130,65 @@ namespace okami {
     };
 
     template <MessageConcept T>
-    struct PortIn {
+    struct In {
         MessagePort<T>* m_lane;
+        std::shared_lock<std::shared_mutex> m_lock;
 
-        PortIn() = default;
-        PortIn(MessagePort<T>* lane) : m_lane(lane) {}
+        In() = default;
+        In(MessagePort<T>* lane) : m_lane(lane), m_lock(lane->m_mutex) {}
 
         inline void Handle(std::invocable<T const&> auto&& handler) {
-            m_lane->Handle(std::move(handler));
+            m_lane->HandleNoLock(std::move(handler));
+        }
+
+        T const& operator*() const {
+            return m_lane->m_messages.front();
+        }
+
+        T const* operator->() const {
+            return &m_lane->m_messages.front();
         }
     };
 
     template <MessageConcept T>
-    struct PortOut {
+    struct Out {
         MessagePort<T>* m_lane;
-        PortOut() = default;
-        PortOut(MessagePort<T>* lane) : m_lane(lane) {}
+        Out() = default;
+        Out(MessagePort<T>* lane) : m_lane(lane) {}
 
         inline void Send(T message) {
             m_lane->Send(std::move(message));
         }
     };
 
-    template <MessageConcept T>
+    template <MessageConcept T, int Priority = 0>
     struct Pipe {
+        static constexpr int kPriority = Priority;
+
         MessagePort<T>* m_port;
+        std::shared_lock<std::shared_mutex> m_lock;
 
         Pipe() = default;
-        Pipe(MessagePort<T>* port) : m_port(port) {}
+        Pipe(MessagePort<T>* port) : m_port(port), m_lock(port->m_mutex) {}
 
         inline void Handle(std::invocable<std::span<T>> auto&& handler) {
-            m_port->HandlePipe(std::move(handler));
+            m_port->HandlePipeNoLock(std::move(handler));
         }
 
         inline void HandleSingle(std::invocable<T&> auto&& handler) {
-            m_port->HandlePipeSingle(std::move(handler));
+            m_port->HandlePipeSingleNoLock(std::move(handler));
         }
     };
 
     template <typename T>
     struct TraitIsPipe { static constexpr bool value = false; };
-    template <typename T>
-    struct TraitIsPipe<Pipe<T>> { static constexpr bool value = true; };
+    template <typename T, int Priority>
+    struct TraitIsPipe<Pipe<T, Priority>> { static constexpr bool value = true; };
 
     template <typename T>
     struct PipeGetType { using type = std::void_t<>; };
-    template <typename T>
-    struct PipeGetType<Pipe<T>> { using type = T; };
+    template <typename T, int Priority>
+    struct PipeGetType<Pipe<T, Priority>> { using type = T; };
 
     enum class NodeParamType {
         PORT_IN,
@@ -170,31 +197,31 @@ namespace okami {
     };
 
     template <typename T>
-    struct message_node_param_trait<PortIn<T>> {
+    struct message_node_param_trait<In<T>> {
         using message_type = T; 
         static constexpr NodeParamType type = NodeParamType::PORT_IN;
         static constexpr bool is_valid = true;
     };
 
     template <typename T>
-    struct message_node_param_trait<PortOut<T>> {
+    struct message_node_param_trait<Out<T>> {
         using message_type = T;
         static constexpr NodeParamType type = NodeParamType::PORT_OUT;
         static constexpr bool is_valid = true;
     };
 
-    template <typename T>
-    struct message_node_param_trait<Pipe<T>> {
+    template <typename T, int Priority>
+    struct message_node_param_trait<Pipe<T, Priority>> {
         using message_type = T;
         static constexpr NodeParamType type = NodeParamType::PIPE;
         static constexpr bool is_valid = true;
     };
 
     template <typename T>
-    using MsgIn = PortIn<T>;
+    using MsgIn = In<T>;
 
     template <typename T>
-    using MsgOut = PortOut<T>;
+    using MsgOut = Out<T>;
 
     class MessageBus {
     private:
@@ -230,32 +257,33 @@ namespace okami {
 
         // Helper to create and bind a port
         template <typename T>
-        auto GetPortWrapper() {
+        auto GetWrapper() {
             using trait = message_node_param_trait<std::remove_reference_t<T>>;
             using msg_t = typename trait::message_type;
             if constexpr (trait::type == NodeParamType::PORT_IN) {
-                PortIn<msg_t> port;
+                In<msg_t> port;
                 port.m_lane = GetPort<msg_t>();
                 return port;
             } else if constexpr (trait::type == NodeParamType::PORT_OUT) {
-                PortOut<msg_t> port;
+                Out<msg_t> port;
                 port.m_lane = GetPort<msg_t>();
                 return port;
             } else if constexpr (trait::type == NodeParamType::PIPE) {
-                Pipe<msg_t> pipe;
+                constexpr auto kPriority = T::kPriority; 
+                Pipe<msg_t, kPriority> pipe;
                 pipe.m_port = GetPort<msg_t>();
                 return pipe;
             }
         }
 
         template <MessageConcept T>
-        PortOut<T> GetPortOut() {
-            return GetPortWrapper<PortOut<T>>();
+        Out<T> GetPortOut() {
+            return GetWrapper<Out<T>>();
         }
 
         template <MessageConcept T>
-        PortIn<T> GetPortIn() {
-            return GetPortWrapper<PortIn<T>>();
+        In<T> GetPortIn() {
+            return GetWrapper<In<T>>();
         }
 
         template <MessageConcept T>
@@ -311,7 +339,7 @@ namespace okami {
     msg_args_tuple GetPortTuple(MessageBus& bus) {
         return []<typename... Ts>(std::tuple<Ts...>*, MessageBus& bus) {
             return std::tuple<Ts...>{
-                bus.GetPortWrapper<Ts>()...
+                bus.GetWrapper<Ts>()...
             };
         }(static_cast<msg_args_tuple*>(nullptr), bus);
     }
@@ -391,11 +419,23 @@ namespace okami {
             }
         }
 
+        template <typename PortWrapperT>
+        void ConnectBarrierPipe(std::shared_ptr<JobGraphNode> node) {
+            if constexpr (message_node_param_trait<PortWrapperT>::type == NodeParamType::PIPE) {
+                auto& pipe = EnsurePipe(typeid(message_node_param_trait<PortWrapperT>::message_type));
+                pipe.m_nodes.push_back(PipeGroup::Internal{
+                    .m_node = node,
+                    .m_priority = PortWrapperT::kPriority
+                });
+            }
+        }
+
         template <typename msg_args_tuple>
         void ConnectAllDependencies(std::shared_ptr<JobGraphNode> node) {
             []<std::size_t... Is>(std::index_sequence<Is...>, JobGraph& graph, std::shared_ptr<JobGraphNode> node) {
                 (graph.ConnectBarrierIn<std::tuple_element_t<Is, msg_args_tuple>>(node), ...);
                 (graph.ConnectBarrierOut<std::tuple_element_t<Is, msg_args_tuple>>(node), ...);
+                (graph.ConnectBarrierPipe<std::tuple_element_t<Is, msg_args_tuple>>(node), ...);
             }(std::make_index_sequence<std::tuple_size_v<msg_args_tuple>>{}, *this, node);
         }
 
@@ -415,7 +455,7 @@ namespace okami {
         // New AddMessageNode method
         template <typename Callable>
         int AddMessageNode(Callable task, std::span<int const> dependencies = {}) {
-            // For all of the PortIn arguments, add the 
+            // For all of the In arguments, add the 
             using args_tuple = typename function_traits<Callable>::args_tuple;
             using msg_args_tuple = typename tuple_drop_first<args_tuple>::type;
 
@@ -425,50 +465,13 @@ namespace okami {
             // Create the node
             auto node = AddNodeInternal([task](JobContext& ctx) mutable -> Error {
                 auto ports_tuple = GetPortTuple<msg_args_tuple>(ctx.m_messageBus);
-                return std::apply([&](auto&... ports) { return task(ctx, ports...); }, ports_tuple);
+                return std::apply([&](auto&... ports) { return task(ctx, std::move(ports)...); }, ports_tuple);
             }, dependencies);
 
             ConnectAllDependencies<msg_args_tuple>(node);
 
             // Populate message types
             node->template AddPortEnsure<msg_args_tuple>();
-            return node->m_id;
-        }
-
-        template <typename Callable>
-        int AddPipeNode(Callable task, std::span<int const> dependencies = {}, int priority = 0) {
-            // For all of the PortIn arguments, add the 
-            using args_tuple = typename function_traits<Callable>::args_tuple;
-            using msg_args_tuple = typename tuple_drop_first_second<args_tuple>::type;
-
-            static_assert(std::is_same_v<std::tuple_element_t<0, args_tuple>, JobContext&>,
-                          "First argument of the task must be JobContext&");
-            static_assert(TraitIsPipe<std::tuple_element_t<1, args_tuple>>::value,
-                          "Second argument of the task must be Pipe");
-
-            // Create the node
-            auto node = AddNodeInternal([task](JobContext& ctx) mutable -> Error {
-                using args_tuple = typename function_traits<Callable>::args_tuple;
-
-                // Create the ports
-                auto ports_tuple = GetPortTuple<msg_args_tuple>(ctx.m_messageBus);
-
-                using pipe_msg_t = typename message_node_param_trait<std::tuple_element_t<1, args_tuple>>::message_type;
-
-                auto pipe = ctx.m_messageBus.GetPipe<pipe_msg_t>();
-                return std::apply([&](auto&... ports) { return task(ctx, pipe, ports...); }, ports_tuple);
-            }, dependencies);
-
-            // Populate message types
-            using port_ensure_tuple = typename tuple_drop_first<args_tuple>::type;
-            node->template AddPortEnsure<port_ensure_tuple>();
-
-            auto& pipe = EnsurePipe(typeid(std::tuple_element_t<1, args_tuple>));
-            pipe.m_nodes.push_back(PipeGroup::Internal{
-                .m_node = node,
-                .m_priority = priority
-            });
-
             return node->m_id;
         }
 

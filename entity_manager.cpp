@@ -319,7 +319,7 @@ public:
         return m_tree;
     }
 
-    entity_t CreateEntity(PortOut<EntityCreateSignal> port, entity_t parent = kRoot) override {
+    entity_t CreateEntity(Out<EntityCreateSignal> port, entity_t parent = kRoot) override {
         entity_t newEntity = m_tree.ReserveEntityId();
 		port.Send(EntityCreateSignal{newEntity, parent});
         return newEntity;
