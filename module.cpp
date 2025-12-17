@@ -71,31 +71,44 @@ Error EngineModule::Startup(InitContext const& a) {
     return {};
 }
 
-Error EngineModule::ProcessFrame(Time const& t, ExecutionContext const& a) {
+Error EngineModule::BuildGraph(JobGraph& a, BuildGraphParams const& b) {
     OKAMI_ASSERT(b_started, "Module must be started before processing frames");
 
-    Error e = ProcessFrameImpl(t, a);
+    Error e = BuildGraphImpl(a, b);
     OKAMI_ERROR_RETURN(e);
 
-    if (!b_children_process_frame) {
+    if (!b_children_build_update_graph) {
         return {};
     }
     
     for (auto& mod : m_submodules) {
-        e += mod->ProcessFrame(t, a);
+        e += mod->BuildGraph(a, b);
         OKAMI_ERROR_RETURN(e);
     }
     return {};
 }
 
-Error EngineModule::Merge(MergeContext const& a) {
+Error EngineModule::SendMessages(MessageBus& a) {
     OKAMI_ASSERT(b_started, "Module must be started before processing frames");
 
-    Error e = MergeImpl(a);
+    Error e = SendMessagesImpl(a);
     OKAMI_ERROR_RETURN(e);
 
     for (auto& mod : m_submodules) {
-        e += mod->Merge(a);
+        e += mod->SendMessages(a);
+        OKAMI_ERROR_RETURN(e);
+    }
+    return {};
+}
+
+Error EngineModule::ReceiveMessages(MessageBus& a) {
+    OKAMI_ASSERT(b_started, "Module must be started before processing frames");
+
+    Error e = ReceiveMessagesImpl(a);
+    OKAMI_ERROR_RETURN(e);
+
+    for (auto& mod : m_submodules) {
+        e += mod->ReceiveMessages(a);
         OKAMI_ERROR_RETURN(e);
     }
     return {};
@@ -111,11 +124,12 @@ void EngineModule::Shutdown(InitContext const& a) {
         auto& mod = *it;
         mod->Shutdown(a);
     }
+    m_submodules.clear();
     ShutdownImpl(a);
 }
 
-std::string EmptyModule::GetName() const {
-    return m_name;
+std::string EngineModule::GetName() const {
+    return "Unnamed Module";
 }
 
 } // namespace okami

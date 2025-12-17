@@ -17,9 +17,9 @@ int main() {
     RendererParams params;
 
     // Register renderer based on compile-time options
-    en.CreateRenderModule<GLFWModuleFactory>();
-    en.CreateRenderModule<OGLRendererFactory>({}, params);
-    en.CreateUpdateModule<Im3dModuleFactory>();
+    en.CreateModule<GLFWModuleFactory>();
+    en.CreateModule<OGLRendererFactory>({}, params);
+    en.CreateModule<Im3dModuleFactory>();
 
     Error err = en.Startup();
     if (err.IsError()) {
@@ -31,8 +31,8 @@ int main() {
     en.AddComponent(cameraEntity, Camera::Orthographic(2.25f, 1.0f, -1.0f));
     en.SetActiveCamera(cameraEntity);
 
-    en.AddScript([](Time const& time, ExecutionContext const& context) {
-        context.m_graph->AddMessageNode([](JobContext& jc, Pipe<Im3dContext> im3d) -> Error {
+    en.AddScript([](JobGraph& graph, BuildGraphParams const& params) {
+        graph.AddMessageNode([](JobContext& jc, Pipe<Im3dContext> im3d) -> Error {
             auto& im3dc = *im3d;
 
             im3dc->begin(Im3d::PrimitiveMode_Triangles);

@@ -121,24 +121,18 @@ namespace okami {
 		std::any m_userData;
 	};
 
-	class IRenderModule {
-	public:
-		virtual ~IRenderModule() = default;
-
-		virtual Error Pass(Time const& time, InterfaceCollection& ic, RenderPassInfo info) = 0;
-	};
-
 	struct RendererParams {
 		bool m_headlessRenderToFile = true;
 		std::string m_headlessOutputFileStem = "output";
 		std::string m_headlessRenderOutputDir = "renders"; 
 	};
 
-    class IRenderer {
-	public:
-		virtual ~IRenderer() = default;
+	class IRenderModule {
+    public:
+        virtual ~IRenderModule() = default;
 
 		virtual void SetActiveCamera(entity_t e) = 0;
 		virtual entity_t GetActiveCamera() const = 0;
+        virtual Error Render() = 0;
 	};
 }

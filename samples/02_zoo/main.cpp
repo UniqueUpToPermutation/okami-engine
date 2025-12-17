@@ -26,8 +26,8 @@ int main() {
     RendererParams params;
 
     // Register renderer based on compile-time options
-    en.CreateRenderModule<GLFWModuleFactory>();
-    en.CreateRenderModule<OGLRendererFactory>({}, params);
+    en.CreateModule<GLFWModuleFactory>();
+    en.CreateModule<OGLRendererFactory>({}, params);
 
     Error err = en.Startup();
     if (err.IsError()) {
@@ -70,8 +70,8 @@ int main() {
     en.AddComponent(geometryEntity, StaticMeshComponent{ geometryHandle });
     en.AddComponent(geometryEntity, Transform::Translate(0.5f, 0.1f, 0.1f) * Transform::Scale(0.25f));
 
-    en.AddScript([tri1Entity, cameraEntity](Time const& t, ExecutionContext const& context) {
-        context.m_graph->AddMessageNode([cameraEntity](
+    en.AddScript([tri1Entity, cameraEntity](JobGraph& graph, BuildGraphParams const& params) {
+        graph.AddMessageNode([cameraEntity](
             JobContext& ctx,
             Out<AddVelocityMessage> outVelocity) -> Error {
             outVelocity.Send(AddVelocityMessage{ .m_entity = cameraEntity, .m_velocity = glm::vec3(0.0f, 0.0f, 0.0f) });

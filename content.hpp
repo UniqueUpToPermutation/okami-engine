@@ -151,6 +151,7 @@ namespace okami {
         Error StartupImpl(InitContext const& ic) override {
 			return {};
 		}
+		
         void ShutdownImpl(InitContext const& ic) override {
 			{
 				std::lock_guard<std::mutex> lock(m_path_mtx);
@@ -160,12 +161,6 @@ namespace okami {
 			m_res_to_impl.clear();
 			m_loaded_handler.Clear();
 			m_new_resources.Clear();
-		}
-        Error ProcessFrameImpl(Time const&, ExecutionContext const& ec) override {
-			return {};
-		}
-        Error MergeImpl(MergeContext const& mc) override {
-			return {};
 		}
 
 	public:

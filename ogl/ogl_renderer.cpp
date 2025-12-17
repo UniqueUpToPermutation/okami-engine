@@ -20,7 +20,7 @@ using namespace okami;
 
 class OGLRendererModule final : 
     public EngineModule, 
-    public IRenderer {
+    public IRenderModule {
 private:
     RendererParams m_params;
     RendererConfig m_config;
@@ -41,7 +41,7 @@ private:
 
 protected:
     Error RegisterImpl(InterfaceCollection& interfaces) override {
-        interfaces.Register<IRenderer>(this);
+        interfaces.Register<IRenderModule>(this);
         interfaces.Register<IGLShaderCache>(m_shaderCache.get());
         RegisterConfig<RendererConfig>(interfaces, LOG_WRAP(WARNING));
 
@@ -99,7 +99,7 @@ protected:
         };
     }
 
-    Error ProcessFrameImpl(Time const&, ExecutionContext const& context) override {
+    Error Render() override {
         // Upload textures and geometry created this frame
         m_textureManager->ProcessNewResources({});
         m_geometryManager->ProcessNewResources({});
@@ -121,10 +121,6 @@ protected:
 
         m_glProvider->SwapBuffers();
 
-        return {};
-    }
-
-    Error MergeImpl(MergeContext const& context) override {
         return {};
     }
 

@@ -25,9 +25,7 @@ namespace okami {
 	private:
 		EngineParams m_params;
 
-        EmptyModule m_ioModules;
-        EmptyModule m_updateModules;
-        EmptyModule m_renderModules;
+        EngineModule m_modules;
 
         InterfaceCollection m_interfaces;
         MessageBus m_messages;
@@ -55,18 +53,8 @@ namespace okami {
         }
 
         template <typename FactoryT, typename... TArgs>
-        auto CreateIOModule(FactoryT factory = FactoryT{}, TArgs&&... args) {
-            return m_ioModules.CreateChildFromFactory(factory, std::forward<TArgs>(args)...);
-        }
-
-        template <typename FactoryT, typename... TArgs>
-        auto CreateUpdateModule(FactoryT factory = FactoryT{}, TArgs&&... args) {
-            return m_updateModules.CreateChildFromFactory(factory, std::forward<TArgs>(args)...);
-        }
-
-        template <typename FactoryT, typename... TArgs>
-        auto CreateRenderModule(FactoryT factory = FactoryT{}, TArgs&&... args) {
-            return m_renderModules.CreateChildFromFactory(factory, std::forward<TArgs>(args)...);
+        auto CreateModule(FactoryT factory = FactoryT{}, TArgs&&... args) {
+            return m_modules.CreateChildFromFactory(factory, std::forward<TArgs>(args)...);
         }
 
         template <typename T>
@@ -94,7 +82,7 @@ namespace okami {
         }
 
         void AddScript(
-            std::function<void(Time const&, ExecutionContext const&)> script, 
+            std::function<void(JobGraph&, BuildGraphParams const&)> script, 
             std::string_view name = "Unnamed Script");
 
 		std::filesystem::path GetRenderOutputPath(size_t frameIndex);

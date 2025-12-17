@@ -52,14 +52,6 @@ void OGLSpriteRenderer::ShutdownImpl(InitContext const& context) {
     // OpenGL resources are automatically cleaned up by RAII wrappers
 }
 
-Error OGLSpriteRenderer::ProcessFrameImpl(Time const&, ExecutionContext const& context) {
-    return {};
-}
-
-Error OGLSpriteRenderer::MergeImpl(MergeContext const& context) {
-    return {};
-}
-
 Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
     // Collect all sprites and their transforms
     std::vector<std::pair<ResHandle<Texture>, glsl::SpriteInstance>> spriteInstances;

@@ -51,14 +51,6 @@ void OGLTriangleRenderer::ShutdownImpl(InitContext const& context) {
 
 }
 
-Error OGLTriangleRenderer::ProcessFrameImpl(Time const&, ExecutionContext const& context) {
-    return {};
-}
-
-Error OGLTriangleRenderer::MergeImpl(MergeContext const& context) {
-    return {};
-}
-
 Error OGLTriangleRenderer::Pass(OGLPass const& pass) {
     if (pass.m_type != OGLPassType::Forward) {
         return {};

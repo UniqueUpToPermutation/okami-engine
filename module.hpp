@@ -67,7 +67,7 @@ namespace okami {
 
         template <typename T>
         void Register(T* interfacePtr) {
-            m_interfaces[std::type_index(typeid(T))] = interfacePtr;
+            m_interfaces.emplace(std::type_index(typeid(T)), interfacePtr);
         }
 
         std::optional<std::any> QueryType(std::type_info const& type) const;
@@ -79,6 +79,15 @@ namespace okami {
             }
             else {
                 return nullptr;
+            }
+        }
+
+        template <typename T, typename Callable>
+        void ForEachInterface(Callable&& func) {
+            std::type_index typeIdx = std::type_index(typeid(T));
+            auto range = m_interfaces.equal_range(typeIdx);
+            for (auto it = range.first; it != range.second; ++it) {
+                func(std::any_cast<T*>(it->second));
             }
         }
 
@@ -103,21 +112,10 @@ namespace okami {
         }
 
     protected:
-        std::unordered_map<std::type_index, std::any> m_interfaces;
+        std::unordered_multimap<std::type_index, std::any> m_interfaces;
     };
 
     struct InitContext {
-        MessageBus& m_messages;
-        InterfaceCollection& m_interfaces;
-    };
-
-    struct ExecutionContext {
-        JobGraph* m_graph = nullptr;
-        MessageBus* m_messages = nullptr;
-        InterfaceCollection& m_interfaces;
-    };
-
-    struct MergeContext {
         MessageBus& m_messages;
         InterfaceCollection& m_interfaces;
     };
@@ -129,32 +127,49 @@ namespace okami {
 		size_t m_nextFrame;
 	};
 
+    struct BuildGraphParams {
+    };
+
+    class IIOModule {
+    public:
+        virtual ~IIOModule() = default;
+        virtual Error IOProcess(InterfaceCollection& interfaces) = 0;
+    };
+
+    class IGUIModule {
+    public:
+        virtual ~IGUIModule() = default;
+        virtual Error MessagePump(InterfaceCollection& interfaces) = 0;
+    };
+
     class EngineModule {
     private:
         std::vector<std::unique_ptr<EngineModule>> m_submodules;
         bool b_started = false;
         bool b_shutdown = false;
 
-        // Sets if children should have their ProcessFrame called automatically
-        bool b_children_process_frame = true;
+        // Sets if children should have their BuildGraph called automatically
+        bool b_children_build_update_graph = true;
         bool b_children_process_startup = true;
 
     protected:
         inline void SetChildrenProcessFrame(bool enable) {
-            b_children_process_frame = enable;
+            b_children_build_update_graph = enable;
         }
 
         inline void SetChildrenProcessStartup(bool enable) {
             b_children_process_startup = enable;
         }
 
-        virtual Error RegisterImpl(InterfaceCollection&) = 0;
+        virtual Error RegisterImpl(InterfaceCollection&) { return {}; }
 
-        virtual Error StartupImpl(InitContext const&) = 0;
-        virtual void ShutdownImpl(InitContext const&) = 0;
+        virtual Error StartupImpl(InitContext const&) { return {}; }
+        virtual void ShutdownImpl(InitContext const&) { }
 
-        virtual Error ProcessFrameImpl(Time const&, ExecutionContext const&) = 0;
-        virtual Error MergeImpl(MergeContext const&) = 0;
+        virtual Error BuildGraphImpl(JobGraph&, BuildGraphParams const& = {}) { return {}; }
+
+        virtual Error SendMessagesImpl(MessageBus&) { return {}; }
+        virtual Error ReceiveMessagesImpl(MessageBus&) { return {}; }
 
     public:
 		auto begin();
@@ -180,31 +195,16 @@ namespace okami {
 
         Error Register(InterfaceCollection&);
         Error Startup(InitContext const&);
-        Error ProcessFrame(Time const& t, ExecutionContext const&);
-        Error Merge(MergeContext const&);
+
+        Error SendMessages(MessageBus&);
+        Error ReceiveMessages(MessageBus&);
+
+        Error BuildGraph(JobGraph&, BuildGraphParams const& = {});
 
         void Shutdown(InitContext const& a);
 
-        virtual std::string GetName() const = 0;
+        virtual std::string GetName() const;
 
         virtual ~EngineModule();
-    };
-
-    class EmptyModule final : public EngineModule {
-    private:
-        std::string m_name;
-    
-    public:
-        inline EmptyModule(std::string name = "Empty Module") : m_name(name) {}
-
-    protected:
-        Error RegisterImpl(InterfaceCollection&) override { return {};}
-        Error StartupImpl(InitContext const&) override { return {}; }
-        void ShutdownImpl(InitContext const&) override { }
-
-        virtual Error ProcessFrameImpl(Time const&, ExecutionContext const&) override { return {}; }
-        virtual Error MergeImpl(MergeContext const&) override { return {}; }
-
-		std::string GetName() const override;
     };
 }

@@ -19,20 +19,18 @@ protected:
     void ShutdownImpl(InitContext const& context) override {
     }
 
-    Error ProcessFrameImpl(Time const& time, ExecutionContext const& ec) override {
+    Error SendMessagesImpl(MessageBus& bus) override {
         // Send a context for next frame
         // People will pipe and write to this context
-        ec.m_messages->Send(Im3dContext{
+        bus.Send(Im3dContext{
             .m_context = std::make_unique<Im3d::Context>()
         });
         return {};
     }
 
-    Error MergeImpl(MergeContext const& context) override {
-        auto port = context.m_messages.GetPort<Im3dContext>();
-
+    Error ReceiveMessagesImpl(MessageBus& bus) override {
         // This context now becomes the one to render
-        port->HandlePipeSingle([this](Im3dContext& context) {
+        bus.HandlePipe<Im3dContext>([this](Im3dContext& context) {
             context->endFrame();
             m_contextToRender = std::move(context);
         });

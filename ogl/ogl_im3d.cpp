@@ -43,10 +43,7 @@ Error OGLIm3D::StartupImpl(InitContext const& context) {
 
     return {};
 }
-void OGLIm3D::ShutdownImpl(InitContext const& context) { }
 
-Error OGLIm3D::ProcessFrameImpl(Time const& time, ExecutionContext const& context) { return {}; }
-Error OGLIm3D::MergeImpl(MergeContext const& context) { return {}; }
 Error OGLIm3D::Pass(OGLPass const& pass) {
     if (!m_dataProvider) {
         return {};

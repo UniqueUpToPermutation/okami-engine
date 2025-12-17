@@ -292,17 +292,12 @@ protected:
 		return {};
 	}
 
-	void ShutdownImpl(InitContext const& a) override {
-	}
-
-    Error ProcessFrameImpl(Time const& t, ExecutionContext const& a) override {
+    Error SendMessagesImpl(MessageBus& a) override {
         m_deserializers.clear();
         m_configs.clear();
 
         return {};
     }
-
-    Error MergeImpl(MergeContext const& a) override { return {}; }
 
     void Register(std::string_view name, std::function<std::any(IConfigDeserializer&)> func) override {
 		m_deserializers[name] = func;

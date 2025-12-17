@@ -285,7 +285,7 @@ protected:
     }
     
     Error StartupImpl(InitContext const& a) override {
-		a.m_messages.EnsurePort<EntityRemoveSignal>();
+		a.m_messages.EnsurePort<EntityRemoveMessage>();
 		a.m_messages.EnsurePort<EntityCreateSignal>();
 		a.m_messages.EnsurePort<EntityParentChangeSignal>();
 
@@ -293,17 +293,16 @@ protected:
 	}
     void ShutdownImpl(InitContext const&) override { }
 
-    Error ProcessFrameImpl(Time const& t, ExecutionContext const& a) override { return {}; }
-    Error MergeImpl(MergeContext const& a) override {
-		a.m_messages.Handle<EntityCreateSignal>([this](EntityCreateSignal const& msg) {
+    Error ReceiveMessagesImpl(MessageBus& bus) override {
+		bus.Handle<EntityCreateSignal>([this](EntityCreateSignal const& msg) {
 			m_tree.AddReservedEntity(msg.m_entity, msg.m_parent);
 		});
 
-		a.m_messages.Handle<EntityParentChangeSignal>([this](EntityParentChangeSignal const& msg) {
+		bus.Handle<EntityParentChangeSignal>([this](EntityParentChangeSignal const& msg) {
 			m_tree.SetParent(msg.m_entity, msg.m_newParent);
 		});
 
-		a.m_messages.Handle<EntityRemoveSignal>([this](EntityRemoveSignal const& msg) {
+		bus.Handle<EntityRemoveMessage>([this](EntityRemoveMessage const& msg) {
 			m_tree.RemoveEntity(msg.m_entity);
 		});
 

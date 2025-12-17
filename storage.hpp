@@ -67,7 +67,7 @@ namespace okami {
             ic.m_messages.EnsurePort<AddComponentSignal<T>>();
             ic.m_messages.EnsurePort<UpdateComponentSignal<T>>();
             ic.m_messages.EnsurePort<RemoveComponentSignal<T>>();
-            ic.m_messages.EnsurePort<EntityRemoveSignal>();
+            ic.m_messages.EnsurePort<EntityRemoveMessage>();
             ic.m_messages.EnsurePort<OnAddComponentEvent<T>>();
             ic.m_messages.EnsurePort<OnUpdateComponentEvent<T>>();
             ic.m_messages.EnsurePort<OnRemoveComponentEvent<T>>();
@@ -81,9 +81,9 @@ namespace okami {
             m_added.clear();
         }
 
-        Error ProcessFrameImpl(Time const&, ExecutionContext const& ec) override {
+        Error BuildGraphImpl(JobGraph& graph, BuildGraphParams const&) override {
             if (m_publishOnAddEvent) {
-                ec.m_graph->AddMessageNode([this](JobContext& context, Out<OnAddComponentEvent<T>> port) {
+                graph.AddMessageNode([this](JobContext& context, Out<OnAddComponentEvent<T>> port) {
                     for (auto msg : m_added) {
                         port.Send(msg);
                     }
@@ -93,7 +93,7 @@ namespace okami {
             }
 
             if (m_publishOnUpdateEvent) {
-                ec.m_graph->AddMessageNode([this](JobContext& context, Out<OnUpdateComponentEvent<T>> port) {
+                graph.AddMessageNode([this](JobContext& context, Out<OnUpdateComponentEvent<T>> port) {
                     for (auto msg : m_modified) {
                         port.Send(msg);
                     }
@@ -103,7 +103,7 @@ namespace okami {
             }
 
             if (m_publishOnRemoveEvent) {
-                ec.m_graph->AddMessageNode([this](JobContext& context, Out<OnRemoveComponentEvent<T>> port) {
+                graph.AddMessageNode([this](JobContext& context, Out<OnRemoveComponentEvent<T>> port) {
                     for (auto msg : m_removed) {
                         port.Send(msg);
                     }
@@ -115,16 +115,16 @@ namespace okami {
             return {};
         }
 
-        Error MergeImpl(MergeContext const& context) override {
+        Error ReceiveMessagesImpl(MessageBus& bus) override {
             if (!m_overrideAddHandler) {
-                context.m_messages.Handle<AddComponentSignal<T>>([this](AddComponentSignal<T> const& signal) {
+                bus.Handle<AddComponentSignal<T>>([this](AddComponentSignal<T> const& signal) {
                     m_storage[signal.m_entity] = signal.m_component;
                     m_added.push_back(OnAddComponentEvent<T>{signal.m_entity, signal.m_component});
                 });
             }
 
             if (!m_overrideUpdateHandler) {
-                context.m_messages.Handle<UpdateComponentSignal<T>>([this](UpdateComponentSignal<T> const& signal) {
+                bus.Handle<UpdateComponentSignal<T>>([this](UpdateComponentSignal<T> const& signal) {
                     auto it = m_storage.find(signal.m_entity);
                     if (it != m_storage.end()) {
                         it->second = signal.m_component;
@@ -136,7 +136,7 @@ namespace okami {
             }
 
             if (!m_overrideRemoveHandler) {
-                context.m_messages.Handle<RemoveComponentSignal<T>>([this](RemoveComponentSignal<T> const& signal) {
+                bus.Handle<RemoveComponentSignal<T>>([this](RemoveComponentSignal<T> const& signal) {
                     auto it = m_storage.find(signal.m_entity);
                     if (it != m_storage.end()) {
                         auto component = it->second;
@@ -149,7 +149,7 @@ namespace okami {
             }
 
             if (!m_overrideEntityRemoveHandler) {
-                context.m_messages.Handle<EntityRemoveSignal>([this](EntityRemoveSignal const& signal) {
+                bus.Handle<EntityRemoveMessage>([this](EntityRemoveMessage const& signal) {
                     auto it = m_storage.find(signal.m_entity);
                     if (it != m_storage.end()) {
                         auto component = it->second;

@@ -30,8 +30,8 @@ protected:
     void ShutdownImpl(InitContext const& context) override {
     }
 
-    Error ProcessFrameImpl(Time const& t, ExecutionContext const& ec) override {
-        ec.m_graph->AddMessageNode([this](
+    Error BuildGraphImpl(JobGraph& graph, BuildGraphParams const& params = {}) override {
+        graph.AddMessageNode([this](
             JobContext& jobContext,
             In<Time> time,
             In<AddVelocity2DMessage> inAddVelocity,
@@ -50,7 +50,7 @@ protected:
             return {};
         });
 
-        ec.m_graph->AddMessageNode([this](
+        graph.AddMessageNode([this](
             JobContext& jobContext,
             In<Time> time,
             In<AddVelocityMessage> inAddVelocity,
@@ -71,10 +71,8 @@ protected:
         return {};
     }
 
-    Error MergeImpl(MergeContext const& mc) override {
-        auto solveMessages = mc.m_messages.GetPort<TransformSolveMessage>();
-
-        solveMessages->Handle([&](TransformSolveMessage const& msg) {
+    Error ReceiveMessagesImpl(MessageBus& messages) override {
+        messages.Handle<TransformSolveMessage>([&](TransformSolveMessage const& msg) {
             m_transformStorage->Set(msg.m_entity, msg.m_result);
         });
 

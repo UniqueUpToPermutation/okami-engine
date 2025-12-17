@@ -5,7 +5,7 @@
 
 namespace okami {
     template <ResourceType T> 
-    class IOModule : public EngineModule {
+    class IOModule : public EngineModule, public IIOModule {
     private:
         DefaultSignalHandler<LoadResourceSignal<T>> m_load_handler;
 
@@ -14,24 +14,17 @@ namespace okami {
 
         Error RegisterImpl(InterfaceCollection& interfaces) override {
             interfaces.RegisterSignalHandler<LoadResourceSignal<T>>(&m_load_handler);
+            interfaces.Register<IOModule>(this);
+            
             return {};
-        }
-        Error StartupImpl(InitContext const&) override {
-            return {};
-        }
-        void ShutdownImpl(InitContext const&) override {
         }
 
-        Error ProcessFrameImpl(Time const&, ExecutionContext const& a) override {
-            m_load_handler.Handle([this, &a](LoadResourceSignal<T> const& msg) {
+        Error IOProcess(InterfaceCollection& interfaces) override {
+            m_load_handler.Handle([this, &interfaces](LoadResourceSignal<T> const& msg) {
                 auto result = LoadResource(LoadResourceSignal<T>{msg});
-                a.m_interfaces.SendSignal(std::move(result));
+                interfaces.SendSignal(std::move(result));
             });
 
-            return {};
-        }
-
-        Error MergeImpl(MergeContext const& a) override {
             return {};
         }
 

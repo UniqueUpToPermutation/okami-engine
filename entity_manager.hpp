@@ -20,7 +20,7 @@ namespace okami
 		entity_t m_parent;
 	};
 
-	struct EntityRemoveSignal {
+	struct EntityRemoveMessage {
 		entity_t m_entity;
 	};
 
@@ -153,8 +153,8 @@ namespace okami
     public:
         virtual EntityTree const& GetTree() const = 0;
         virtual entity_t CreateEntity(Out<EntityCreateSignal> port, entity_t parent = kRoot) = 0;
-        inline void RemoveEntity(Out<EntityRemoveSignal> port, entity_t entity) {
-			port.Send(EntityRemoveSignal{entity});
+        inline void RemoveEntity(Out<EntityRemoveMessage> port, entity_t entity) {
+			port.Send(EntityRemoveMessage{entity});
 		}
         inline void SetParent(Out<EntityParentChangeSignal> port, entity_t entity, entity_t parent = kRoot) {
 			port.Send(EntityParentChangeSignal{entity, GetTree().GetParent(entity), parent});

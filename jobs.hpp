@@ -300,7 +300,14 @@ namespace okami {
         template <MessageConcept T>
         void Handle(std::invocable<T const&> auto&& handler) {
             if (auto lane = GetPort<T>()) {
-                lane->Handle(handler);
+                lane->Handle(std::move(handler));
+            }
+        }
+
+        template <MessageConcept T>
+        void HandlePipe(std::invocable<T&> auto&& handler) {
+            if (auto lane = GetPort<T>()) {
+                lane->HandlePipeSingle(std::move(handler));
             }
         }
 

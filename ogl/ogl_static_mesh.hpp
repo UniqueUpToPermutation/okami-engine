@@ -32,9 +32,6 @@ namespace okami {
         Error StartupImpl(InitContext const& context) override;
         void ShutdownImpl(InitContext const& context) override;
 
-        Error ProcessFrameImpl(Time const& time, ExecutionContext const& context) override;
-        Error MergeImpl(MergeContext const& context) override;
-    
     public:
         OGLStaticMeshRenderer(OGLGeometryManager* geometryManager);
 

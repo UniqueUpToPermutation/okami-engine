@@ -25,9 +25,6 @@ namespace okami {
         Error RegisterImpl(InterfaceCollection&) override;
         Error StartupImpl(InitContext const&) override;
         void ShutdownImpl(InitContext const&) override;
-
-        Error ProcessFrameImpl(Time const&, ExecutionContext const&) override;
-        Error MergeImpl(MergeContext const&) override;
     
     public:
         OGLTriangleRenderer();

@@ -50,14 +50,6 @@ void OGLStaticMeshRenderer::ShutdownImpl(InitContext const& context) {
 
 }
 
-Error OGLStaticMeshRenderer::ProcessFrameImpl(Time const&, ExecutionContext const& context) {
-    return {};
-}
-
-Error OGLStaticMeshRenderer::MergeImpl(MergeContext const& context) {
-    return {};
-}
-
 OGLStaticMeshRenderer::OGLStaticMeshRenderer(OGLGeometryManager* geometryManager) :
     m_geometryManager(geometryManager) {
     m_storage = CreateChild<StorageModule<StaticMeshComponent>>();
