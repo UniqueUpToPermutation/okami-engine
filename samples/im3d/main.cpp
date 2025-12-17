@@ -33,25 +33,25 @@ int main() {
 
     en.AddScript([](Time const& time, ExecutionContext const& context) {
         context.m_graph->AddMessageNode([](JobContext& jc, Pipe<Im3dContext> im3d) -> Error {
-            im3d.HandleSingle([&](Im3dContext& im3dc) {
-                im3dc->begin(Im3d::PrimitiveMode_Triangles);
-                im3dc->vertex(Im3d::Vec3(-0.25f, 0.25f, 0.0f), 1.0, Im3d::Color_Magenta);
-                im3dc->vertex(Im3d::Vec3(0.0f, 0.75f, 0.0f), 1.0, Im3d::Color_Yellow);
-                im3dc->vertex(Im3d::Vec3(0.25f, 0.25f, 0.0f), 1.0, Im3d::Color_Cyan);
-                im3dc->end();
+            auto& im3dc = *im3d;
 
-                im3dc->begin(Im3d::PrimitiveMode_LineLoop);
-                im3dc->vertex(Im3d::Vec3(-0.75f, -0.75f, 0.0f), 1.0, Im3d::Color_Red);
-                im3dc->vertex(Im3d::Vec3(-0.5f, -0.25f, 0.0f), 1.0, Im3d::Color_Blue);
-                im3dc->vertex(Im3d::Vec3(-0.25f, -0.75f, 0.0f), 1.0, Im3d::Color_Green);
-                im3dc->end();
+            im3dc->begin(Im3d::PrimitiveMode_Triangles);
+            im3dc->vertex(Im3d::Vec3(-0.25f, 0.25f, 0.0f), 1.0, Im3d::Color_Magenta);
+            im3dc->vertex(Im3d::Vec3(0.0f, 0.75f, 0.0f), 1.0, Im3d::Color_Yellow);
+            im3dc->vertex(Im3d::Vec3(0.25f, 0.25f, 0.0f), 1.0, Im3d::Color_Cyan);
+            im3dc->end();
 
-                im3dc->begin(Im3d::PrimitiveMode_Points);
-                im3dc->vertex(Im3d::Vec3(0.25f, -0.75f, 0.0f), 1.0, Im3d::Color_Black);
-                im3dc->vertex(Im3d::Vec3(0.5f, -0.25f, 0.0f), 1.0, Im3d::Color_Black);
-                im3dc->vertex(Im3d::Vec3(0.75f, -0.75f, 0.0f), 1.0, Im3d::Color_Black);
-                im3dc->end();
-            });
+            im3dc->begin(Im3d::PrimitiveMode_LineLoop);
+            im3dc->vertex(Im3d::Vec3(-0.75f, -0.75f, 0.0f), 1.0, Im3d::Color_Red);
+            im3dc->vertex(Im3d::Vec3(-0.5f, -0.25f, 0.0f), 1.0, Im3d::Color_Blue);
+            im3dc->vertex(Im3d::Vec3(-0.25f, -0.75f, 0.0f), 1.0, Im3d::Color_Green);
+            im3dc->end();
+
+            im3dc->begin(Im3d::PrimitiveMode_Points);
+            im3dc->vertex(Im3d::Vec3(0.25f, -0.75f, 0.0f), 1.0, Im3d::Color_Black);
+            im3dc->vertex(Im3d::Vec3(0.5f, -0.25f, 0.0f), 1.0, Im3d::Color_Black);
+            im3dc->vertex(Im3d::Vec3(0.75f, -0.75f, 0.0f), 1.0, Im3d::Color_Black);
+            im3dc->end();
 
             return {};
         });

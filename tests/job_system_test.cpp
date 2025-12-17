@@ -321,20 +321,16 @@ TEST(JobSystemTest, PipeTest2) {
     bus.EnsurePort<TestMessage>();
     bus.Send(TestMessage{.value = 0, .text = ""});
 
-    auto prod2 = [](JobContext&, Pipe<TestMessage, 0> pipe) {
-        pipe.HandleSingle([&](TestMessage& msg) {
-            msg.text = "2";
-            msg.value += 1;
-        });
+    auto prod2 = [](JobContext&, Pipe<TestMessage, 0> msg) {
+        msg->text = "2";
+        msg->value += 1;
         return Error{};
     };
     int nodeP2 = graph.AddMessageNode(prod2);
 
-    auto prod1 = [](JobContext&, Pipe<TestMessage, 1> pipe) {
-        pipe.HandleSingle([&](TestMessage& msg) {
-            msg.text = "1";
-            msg.value += 1;
-        });
+    auto prod1 = [](JobContext&, Pipe<TestMessage, 1> msg) {
+        msg->text = "1";
+        msg->value += 1;
         return Error{};
     };
     int nodeP1 = graph.AddMessageNode(prod1);

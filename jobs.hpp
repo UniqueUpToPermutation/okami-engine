@@ -131,33 +131,33 @@ namespace okami {
 
     template <MessageConcept T>
     struct In {
-        MessagePort<T>* m_lane;
+        MessagePort<T>* m_port;
         std::shared_lock<std::shared_mutex> m_lock;
 
         In() = default;
-        In(MessagePort<T>* lane) : m_lane(lane), m_lock(lane->m_mutex) {}
+        In(MessagePort<T>* port) : m_port(port), m_lock(port->m_mutex) {}
 
         inline void Handle(std::invocable<T const&> auto&& handler) {
-            m_lane->HandleNoLock(std::move(handler));
+            m_port->HandleNoLock(std::move(handler));
         }
 
         T const& operator*() const {
-            return m_lane->m_messages.front();
+            return m_port->m_messages.front();
         }
 
         T const* operator->() const {
-            return &m_lane->m_messages.front();
+            return &m_port->m_messages.front();
         }
     };
 
     template <MessageConcept T>
     struct Out {
-        MessagePort<T>* m_lane;
+        MessagePort<T>* m_port;
         Out() = default;
-        Out(MessagePort<T>* lane) : m_lane(lane) {}
+        Out(MessagePort<T>* port) : m_port(port) {}
 
         inline void Send(T message) {
-            m_lane->Send(std::move(message));
+            m_port->Send(std::move(message));
         }
     };
 
@@ -175,8 +175,12 @@ namespace okami {
             m_port->HandlePipeNoLock(std::move(handler));
         }
 
-        inline void HandleSingle(std::invocable<T&> auto&& handler) {
-            m_port->HandlePipeSingleNoLock(std::move(handler));
+        T& operator*() {
+            return m_port->m_messages.front();
+        }
+
+        T* operator->()  {
+            return &m_port->m_messages.front();
         }
     };
 
@@ -262,11 +266,11 @@ namespace okami {
             using msg_t = typename trait::message_type;
             if constexpr (trait::type == NodeParamType::PORT_IN) {
                 In<msg_t> port;
-                port.m_lane = GetPort<msg_t>();
+                port.m_port = GetPort<msg_t>();
                 return port;
             } else if constexpr (trait::type == NodeParamType::PORT_OUT) {
                 Out<msg_t> port;
-                port.m_lane = GetPort<msg_t>();
+                port.m_port = GetPort<msg_t>();
                 return port;
             } else if constexpr (trait::type == NodeParamType::PIPE) {
                 constexpr auto kPriority = T::kPriority; 
