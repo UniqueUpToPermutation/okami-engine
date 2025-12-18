@@ -83,7 +83,7 @@ namespace okami {
         }
 
         template <typename T, typename Callable>
-        void ForEachInterface(Callable&& func) {
+        void ForEachInterface(Callable&& func) const {
             std::type_index typeIdx = std::type_index(typeid(T));
             auto range = m_interfaces.equal_range(typeIdx);
             for (auto it = range.first; it != range.second; ++it) {
@@ -103,11 +103,13 @@ namespace okami {
 
         template <SignalConcept T>
         void SendSignal(T message) const {
-            auto handler = Query<ISignalHandler<T>>();
-            if (handler) {
+            bool handled = false;
+            ForEachInterface<ISignalHandler<T>>([&](ISignalHandler<T>* handler) {
                 handler->Send(std::move(message));
-            } else {
-                OKAMI_LOG_WARNING("No signal handler registered for message type: " + std::string{typeid(T).name()});
+                handled = true;
+            });
+            if (!handled) {
+                OKAMI_LOG_WARNING("No ISignalHandler<" + std::string(typeid(T).name()) + "> registered to handle signal");
             }
         }
 
@@ -121,10 +123,10 @@ namespace okami {
     };
 
     struct Time {
-		double m_deltaTime;
-        double m_nextFrameTime;
-		double m_lastFrameTime;
-		size_t m_nextFrame;
+		double m_deltaTime = 0.0;
+        double m_nextFrameTime = 0.0;
+		double m_lastFrameTime = 0.0;
+		size_t m_nextFrame = 0;
 	};
 
     struct BuildGraphParams {
@@ -147,6 +149,7 @@ namespace okami {
         std::vector<std::unique_ptr<EngineModule>> m_submodules;
         bool b_started = false;
         bool b_shutdown = false;
+        int m_id = -1;
 
         // Sets if children should have their BuildGraph called automatically
         bool b_children_build_update_graph = true;
@@ -205,6 +208,9 @@ namespace okami {
 
         virtual std::string GetName() const;
 
+        inline int GetId() const { return m_id; }
+
         virtual ~EngineModule();
+        EngineModule();
     };
 }

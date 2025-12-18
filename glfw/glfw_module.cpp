@@ -173,6 +173,11 @@ private:
     WindowConfig m_config;
     bool m_createContext = false;
 
+    std::vector<KeyMessage> m_keyMessages;
+    std::vector<MouseButtonMessage> m_mouseButtonMessages;
+    KeyboardState m_keyboardState;
+    MouseState m_mouseState;
+
 public:
     void* GetNativeWindowHandle() const override {
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
@@ -232,6 +237,32 @@ protected:
             m_config.windowTitle.c_str(), nullptr, nullptr);
         OKAMI_ERROR_RETURN_IF(!m_window, "Failed to create GLFW window");
 
+        glfwSetWindowUserPointer(m_window, this);
+
+        glfwSetKeyCallback(m_window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+            GLFWModule* module = static_cast<GLFWModule*>(glfwGetWindowUserPointer(window));
+            Key okamiKey = GLFWToOkamiKey(key);
+            Action okamiAction = action == GLFW_PRESS ? Action::Press : action == GLFW_RELEASE ? Action::Release : Action::Repeat;
+            module->m_keyMessages.push_back({okamiKey, okamiAction});
+            if (okamiKey != Key::Unknown) {
+                module->m_keyboardState.m_keyStates[static_cast<int>(okamiKey)] = (action != GLFW_RELEASE);
+            }
+        });
+
+        glfwSetMouseButtonCallback(m_window, [](GLFWwindow* window, int button, int action, int mods) {
+            GLFWModule* module = static_cast<GLFWModule*>(glfwGetWindowUserPointer(window));
+            MouseButton okamiButton = GLFWToOkamiMouseButton(button);
+            Action okamiAction = action == GLFW_PRESS ? Action::Press : Action::Release;
+            module->m_mouseButtonMessages.push_back({okamiButton, okamiAction});
+            module->m_mouseState.m_buttonStates[okamiButton] = (action == GLFW_PRESS);
+        });
+
+        glfwSetCursorPosCallback(m_window, [](GLFWwindow* window, double xpos, double ypos) {
+            GLFWModule* module = static_cast<GLFWModule*>(glfwGetWindowUserPointer(window));
+            module->m_mouseState.m_cursorX = xpos;
+            module->m_mouseState.m_cursorY = ypos;
+        });
+
         if (m_createContext) {
             glfwMakeContextCurrent(m_window);
         }
@@ -251,9 +282,41 @@ protected:
     Error MessagePump(InterfaceCollection& interfaces) override {
         glfwPollEvents();
 
+        for (auto& msg : m_keyMessages) {
+            interfaces.SendSignal(msg);
+        }
+        m_keyMessages.clear();
+
+        for (auto& msg : m_mouseButtonMessages) {
+            interfaces.SendSignal(msg);
+        }
+        m_mouseButtonMessages.clear();
+
         if (glfwWindowShouldClose(m_window)) {
             interfaces.SendSignal(SignalExit{});
         }
+
+        return {};
+    }
+
+    Error SendMessagesImpl(MessageBus& bus) override {
+        auto winPos = glm::ivec2{0, 0};
+        glfwGetWindowPos(m_window, &winPos.x, &winPos.y);
+
+        bus.Send<IOState>(IOState{ 
+            .m_keyboard = m_keyboardState, 
+            .m_mouse = m_mouseState,
+            .m_display = DisplayState{
+                .m_framebufferSize = GetFramebufferSize(),
+                .m_windowPosition = winPos,
+                .m_focused = glfwGetWindowAttrib(m_window, GLFW_FOCUSED) != 0,
+            }
+        });
+        bus.SendBatch<KeyMessage>(m_keyMessages);
+        bus.SendBatch<MouseButtonMessage>(m_mouseButtonMessages);
+
+        m_keyMessages.clear();
+        m_mouseButtonMessages.clear();
 
         return {};
     }

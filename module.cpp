@@ -36,6 +36,10 @@ auto InterfaceCollection::cend() const {
 // EngineModule destructor definition
 EngineModule::~EngineModule() = default;
 
+std::atomic<int> g_moduleIdCounter = 0;
+EngineModule::EngineModule() : m_id(g_moduleIdCounter++) {
+}
+
 // EngineModule method definitions
 auto EngineModule::begin() { return m_submodules.begin(); }
 auto EngineModule::end() { return m_submodules.end(); }

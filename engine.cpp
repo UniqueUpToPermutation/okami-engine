@@ -210,8 +210,10 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 		// Receive messages after update, commit staged object changes
 		m_modules.ReceiveMessages(m_messages);
 
+		// Frame timing
 		timeEstimator = timeEstimator.Step();
 
+		// Check for exit conditions
 		if (maxFrames && timeEstimator.m_nextFrame >= *maxFrames) {
 			shouldExit = true;
 		}
@@ -219,6 +221,10 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 		if (m_exitHandler.FetchAndReset() > 0) {
 			shouldExit = true;
 		}
+
+		m_messages.Handle<MessageExit>([&shouldExit](MessageExit const&) { 
+			shouldExit = true; 
+		});
 	}
 }
 

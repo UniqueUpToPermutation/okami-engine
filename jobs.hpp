@@ -85,6 +85,14 @@ namespace okami {
             m_messages.push_back(std::move(message));
         }
 
+        void SendBatch(std::span<T> messages) {
+            std::unique_lock lock(m_mutex);
+            m_messages.reserve(m_messages.size() + messages.size());
+            for (auto& message : messages) {
+                m_messages.push_back(std::move(message));
+            }
+        }
+
         inline void HandleNoLock(std::invocable<T const&> auto&& handler) {
             std::shared_lock lock(m_mutex);
             for (const auto& message : m_messages) {
@@ -148,6 +156,14 @@ namespace okami {
         T const* operator->() const {
             return &m_port->m_messages.front();
         }
+
+        bool IsEmpty() const {
+            return m_port->m_messages.empty();
+        }
+
+        operator bool() const {
+            return !IsEmpty();
+        }
     };
 
     template <MessageConcept T>
@@ -159,20 +175,33 @@ namespace okami {
         inline void Send(T message) {
             m_port->Send(std::move(message));
         }
+        
+        inline void SendBatch(std::span<T> messages) {
+            m_port->SendBatch(messages);
+        }
     };
 
-    template <MessageConcept T, int Priority = 0>
-    struct Pipe {
-        static constexpr int kPriority = Priority;
+    using pipe_priority_t = int;
+    constexpr pipe_priority_t kDefaultPipePriority = 0;
 
+    constexpr auto kPipePriorityFirst = std::numeric_limits<pipe_priority_t>::max();
+    constexpr auto kPipePriorityLast = std::numeric_limits<pipe_priority_t>::min();
+
+    template <MessageConcept T, pipe_priority_t Priority = 0>
+    struct Pipe {
+        static constexpr pipe_priority_t kPriority = Priority;
         MessagePort<T>* m_port;
         std::shared_lock<std::shared_mutex> m_lock;
 
         Pipe() = default;
         Pipe(MessagePort<T>* port) : m_port(port), m_lock(port->m_mutex) {}
 
-        inline void Handle(std::invocable<std::span<T>> auto&& handler) {
+        inline void HandleSpan(std::invocable<std::span<T>> auto&& handler) {
             m_port->HandlePipeNoLock(std::move(handler));
+        }
+
+        inline void Handle(std::invocable<T&> auto&& handler) {
+            m_port->HandlePipeSingleNoLock(std::move(handler));
         }
 
         T& operator*() {
@@ -186,12 +215,12 @@ namespace okami {
 
     template <typename T>
     struct TraitIsPipe { static constexpr bool value = false; };
-    template <typename T, int Priority>
+    template <typename T, pipe_priority_t Priority>
     struct TraitIsPipe<Pipe<T, Priority>> { static constexpr bool value = true; };
 
     template <typename T>
     struct PipeGetType { using type = std::void_t<>; };
-    template <typename T, int Priority>
+    template <typename T, pipe_priority_t Priority>
     struct PipeGetType<Pipe<T, Priority>> { using type = T; };
 
     enum class NodeParamType {
@@ -221,12 +250,6 @@ namespace okami {
         static constexpr bool is_valid = true;
     };
 
-    template <typename T>
-    using MsgIn = In<T>;
-
-    template <typename T>
-    using MsgOut = Out<T>;
-
     class MessageBus {
     private:
         std::unordered_map<std::type_index, std::unique_ptr<IMessagePort>> m_ports;
@@ -234,20 +257,30 @@ namespace okami {
     public:
         virtual ~MessageBus() = default;
 
-        void Send(MessageConcept auto message) const {
-            if (auto it = m_ports.find(typeid(message)); it != m_ports.end()) {
-                auto lane = dynamic_cast<MessagePort<std::decay_t<decltype(message)>>*>(it->second.get());
-                OKAMI_ASSERT(lane != nullptr, "Message port type mismatch");
-                lane->Send(std::move(message));
+        template <MessageConcept T>
+        MessagePort<T>* EnsurePort() {
+            std::type_index typeIdx = typeid(T);
+            if (m_ports.find(typeIdx) == m_ports.end()) {
+                auto ptr = std::make_unique<MessagePort<T>>();
+                MessagePort<T>* rawPtr = ptr.get();
+                m_ports[typeIdx] = std::move(ptr);
+                return rawPtr;
+            } else {
+                return dynamic_cast<MessagePort<T>*>(m_ports[typeIdx].get());
             }
         }
 
+        void Send(MessageConcept auto message) {
+            auto port = EnsurePort<std::decay_t<decltype(message)>>();
+            OKAMI_ASSERT(port != nullptr, "Message port type mismatch");
+            port->Send(std::move(message));
+        }
+
         template <MessageConcept T>
-        void EnsurePort() {
-            std::type_index typeIdx = typeid(T);
-            if (m_ports.find(typeIdx) == m_ports.end()) {
-                m_ports[typeIdx] = std::make_unique<MessagePort<T>>();
-            }
+        void SendBatch(std::span<T> messages) {
+            auto port = EnsurePort<std::decay_t<T>>();
+            OKAMI_ASSERT(port != nullptr, "Message port type mismatch");
+            port->SendBatch(messages);
         }
 
         template <MessageConcept T>

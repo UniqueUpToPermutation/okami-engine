@@ -11,6 +11,7 @@
 
 namespace okami {
     struct SignalExit {};
+    struct MessageExit {};
 
 	struct EngineParams {
 		int m_argc = 0;
