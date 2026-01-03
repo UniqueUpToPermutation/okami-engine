@@ -9,7 +9,7 @@
 #include "engine.hpp"
 
 #include "ogl/ogl_renderer.hpp"
-#include "glfw/glfw_module.hpp"
+#include "glfw_module.hpp"
 
 #include "renderer.hpp"
 #include "transform.hpp"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../module.hpp"
+#include "module.hpp"
 
 namespace okami {
     struct GLFWModuleFactory {

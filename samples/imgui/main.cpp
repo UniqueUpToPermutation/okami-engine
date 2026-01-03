@@ -1,7 +1,7 @@
 #include "engine.hpp"
 
 #include "ogl/ogl_renderer.hpp"
-#include "glfw/glfw_module.hpp"
+#include "glfw_module.hpp"
 
 #include "transform.hpp"
 #include "paths.hpp"
@@ -19,7 +19,7 @@ int main() {
     // Register renderer based on compile-time options
     en.CreateModule<GLFWModuleFactory>();
     en.CreateModule<ImGuiModuleFactory>();
-    
+
     en.CreateModule<OGLRendererFactory>({}, params);
 
     Error err = en.Startup();

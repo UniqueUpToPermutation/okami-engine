@@ -1,7 +1,7 @@
 #include "engine.hpp"
 
 #include "ogl/ogl_renderer.hpp"
-#include "glfw/glfw_module.hpp"
+#include "glfw_module.hpp"
 
 #include "transform.hpp"
 #include "paths.hpp"
@@ -18,9 +18,10 @@ int main() {
 
     // Register renderer based on compile-time options
     en.CreateModule<GLFWModuleFactory>();
-    en.CreateModule<OGLRendererFactory>({}, params);
     en.CreateModule<Im3dModuleFactory>();
 
+    en.CreateModule<OGLRendererFactory>({}, params);
+    
     Error err = en.Startup();
     if (err.IsError()) {
         std::cerr << "Engine startup failed: " << err << std::endl;

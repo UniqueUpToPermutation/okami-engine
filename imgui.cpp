@@ -59,12 +59,29 @@ ImGuiKey OkamiKeyToImGuiKey(Key key) {
     }
 }
 
+CursorType ImGuiCursorToOkamiCursor(ImGuiMouseCursor cursor) {
+    switch (cursor) {
+        case ImGuiMouseCursor_Arrow: return CursorType::Arrow;
+        case ImGuiMouseCursor_TextInput: return CursorType::IBeam;
+        case ImGuiMouseCursor_ResizeAll: return CursorType::ResizeAll;
+        case ImGuiMouseCursor_ResizeNS: return CursorType::VResize;
+        case ImGuiMouseCursor_ResizeEW: return CursorType::HResize;
+        case ImGuiMouseCursor_ResizeNESW: return CursorType::ResizeNESW;
+        case ImGuiMouseCursor_ResizeNWSE: return CursorType::ResizeNWSE;
+        case ImGuiMouseCursor_Hand: return CursorType::Hand;
+        case ImGuiMouseCursor_NotAllowed: return CursorType::NotAllowed;
+        default: return CursorType::Unknown;
+    }
+}
+
 class ImguiModule final : 
     public EngineModule, 
     public IImguiProvider {
 protected:
     ImDrawData m_drawDataToRender;
-    ImGuiContext* m_context = nullptr;  
+    ImGuiContext* m_context = nullptr;
+
+    float m_lastScaleFactor = 1.0f;
 
     void ClearDrawData() {
         // Clear previous frame data to avoid memory leaks
@@ -100,27 +117,19 @@ protected:
 
     Error BuildGraphImpl(JobGraph& graph, BuildGraphParams const& params) {
         // Node to start a new ImGui frame
-        graph.AddMessageNode([id = GetId()](JobContext& jobContext,
+        graph.AddMessageNode([id = GetId(), &lastScaleFactor = m_lastScaleFactor](JobContext& jobContext,
             In<Time> time,
             In<IOState> io,
             Pipe<KeyMessage, kImGuiInputPriority> keyMessage,
-            Pipe<MouseButtonMessage, kImGuiInputPriority> mouseMessage, 
+            Pipe<MouseButtonMessage, kImGuiInputPriority> mouseMessage,
+            Pipe<MousePosMessage> mousePosMessage,
+            Pipe<ScrollMessage> scrollMessage,
+            Out<SetCursorMessage> outSetCursor,
             Pipe<ImGuiContextObject, kPipePriorityFirst>) -> Error {
 
             if (io) {
                 // Update ImGui IO state
                 ImGuiIO& imgui_io = ImGui::GetIO();
-
-                if (imgui_io.WantCaptureKeyboard) {
-                    keyMessage.Handle([id](KeyMessage& msg) {
-                        msg.m_captureId = id;   
-                    });
-                }
-                if (imgui_io.WantCaptureMouse) {
-                    mouseMessage.Handle([id](MouseButtonMessage& msg) {
-                        msg.m_captureId = id;   
-                    });
-                }
 
                 imgui_io.DisplaySize = ImVec2(
                     (float)io->m_display.m_framebufferSize.x, 
@@ -129,17 +138,102 @@ protected:
                 imgui_io.DeltaTime = (float)time->m_deltaTime;
 
                 imgui_io.MousePos = ImVec2((float)io->m_mouse.m_cursorX, (float)io->m_mouse.m_cursorY);
-                imgui_io.MouseDown[0] = io->m_mouse.IsButtonPressed(MouseButton::Left);
-                imgui_io.MouseDown[1] = io->m_mouse.IsButtonPressed(MouseButton::Right);
-                imgui_io.MouseDown[2] = io->m_mouse.IsButtonPressed(MouseButton::Middle);
-                imgui_io.MouseDown[3] = io->m_mouse.IsButtonPressed(MouseButton::Button4);
-                imgui_io.MouseDown[4] = io->m_mouse.IsButtonPressed(MouseButton::Button5);
 
-                for (int i = 0; i < kKeyCount; ++i) {
-                    ImGuiKey imguiKey = OkamiKeyToImGuiKey(static_cast<Key>(i));
-                    if (imguiKey != ImGuiKey_None) {
-                        imgui_io.AddKeyEvent(imguiKey, io->m_keyboard.m_keyStates[i]);
+                keyMessage.Handle([&imgui_io](KeyMessage& msg) {
+                    if (msg.m_captureId != kNoCaptureId) {
+                        return; // Already captured
                     }
+
+                    ImGuiKey imguiKey = OkamiKeyToImGuiKey(msg.m_key);
+                    if (imguiKey != ImGuiKey_None) {
+                        bool isPressed = (msg.m_action == Action::Press);
+                        imgui_io.AddKeyEvent(imguiKey, isPressed);
+                    }
+                });
+
+                mouseMessage.Handle([&imgui_io](MouseButtonMessage& msg) {
+                    if (msg.m_captureId != kNoCaptureId) {
+                        return; // Already captured
+                    }
+
+                    bool isPressed = (msg.m_action == Action::Press);
+                    switch (msg.m_button) {
+                        case MouseButton::Left:
+                            imgui_io.AddMouseButtonEvent(0, isPressed);
+                            break;
+                        case MouseButton::Right:
+                            imgui_io.AddMouseButtonEvent(1, isPressed);
+                            break;
+                        case MouseButton::Middle:
+                            imgui_io.AddMouseButtonEvent(2, isPressed);
+                            break;
+                        case MouseButton::Button4:
+                            imgui_io.AddMouseButtonEvent(3, isPressed);
+                            break;
+                        case MouseButton::Button5:
+                            imgui_io.AddMouseButtonEvent(4, isPressed);
+                            break;
+                        default:
+                            break;
+                    }
+                });
+
+                mousePosMessage.Handle([&imgui_io](MousePosMessage& msg) {
+                    if (msg.m_captureId != kNoCaptureId) {
+                        return; // Already captured
+                    }
+                    imgui_io.AddMousePosEvent((float)msg.m_x, (float)msg.m_y);
+                });
+                scrollMessage.Handle([&imgui_io](ScrollMessage& msg) {
+                    if (msg.m_captureId != kNoCaptureId) {
+                        return; // Already captured
+                    }
+                    imgui_io.AddMouseWheelEvent((float)msg.m_xOffset, (float)msg.m_yOffset);
+                });
+
+                // Scale everything for DPI changes
+                if (lastScaleFactor != io->m_display.m_contentScale.x) {
+                    auto newScaleFactor = io->m_display.m_contentScale.x;
+                    ImGui::GetStyle().ScaleAllSizes(newScaleFactor / lastScaleFactor);
+                    lastScaleFactor = newScaleFactor;
+                }
+                imgui_io.FontGlobalScale = lastScaleFactor;
+
+                // Capture input messages if not captured by others
+                if (imgui_io.WantCaptureKeyboard) {
+                    keyMessage.Handle([id](KeyMessage& msg) {
+                        if (msg.m_captureId != kNoCaptureId) {
+                            return; // Already captured
+                        }
+                        msg.m_captureId = id;   
+                    });
+                }
+                if (imgui_io.WantCaptureMouse) {
+                    mouseMessage.Handle([id](MouseButtonMessage& msg) {
+                        if (msg.m_captureId != kNoCaptureId) {
+                            return; // Already captured
+                        }
+                        msg.m_captureId = id;   
+                    });
+                    mousePosMessage.Handle([id](MousePosMessage& msg) {
+                        if (msg.m_captureId != kNoCaptureId) {
+                            return; // Already captured
+                        }
+                        msg.m_captureId = id;   
+                    });
+                    scrollMessage.Handle([id](ScrollMessage& msg) {
+                        if (msg.m_captureId != kNoCaptureId) {
+                            return; // Already captured
+                        }
+                        msg.m_captureId = id;   
+                    });
+                }
+
+                // Update mouse cursor
+                if (!(imgui_io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange)) {
+                    ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
+                    SetCursorMessage setCursorMsg{ ImGuiCursorToOkamiCursor(imgui_cursor) };
+                    outSetCursor.Send(setCursorMsg);
                 }
             }
 

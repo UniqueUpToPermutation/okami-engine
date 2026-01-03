@@ -1,7 +1,7 @@
 #include "glfw_module.hpp"
-#include "../renderer.hpp"
-#include "../config.hpp"
-#include "../input.hpp"
+#include "renderer.hpp"
+#include "config.hpp"
+#include "input.hpp"
 
 #include <glog/logging.h>
 
@@ -173,10 +173,16 @@ private:
     WindowConfig m_config;
     bool m_createContext = false;
 
-    std::vector<KeyMessage> m_keyMessages;
-    std::vector<MouseButtonMessage> m_mouseButtonMessages;
     KeyboardState m_keyboardState;
     MouseState m_mouseState;
+
+    std::array<GLFWcursor*, static_cast<int>(CursorType::Count)> m_cursors = { nullptr };
+
+    DefaultSignalHandler<KeyMessage> m_keySignalHandler;
+    DefaultSignalHandler<MouseButtonMessage> m_mouseButtonSignalHandler;
+    DefaultSignalHandler<MousePosMessage> m_mousePosSignalHandler;
+    DefaultSignalHandler<ScrollMessage> m_scrollSignalHandler;
+    DefaultSignalHandler<SetCursorMessage> m_setCursorSignalHandler;
 
 public:
     void* GetNativeWindowHandle() const override {
@@ -209,6 +215,13 @@ protected:
         interfaces.Register<INativeWindowProvider>(this);
         interfaces.Register<IGLProvider>(this);
         interfaces.Register<IGUIModule>(this);
+
+        interfaces.RegisterSignalHandler<KeyMessage>(&m_keySignalHandler);
+        interfaces.RegisterSignalHandler<MouseButtonMessage>(&m_mouseButtonSignalHandler);
+        interfaces.RegisterSignalHandler<MousePosMessage>(&m_mousePosSignalHandler);
+        interfaces.RegisterSignalHandler<ScrollMessage>(&m_scrollSignalHandler);
+        interfaces.RegisterSignalHandler<SetCursorMessage>(&m_setCursorSignalHandler);
+
         RegisterConfig<WindowConfig>(interfaces, LOG_WRAP(WARNING));
         return {};
     }
@@ -243,9 +256,8 @@ protected:
             GLFWModule* module = static_cast<GLFWModule*>(glfwGetWindowUserPointer(window));
             Key okamiKey = GLFWToOkamiKey(key);
             Action okamiAction = action == GLFW_PRESS ? Action::Press : action == GLFW_RELEASE ? Action::Release : Action::Repeat;
-            module->m_keyMessages.push_back({okamiKey, okamiAction});
             if (okamiKey != Key::Unknown) {
-                module->m_keyboardState.m_keyStates[static_cast<int>(okamiKey)] = (action != GLFW_RELEASE);
+                module->m_keySignalHandler.Send({okamiKey, okamiAction});
             }
         });
 
@@ -253,24 +265,46 @@ protected:
             GLFWModule* module = static_cast<GLFWModule*>(glfwGetWindowUserPointer(window));
             MouseButton okamiButton = GLFWToOkamiMouseButton(button);
             Action okamiAction = action == GLFW_PRESS ? Action::Press : Action::Release;
-            module->m_mouseButtonMessages.push_back({okamiButton, okamiAction});
-            module->m_mouseState.m_buttonStates[okamiButton] = (action == GLFW_PRESS);
+            module->m_mouseButtonSignalHandler.Send({okamiButton, okamiAction});
         });
 
         glfwSetCursorPosCallback(m_window, [](GLFWwindow* window, double xpos, double ypos) {
             GLFWModule* module = static_cast<GLFWModule*>(glfwGetWindowUserPointer(window));
-            module->m_mouseState.m_cursorX = xpos;
-            module->m_mouseState.m_cursorY = ypos;
+            module->m_mousePosSignalHandler.Send({xpos, ypos});
+        });
+
+        glfwSetScrollCallback(m_window, [](GLFWwindow* window, double xoffset, double yoffset) {
+            GLFWModule* module = static_cast<GLFWModule*>(glfwGetWindowUserPointer(window));
+            module->m_scrollSignalHandler.Send({xoffset, yoffset});
         });
 
         if (m_createContext) {
             glfwMakeContextCurrent(m_window);
         }
 
+        // Create cursors
+        m_cursors[static_cast<int>(CursorType::Arrow)] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+        m_cursors[static_cast<int>(CursorType::IBeam)] = glfwCreateStandardCursor(GLFW_IBEAM_CURSOR);
+        m_cursors[static_cast<int>(CursorType::Crosshair)] = glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR);
+        m_cursors[static_cast<int>(CursorType::Hand)] = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+        m_cursors[static_cast<int>(CursorType::HResize)] = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
+        m_cursors[static_cast<int>(CursorType::VResize)] = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
+        m_cursors[static_cast<int>(CursorType::ResizeAll)] = glfwCreateStandardCursor(GLFW_RESIZE_ALL_CURSOR);
+        m_cursors[static_cast<int>(CursorType::ResizeNESW)] = glfwCreateStandardCursor(GLFW_RESIZE_NESW_CURSOR);
+        m_cursors[static_cast<int>(CursorType::ResizeNWSE)] = glfwCreateStandardCursor(GLFW_RESIZE_NWSE_CURSOR);
+        m_cursors[static_cast<int>(CursorType::NotAllowed)] = glfwCreateStandardCursor(GLFW_NOT_ALLOWED_CURSOR);
+
         return {};
     }
 
     void ShutdownImpl(InitContext const& context) override {
+        for (auto& cursor : m_cursors) {
+            if (cursor) {
+                glfwDestroyCursor(cursor);
+            }
+            cursor = nullptr;
+        }
+
         if (m_window) {
             glfwDestroyWindow(m_window);
             m_window = nullptr;
@@ -279,44 +313,85 @@ protected:
         glfwTerminate();
     }
     
+    // This will potentially run on a different thread
     Error MessagePump(InterfaceCollection& interfaces) override {
         glfwPollEvents();
-
-        for (auto& msg : m_keyMessages) {
-            interfaces.SendSignal(msg);
-        }
-        m_keyMessages.clear();
-
-        for (auto& msg : m_mouseButtonMessages) {
-            interfaces.SendSignal(msg);
-        }
-        m_mouseButtonMessages.clear();
 
         if (glfwWindowShouldClose(m_window)) {
             interfaces.SendSignal(SignalExit{});
         }
 
+        m_setCursorSignalHandler.Handle([this](SetCursorMessage const& msg) {
+            GLFWcursor* cursor = m_cursors[static_cast<int>(msg.m_cursorType)];
+            glfwSetCursor(m_window, cursor);
+            if (msg.m_cursorType == CursorType::Hidden) {
+                glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+            } else {
+                glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            }
+        });
+
         return {};
     }
 
     Error SendMessagesImpl(MessageBus& bus) override {
+        // Forward input events    
+        m_keySignalHandler.HandleSpan([&](std::span<KeyMessage> messages) {
+            bus.SendBatch<KeyMessage>(messages);
+            for (const auto& msg : messages) {
+                m_keyboardState.m_keyStates[static_cast<int>(msg.m_key)] = (msg.m_action == Action::Press || msg.m_action == Action::Repeat);
+            }
+        });
+        m_mouseButtonSignalHandler.HandleSpan([&](std::span<MouseButtonMessage> messages) {
+            bus.SendBatch<MouseButtonMessage>(messages);
+            for (const auto& msg : messages) {
+                m_mouseState.m_buttonStates[msg.m_button] = (msg.m_action == Action::Press);
+            }
+        });
+        m_mousePosSignalHandler.HandleSpan([&](std::span<MousePosMessage> messages) {
+            bus.SendBatch<MousePosMessage>(messages);
+            for (const auto& msg : messages) {
+                m_mouseState.m_cursorX = msg.m_x;
+                m_mouseState.m_cursorY = msg.m_y;
+            }
+        });
+        m_scrollSignalHandler.HandleSpan([&](std::span<ScrollMessage> messages) {
+            bus.SendBatch<ScrollMessage>(messages);
+        });
+
+        // Send IO state
         auto winPos = glm::ivec2{0, 0};
         glfwGetWindowPos(m_window, &winPos.x, &winPos.y);
+
+        glm::vec2 contentScale{1.0f, 1.0f};
+        glfwGetWindowContentScale(m_window, &contentScale.x, &contentScale.y);
+
+        glm::ivec2 windowSize{0, 0};
+        glfwGetWindowSize(m_window, &windowSize.x, &windowSize.y);
+
+        glfwGetCursorPos(m_window, &m_mouseState.m_cursorX, &m_mouseState.m_cursorY);
 
         bus.Send<IOState>(IOState{ 
             .m_keyboard = m_keyboardState, 
             .m_mouse = m_mouseState,
             .m_display = DisplayState{
                 .m_framebufferSize = GetFramebufferSize(),
+                .m_windowSize = windowSize, 
                 .m_windowPosition = winPos,
+                .m_contentScale = contentScale,
                 .m_focused = glfwGetWindowAttrib(m_window, GLFW_FOCUSED) != 0,
+                .m_iconified = glfwGetWindowAttrib(m_window, GLFW_ICONIFIED) != 0
             }
         });
-        bus.SendBatch<KeyMessage>(m_keyMessages);
-        bus.SendBatch<MouseButtonMessage>(m_mouseButtonMessages);
 
-        m_keyMessages.clear();
-        m_mouseButtonMessages.clear();
+        return {};
+    }
+
+    Error ReceiveMessagesImpl(MessageBus& bus) override {
+        // Forward cursor messages to GLFW
+        bus.Handle<SetCursorMessage>([this](SetCursorMessage const& msg) {
+            m_setCursorSignalHandler.Send(msg);
+        });
 
         return {};
     }

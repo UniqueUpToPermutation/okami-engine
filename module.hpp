@@ -25,20 +25,26 @@ namespace okami {
     class DefaultSignalHandler : public ISignalHandler<T> {
     private:
         std::mutex m_mutex;
-        std::queue<T> m_messages;
+        std::vector<T> m_messages;
 
     public:
         void Send(T message) override {
             std::lock_guard lock(m_mutex);
-            m_messages.push(std::move(message));
+            m_messages.push_back(std::move(message));
         }
 
         void Handle(std::invocable<T> auto&& handler) {
             std::lock_guard lock(m_mutex);
-            while (!m_messages.empty()) {
-                handler(std::move(m_messages.front()));
-                m_messages.pop();
+            for (auto& message : m_messages) {
+                handler(std::move(message));
             }
+            m_messages.clear();
+        }
+
+        void HandleSpan(std::invocable<std::span<T>> auto&& handler) {
+            std::lock_guard lock(m_mutex);
+            handler(std::span<T>(m_messages.data(), m_messages.size()));
+            m_messages.clear();
         }
 
         void Clear() {

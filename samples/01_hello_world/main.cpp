@@ -1,7 +1,7 @@
 #include "engine.hpp"
 
 #include "ogl/ogl_renderer.hpp"
-#include "glfw/glfw_module.hpp"
+#include "glfw_module.hpp"
 
 #include "transform.hpp"
 #include "paths.hpp"

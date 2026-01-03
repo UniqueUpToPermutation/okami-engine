@@ -162,6 +162,40 @@ namespace okami {
         int m_captureId = kNoCaptureId;
     };
 
+    struct MousePosMessage {
+        double m_x;
+        double m_y;
+        int m_captureId = kNoCaptureId;
+    };
+
+    struct ScrollMessage {
+        double m_xOffset;
+        double m_yOffset;
+        int m_captureId = kNoCaptureId;
+    };
+
+    enum class CursorType {
+        Standard,
+        Hidden,
+        Arrow,
+        IBeam,
+        Crosshair,
+        Hand,
+        HResize,
+        VResize,
+        ResizeAll,
+        ResizeNESW,
+        ResizeNWSE,
+        NotAllowed,
+        Unknown,
+
+        Count
+    };
+
+    struct SetCursorMessage {
+        CursorType m_cursorType;
+    };
+
     struct KeyboardState {
         std::array<bool, kKeyCount> m_keyStates{};
 
@@ -198,6 +232,7 @@ namespace okami {
         glm::ivec2 m_framebufferSize = { 0, 0 };
         glm::ivec2 m_windowSize = { 0, 0 };
         glm::ivec2 m_windowPosition = { 0, 0 };
+        glm::vec2 m_contentScale = { 1.0f, 1.0f };
         bool m_focused = true;
         bool m_iconified = false;
     };
