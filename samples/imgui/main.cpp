@@ -18,8 +18,9 @@ int main() {
 
     // Register renderer based on compile-time options
     en.CreateModule<GLFWModuleFactory>();
-    en.CreateModule<OGLRendererFactory>({}, params);
     en.CreateModule<ImGuiModuleFactory>();
+    
+    en.CreateModule<OGLRendererFactory>({}, params);
 
     Error err = en.Startup();
     if (err.IsError()) {

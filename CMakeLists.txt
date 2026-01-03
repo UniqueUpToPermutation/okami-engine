@@ -427,10 +427,7 @@ set(ENGINE_LIB_SOURCES ${_FILTERED_LIB_SOURCES})
 
 add_library(EngineLib STATIC ${ENGINE_LIB_SOURCES})
 
-# Mark vcpkg headers as system to suppress warnings
-if(WIN32)
-    target_include_directories(EngineLib SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include)
-endif()
+
 
 # Link libraries for engine library
 target_link_libraries(EngineLib PUBLIC

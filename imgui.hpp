@@ -24,6 +24,13 @@ namespace okami {
 
     class IImguiProvider {
     public:
-        virtual ImDrawData const& GetDrawData() const = 0;
+        virtual ImDrawData& GetDrawData() = 0;
+
+        virtual ~IImguiProvider() = default;
+    };
+
+    class IImguiRenderer {
+    public:
+        virtual ~IImguiRenderer() = default;
     };
 };

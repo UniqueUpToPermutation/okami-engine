@@ -6,6 +6,7 @@
 #include "ogl_geometry.hpp"
 #include "ogl_static_mesh.hpp"
 #include "ogl_im3d.hpp"
+#include "ogl_imgui.hpp"
 
 #include "../config.hpp"
 #include "../storage.hpp"
@@ -35,6 +36,7 @@ private:
     OGLGeometryManager* m_geometryManager = nullptr;
     OGLStaticMeshRenderer* m_staticMeshRenderer = nullptr;
     OGLIm3D* m_im3d = nullptr;
+    OGLImguiRenderer* m_imguiRenderer = nullptr;
 
     StorageModule<Camera>* m_cameraStorage = nullptr;
     IComponentView<Transform>* m_transformView = nullptr;
@@ -118,6 +120,7 @@ protected:
         m_triangleRenderer->Pass(pass);
         m_spriteRenderer->Pass(pass);
         m_im3d->Pass(pass);
+        m_imguiRenderer->Pass(pass);
 
         m_glProvider->SwapBuffers();
 
@@ -137,6 +140,7 @@ public:
         m_spriteRenderer = CreateChild<OGLSpriteRenderer>(m_textureManager);
         m_staticMeshRenderer = CreateChild<OGLStaticMeshRenderer>(m_geometryManager);
         m_im3d = CreateChild<OGLIm3D>();
+        m_imguiRenderer = CreateChild<OGLImguiRenderer>();
     }
 
     std::string GetName() const override {

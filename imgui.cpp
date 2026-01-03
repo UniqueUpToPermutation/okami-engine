@@ -190,7 +190,7 @@ protected:
     }
 
 public:
-    ImDrawData const& GetDrawData() const override {
+    ImDrawData& GetDrawData() override {
         return m_drawDataToRender;
     }
 

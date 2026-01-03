@@ -17,15 +17,11 @@
     {
       "name": "imgui",
       "features": [
-        "glfw-binding"
+        "glfw-binding",
+        "dx12-binding",
+        "opengl3-binding",
+        "opengl3-binding"
       ]
-    },
-    {
-      "name": "imgui",
-      "features": [
-        "dx12-binding"
-      ],
-      "platform": "windows"
     },
     "ktx",
     "tinygltf",
