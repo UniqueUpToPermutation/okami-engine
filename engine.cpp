@@ -181,6 +181,9 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 	// IO modules process first to stage any initial data
 	processIO();
 
+	// Modules receive any initial messages
+	m_modules.ReceiveMessages(m_messages);
+
 	FrameTimeEstimator timeEstimator;
 	DefaultJobGraphExecutor executor;
 

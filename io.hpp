@@ -14,7 +14,7 @@ namespace okami {
 
         Error RegisterImpl(InterfaceCollection& interfaces) override {
             interfaces.RegisterSignalHandler<LoadResourceSignal<T>>(&m_load_handler);
-            interfaces.Register<IOModule>(this);
+            interfaces.Register<IIOModule>(this);
             
             return {};
         }

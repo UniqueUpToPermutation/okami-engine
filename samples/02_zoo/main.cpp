@@ -74,7 +74,7 @@ int main() {
         JobContext& ctx,
         Out<AddVelocityMessage> outVelocity) -> Error {
 
-        outVelocity.Send(AddVelocityMessage{ .m_entity = cameraEntity, .m_velocity = glm::vec3(0.0f, 0.0f, 0.0f) });
+        //outVelocity.Send(AddVelocityMessage{ .m_entity = cameraEntity, .m_velocity = glm::vec3(0.0f, 0.0f, 0.0f) });
         return Error{};
     });
 

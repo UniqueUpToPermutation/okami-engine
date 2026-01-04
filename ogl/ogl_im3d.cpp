@@ -11,7 +11,7 @@ Error OGLIm3D::StartupImpl(InitContext const& context) {
     m_dataProvider = context.m_interfaces.Query<IIm3dProvider>();
 
     if (!m_dataProvider) {
-        OKAMI_LOG_WARNING("IIm3dProvider interface not available for OGLIm3D");
+        OKAMI_LOG_WARNING("IIm3dProvider interface not found; Im3d rendering will be disabled");
         return {};
     }
 
