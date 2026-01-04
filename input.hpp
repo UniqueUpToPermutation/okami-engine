@@ -174,6 +174,11 @@ namespace okami {
         int m_captureId = kNoCaptureId;
     };
 
+    struct CharMessage {
+        uint32_t m_char;
+        int m_captureId = kNoCaptureId;
+    };
+
     enum class CursorType {
         Standard,
         Hidden,

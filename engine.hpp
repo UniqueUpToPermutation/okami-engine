@@ -82,9 +82,18 @@ namespace okami {
             return cm->Create(std::move(data));
         }
 
-        void AddScript(
+        void AddScriptBundle(
             std::function<void(JobGraph&, BuildGraphParams const&)> script, 
             std::string_view name = "Unnamed Script");
+
+        template <typename Callable>
+        void AddScript(Callable task, std::string_view name = "Unnamed Script") {
+            AddScriptBundle(
+                [task = std::move(task)](JobGraph& graph, BuildGraphParams const& params) {
+                    graph.AddMessageNode(std::move(task));
+                },
+                name);
+        }
 
 		std::filesystem::path GetRenderOutputPath(size_t frameIndex);
 

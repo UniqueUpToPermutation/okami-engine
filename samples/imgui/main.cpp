@@ -34,11 +34,9 @@ int main() {
 
     bool windowOpen = true;
 
-    en.AddScript([&](JobGraph& graph, BuildGraphParams const& params) {
-        graph.AddMessageNode([&](JobContext& jc, Pipe<ImGuiContextObject> imgui) -> Error {
-            ImGui::ShowDemoWindow(&windowOpen);
-            return {};
-        });
+    en.AddScript([&](JobContext& jc, Pipe<ImGuiContextObject> imgui) -> Error {
+        ImGui::ShowDemoWindow(&windowOpen);
+        return {};
     });
 
     en.Run();

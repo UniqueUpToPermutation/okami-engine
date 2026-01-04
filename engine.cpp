@@ -228,7 +228,7 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 	}
 }
 
-void Engine::AddScript(
+void Engine::AddScriptBundle(
 	std::function<void(JobGraph&, BuildGraphParams const&)> script, 
 	std::string_view name) {
 	CreateModule([script = std::move(script), name = std::string{name}]() {

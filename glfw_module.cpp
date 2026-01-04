@@ -183,6 +183,7 @@ private:
     DefaultSignalHandler<MousePosMessage> m_mousePosSignalHandler;
     DefaultSignalHandler<ScrollMessage> m_scrollSignalHandler;
     DefaultSignalHandler<SetCursorMessage> m_setCursorSignalHandler;
+    DefaultSignalHandler<CharMessage> m_charSignalHandler;
 
 public:
     void* GetNativeWindowHandle() const override {
@@ -278,6 +279,11 @@ protected:
             module->m_scrollSignalHandler.Send({xoffset, yoffset});
         });
 
+        glfwSetCharCallback(m_window, [](GLFWwindow* window, unsigned int codepoint) {
+            GLFWModule* module = static_cast<GLFWModule*>(glfwGetWindowUserPointer(window));
+            module->m_charSignalHandler.Send({codepoint});
+        });
+
         if (m_createContext) {
             glfwMakeContextCurrent(m_window);
         }
@@ -357,6 +363,9 @@ protected:
         });
         m_scrollSignalHandler.HandleSpan([&](std::span<ScrollMessage> messages) {
             bus.SendBatch<ScrollMessage>(messages);
+        });
+        m_charSignalHandler.HandleSpan([&](std::span<CharMessage> messages) {
+            bus.SendBatch<CharMessage>(messages);
         });
 
         // Send IO state
