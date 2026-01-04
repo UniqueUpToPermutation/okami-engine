@@ -1,4 +1,5 @@
 #include "camera.hpp"
+#include "common.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -57,7 +58,8 @@ glm::mat4 NoProjection::GetProjectionMatrix(int width, int height, bool usingDir
 
 Camera Camera::Identity() {
 	return Camera{
-		Projection{ NoProjection{} } };
+		Projection{ NoProjection{} } 
+	};
 }
 
 Camera Camera::Perspective(
@@ -104,6 +106,8 @@ Camera Camera::Orthographic(
 			float width,
 			float nearZ,
 			float farZ) {
+	OKAMI_ASSERT(nearZ < farZ, "Near plane must be less than far plane");
+
 	return Camera{
 		Projection{OrthographicProjection{ 
 			.m_width = width, 

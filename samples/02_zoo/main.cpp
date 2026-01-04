@@ -17,6 +17,7 @@
 #include "paths.hpp"
 #include "geometry.hpp"
 #include "physics.hpp"
+#include "storage.hpp"
 
 using namespace okami;
 
@@ -47,9 +48,9 @@ int main() {
     en.AddComponent(tri2Entity, Transform::Translate(0.25f, 0.25f, 0.15f));
 
     auto cameraEntity = en.CreateEntity();
-    en.AddComponent(cameraEntity, Camera::Orthographic(3.0f, 3.0f, -3.0f));
+    en.AddComponent(cameraEntity, Camera::Orthographic(3.0f, -10.0f, 10.0f));
     en.AddComponent(cameraEntity, Transform::LookAt(
-        glm::vec3(-1.0f, -1.0f, -1.0f),
+        glm::vec3(5.0f, 5.0f, 5.0f),
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f)
     ));
@@ -70,12 +71,22 @@ int main() {
     en.AddComponent(geometryEntity, StaticMeshComponent{ geometryHandle });
     en.AddComponent(geometryEntity, Transform::Translate(0.5f, 0.1f, 0.1f) * Transform::Scale(0.25f));
 
-    en.AddScript([tri1Entity, cameraEntity](
-        JobContext& ctx,
-        Out<AddVelocityMessage> outVelocity) -> Error {
+    auto transformAccessor = en.QueryInterface<IComponentView<Transform>>();
 
-        //outVelocity.Send(AddVelocityMessage{ .m_entity = cameraEntity, .m_velocity = glm::vec3(0.0f, 0.0f, 0.0f) });
-        return Error{};
+    // Rotate the camera around the origin
+    en.AddScript([&](
+        JobContext& ctx,
+        In<Time> inTime,
+        Out<UpdateComponentSignal<Transform>> outTransform) -> Error {
+
+        auto transform = transformAccessor->Get(cameraEntity);
+
+        outTransform.Send(UpdateComponentSignal<Transform>{
+            .m_entity = cameraEntity,
+            .m_component = Transform::RotateY(0.5f * inTime->GetDeltaTimeF()) * transform
+        });
+
+        return {};
     });
 
     en.Run();

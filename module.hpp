@@ -133,6 +133,10 @@ namespace okami {
         double m_nextFrameTime = 0.0;
 		double m_lastFrameTime = 0.0;
 		size_t m_nextFrame = 0;
+
+        inline float GetDeltaTimeF() const {
+            return static_cast<float>(m_deltaTime);
+        }
 	};
 
     struct BuildGraphParams {

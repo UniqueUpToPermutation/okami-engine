@@ -6,6 +6,7 @@
 #include "transform.hpp"
 #include "paths.hpp"
 #include "geometry.hpp"
+#include "storage.hpp"
 
 using namespace okami;
 
@@ -27,9 +28,9 @@ int main() {
     auto geometryHandle = en.LoadResource<Geometry>(GetAssetPath("box.glb"));
 
     auto cameraEntity = en.CreateEntity();
-    en.AddComponent(cameraEntity, Camera::Orthographic(3.0f, 3.0f, -3.0f));
+    en.AddComponent(cameraEntity, Camera::Orthographic(3.0f, -3.0f, 3.0f));
     en.AddComponent(cameraEntity, Transform::LookAt(
-        glm::vec3(-1.0f, -1.0f, -1.0f),
+        glm::vec3(1.0f, 1.0f, 1.0f),
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f)
     ));
@@ -38,6 +39,24 @@ int main() {
     auto meshEntity = en.CreateEntity();
     en.AddComponent(meshEntity, StaticMeshComponent{ geometryHandle });
     en.AddComponent(meshEntity, Transform::Scale(0.25f));
+
+    auto transformAccessor = en.QueryInterface<IComponentView<Transform>>();
+
+    // Rotate the camera around the origin
+    en.AddScript([&](
+        JobContext& ctx,
+        In<Time> inTime,
+        Out<UpdateComponentSignal<Transform>> outTransform) -> Error {
+
+        auto transform = transformAccessor->Get(cameraEntity);
+
+        outTransform.Send(UpdateComponentSignal<Transform>{
+            .m_entity = cameraEntity,
+            .m_component = Transform::RotateY(0.5f * inTime->GetDeltaTimeF()) * transform
+        });
+
+        return {};
+    });
 
     en.Run();
     en.Shutdown();

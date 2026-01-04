@@ -29,7 +29,7 @@ int main() {
     }
 
     auto cameraEntity = en.CreateEntity();
-    en.AddComponent(cameraEntity, Camera::Orthographic(2.25f, 1.0f, -1.0f));
+    en.AddComponent(cameraEntity, Camera::Orthographic(3.0f, -1.0f, 1.0f));
     en.SetActiveCamera(cameraEntity);
 
     en.AddScript([](JobContext& jc, Pipe<Im3dContext> im3d) -> Error {
