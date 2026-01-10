@@ -3,7 +3,7 @@
 #include "../engine.hpp"
 
 using namespace okami;
-
+/*
 class EntityTreeTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -301,3 +301,4 @@ TEST_F(EntityTreeTest, MultipleReservedEntities_UniqueIds_DoNotConflict) {
     entity_t regularEntity = tree->CreateEntity();
     EXPECT_TRUE(std::find(reservedIds.begin(), reservedIds.end(), regularEntity) == reservedIds.end());
 }
+*/

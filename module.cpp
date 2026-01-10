@@ -105,14 +105,14 @@ Error EngineModule::SendMessages(MessageBus& a) {
     return {};
 }
 
-Error EngineModule::ReceiveMessages(MessageBus& a) {
+Error EngineModule::ReceiveMessages(MessageBus& a, RecieveMessagesParams const& b) {
     OKAMI_ASSERT(b_started, "Module must be started before processing frames");
 
-    Error e = ReceiveMessagesImpl(a);
+    Error e = ReceiveMessagesImpl(a, b);
     OKAMI_ERROR_RETURN(e);
 
     for (auto& mod : m_submodules) {
-        e += mod->ReceiveMessages(a);
+        e += mod->ReceiveMessages(a, b);
         OKAMI_ERROR_RETURN(e);
     }
     return {};

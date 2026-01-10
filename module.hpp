@@ -11,6 +11,8 @@
 #include "log.hpp"
 #include "jobs.hpp"
 
+#include <entt/entity/registry.hpp>
+
 namespace okami {
     template <SignalConcept T>
     class ISignalHandler {
@@ -126,6 +128,7 @@ namespace okami {
     struct InitContext {
         MessageBus& m_messages;
         InterfaceCollection& m_interfaces;
+        entt::registry& m_registry;
     };
 
     struct Time {
@@ -140,6 +143,11 @@ namespace okami {
 	};
 
     struct BuildGraphParams {
+        entt::registry const& m_registry;
+    };
+
+    struct RecieveMessagesParams {
+        entt::registry& m_registry;
     };
 
     class IIOModule {
@@ -179,10 +187,10 @@ namespace okami {
         virtual Error StartupImpl(InitContext const&) { return {}; }
         virtual void ShutdownImpl(InitContext const&) { }
 
-        virtual Error BuildGraphImpl(JobGraph&, BuildGraphParams const& = {}) { return {}; }
+        virtual Error BuildGraphImpl(JobGraph&, BuildGraphParams const&) { return {}; }
 
         virtual Error SendMessagesImpl(MessageBus&) { return {}; }
-        virtual Error ReceiveMessagesImpl(MessageBus&) { return {}; }
+        virtual Error ReceiveMessagesImpl(MessageBus&, RecieveMessagesParams const&) { return {}; }
 
     public:
 		auto begin();
@@ -210,9 +218,9 @@ namespace okami {
         Error Startup(InitContext const&);
 
         Error SendMessages(MessageBus&);
-        Error ReceiveMessages(MessageBus&);
+        Error ReceiveMessages(MessageBus&, RecieveMessagesParams const&);
 
-        Error BuildGraph(JobGraph&, BuildGraphParams const& = {});
+        Error BuildGraph(JobGraph&, BuildGraphParams const&);
 
         void Shutdown(InitContext const& a);
 

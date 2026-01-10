@@ -5,8 +5,11 @@
 #include "common.hpp"
 #include "pool.hpp"
 
+#include <entt/entt.hpp>
+
 using namespace okami;
 
+/*
 // Define WorldNode and WorldImpl in the .cpp file to keep them private
 struct EntityTreeNode {
 	entity_t m_entityId = kNullEntity;
@@ -272,11 +275,11 @@ EntityPrefixIterator& EntityPrefixIterator::operator++() {
 
 entity_t EntityTree::ReserveEntityId() {
     return m_impl->m_nextEntityId.fetch_add(1);
-}
+}*/
 
 class EntityManager : public EngineModule, public IEntityManager {
 private:
-    EntityTree m_tree;
+    entt::registry& m_registry;
 
 protected:
     Error RegisterImpl(InterfaceCollection& interfaces) override {
@@ -286,24 +289,19 @@ protected:
     
     Error StartupImpl(InitContext const& a) override {
 		a.m_messages.EnsurePort<EntityRemoveMessage>();
-		a.m_messages.EnsurePort<EntityCreateSignal>();
 		a.m_messages.EnsurePort<EntityParentChangeSignal>();
 
 		return {};
 	}
     void ShutdownImpl(InitContext const&) override { }
 
-    Error ReceiveMessagesImpl(MessageBus& bus) override {
-		bus.Handle<EntityCreateSignal>([this](EntityCreateSignal const& msg) {
-			m_tree.AddReservedEntity(msg.m_entity, msg.m_parent);
-		});
-
+    Error ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const& params) override {
 		bus.Handle<EntityParentChangeSignal>([this](EntityParentChangeSignal const& msg) {
-			m_tree.SetParent(msg.m_entity, msg.m_newParent);
+			OKAMI_LOG_WARNING("EntityParentChangeSignal not implemented yet");
 		});
 
 		bus.Handle<EntityRemoveMessage>([this](EntityRemoveMessage const& msg) {
-			m_tree.RemoveEntity(msg.m_entity);
+			m_registry.destroy(msg.m_entity);
 		});
 
         return {};
@@ -314,17 +312,14 @@ protected:
     }
 
 public:
-    EntityTree const& GetTree() const override {
-        return m_tree;
-    }
+	EntityManager(entt::registry& registry) : m_registry(registry) {}
 
-    entity_t CreateEntity(Out<EntityCreateSignal> port, entity_t parent = kRoot) override {
-        entity_t newEntity = m_tree.ReserveEntityId();
-		port.Send(EntityCreateSignal{newEntity, parent});
-        return newEntity;
+    entity_t CreateEntity() override {
+		static_assert(ENTT_USE_ATOMIC, "EntityManager requires ENTT_USE_ATOMIC to be defined for thread-safe entity creation");
+        return m_registry.create(); // Assumed atmoic
     }
 };
 
-std::unique_ptr<EngineModule> EntityManagerFactory::operator()() {
-    return std::make_unique<EntityManager>();
+std::unique_ptr<EngineModule> EntityManagerFactory::operator()(entt::registry& registry) {
+    return std::make_unique<EntityManager>(registry);
 }

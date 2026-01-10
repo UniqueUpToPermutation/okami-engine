@@ -28,7 +28,7 @@ protected:
         return {};
     }
 
-    Error ReceiveMessagesImpl(MessageBus& bus) override {
+    Error ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const& params) override {
         // This context now becomes the one to render
         bus.HandlePipe<Im3dContext>([this](Im3dContext& context) {
             context->endFrame();

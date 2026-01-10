@@ -396,7 +396,7 @@ protected:
         return {};
     }
 
-    Error ReceiveMessagesImpl(MessageBus& bus) override {
+    Error ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const& params) override {
         // Forward cursor messages to GLFW
         bus.Handle<SetCursorMessage>([this](SetCursorMessage const& msg) {
             m_setCursorSignalHandler.Send(msg);

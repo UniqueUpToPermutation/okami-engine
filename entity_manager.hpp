@@ -6,67 +6,68 @@
 #include <memory>
 #include <cstdint>
 
+#include <entt/entity/entity.hpp>
+
+namespace std {
+	inline std::string to_string(entt::entity e) {
+		return std::to_string(entt::to_integral(e));
+	}
+}
+
 namespace okami
 {
 	class ISignalBus;
 	class Engine;
 
-	using entity_t = int32_t;
-	constexpr entity_t kRoot = 0;
-	constexpr entity_t kNullEntity = -1;
-
-    struct EntityCreateSignal {
-		entity_t m_entity;
-		entity_t m_parent;
-	};
+	using entity_t = entt::entity;
+	constexpr entity_t kNullEntity = entt::null;
 
 	struct EntityRemoveMessage {
-		entity_t m_entity;
+		entity_t m_entity = kNullEntity;
 	};
 
 	struct EntityParentChangeSignal {
-		entity_t m_entity;
-		entity_t m_oldParent;
-		entity_t m_newParent;
+		entity_t m_entity = kNullEntity;
+		entity_t m_newParent = kNullEntity;
 	};
 
 	template <typename T>
 	struct AddComponentSignal {
-		entity_t m_entity;
+		entity_t m_entity = kNullEntity;
 		T m_component;
 	};
 
 	template <typename T>
 	struct UpdateComponentSignal {
-		entity_t m_entity;
+		entity_t m_entity = kNullEntity;
 		T m_component;
 	};
 
 	template <typename T>
 	struct RemoveComponentSignal {
-		entity_t m_entity;
+		entity_t m_entity = kNullEntity;
 	};
 
 	template <typename T>
 	struct OnAddComponentEvent {
-		entity_t m_entity;
+		entity_t m_entity = kNullEntity;
 		T m_component;
 	};
 
 	template <typename T>
 	struct OnUpdateComponentEvent {
-		entity_t m_entity;
+		entity_t m_entity = kNullEntity;
 		T m_component;
 	};
 
 	template <typename T>
 	struct OnRemoveComponentEvent {
-		entity_t m_entity;
+		entity_t m_entity = kNullEntity;
 		T m_component;
 	};
 
 	// Forward declarations
-	struct EntityTreeImpl;
+	/*struct EntityTreeImpl;
 	class EntityTree;
 
 	struct EntityIteratorBase {
@@ -147,22 +148,28 @@ namespace okami
         OKAMI_NO_COPY(EntityTree);
 
 	private:
-	};
+	};*/
 
     class IEntityManager {
     public:
-        virtual EntityTree const& GetTree() const = 0;
-        virtual entity_t CreateEntity(Out<EntityCreateSignal> port, entity_t parent = kRoot) = 0;
+        virtual entity_t CreateEntity() = 0;
+
+		inline entity_t CreateEntity(Out<EntityParentChangeSignal> port, entity_t parent) {
+			auto entity = CreateEntity();
+			if (parent != kNullEntity) {
+				port.Send(EntityParentChangeSignal{entity, parent});
+			}
+			return entity;
+		}
+
         inline void RemoveEntity(Out<EntityRemoveMessage> port, entity_t entity) {
 			port.Send(EntityRemoveMessage{entity});
 		}
-        inline void SetParent(Out<EntityParentChangeSignal> port, entity_t entity, entity_t parent = kRoot) {
-			port.Send(EntityParentChangeSignal{entity, GetTree().GetParent(entity), parent});
-		}
+
         virtual ~IEntityManager() = default;
     };
 
     struct EntityManagerFactory {
-        std::unique_ptr<EngineModule> operator()();
+        std::unique_ptr<EngineModule> operator()(entt::registry&);
     };
 }

@@ -36,7 +36,7 @@ Engine::Engine(EngineParams params) :
 #endif
 	}
 
-    CreateModule(EntityManagerFactory{});
+    CreateModule(EntityManagerFactory{}, std::ref(m_registry));
     CreateModule(ConfigModuleFactory{});
 	CreateModule(PhysicsModuleFactory{});
 
@@ -46,7 +46,7 @@ Engine::Engine(EngineParams params) :
 
 entity_t Engine::CreateEntity(entity_t parent) {
     if (m_entityManager) {
-		auto port = m_messages.GetPortOut<EntityCreateSignal>();
+		auto port = m_messages.GetPortOut<EntityParentChangeSignal>();
         return m_entityManager->CreateEntity(port, parent);
     } else {
         throw std::runtime_error("No IEntityManager available in Engine. Call Startup first!");
@@ -71,7 +71,8 @@ Engine::~Engine() {
 InitContext Engine::GetInitContext() {
 	return InitContext{
 		.m_messages = m_messages,
-		.m_interfaces = m_interfaces
+		.m_interfaces = m_interfaces,
+		.m_registry = m_registry
 	};
 }
 
@@ -182,7 +183,8 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 	processIO();
 
 	// Modules receive any initial messages
-	m_modules.ReceiveMessages(m_messages);
+	RecieveMessagesParams receiveParams{ .m_registry = m_registry };
+	m_modules.ReceiveMessages(m_messages, receiveParams);
 
 	FrameTimeEstimator timeEstimator;
 	DefaultJobGraphExecutor executor;
@@ -198,7 +200,8 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 
 		// Execute the update job graph
 		JobGraph updateJobGraph;
-		m_modules.BuildGraph(updateJobGraph);
+		BuildGraphParams graphParams{ .m_registry = m_registry };
+		m_modules.BuildGraph(updateJobGraph, graphParams);
 
 		// Send messages for this frame
 		m_messages.Send(time);
@@ -211,7 +214,7 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 		executor.Execute(updateJobGraph, m_messages);
 
 		// Receive messages after update, commit staged object changes
-		m_modules.ReceiveMessages(m_messages);
+		m_modules.ReceiveMessages(m_messages, receiveParams);
 
 		// Frame timing
 		timeEstimator = timeEstimator.Step();

@@ -264,7 +264,7 @@ protected:
         return {};
     }
 
-    Error ReceiveMessagesImpl(MessageBus& bus) {
+    Error ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const&) override {
         // This context now becomes the one to render
         bus.HandlePipe<ImGuiContextObject>([this](ImGuiContextObject& context) {
             auto drawData = ImGui::GetDrawData();

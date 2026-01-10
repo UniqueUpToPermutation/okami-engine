@@ -43,6 +43,7 @@ find_package(yaml-cpp CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(Ktx CONFIG REQUIRED)
 find_package(unofficial-im3d CONFIG REQUIRED)
+find_package(EnTT CONFIG REQUIRED)
 
 # tmxlite doesn't provide CMake config, find manually
 find_path(TMXLITE_INCLUDE_DIR tmxlite/Map.hpp PATHS ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/include ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-windows/include)
@@ -438,7 +439,10 @@ target_link_libraries(EngineLib PUBLIC
         KTX::ktx
         ${TMXLITE_LIBRARY}
         unofficial::im3d::im3d
+        EnTT::EnTT
 )
+
+target_compile_definitions(EngineLib PUBLIC ENTT_USE_ATOMIC=1)
 
 # Add KTX library
 find_library(KTX_LIBRARY ktx PATHS ${CMAKE_SOURCE_DIR}/vcpkg_installed/x64-osx/lib)

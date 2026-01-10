@@ -30,7 +30,7 @@ protected:
     void ShutdownImpl(InitContext const& context) override {
     }
 
-    Error BuildGraphImpl(JobGraph& graph, BuildGraphParams const& params = {}) override {
+    Error BuildGraphImpl(JobGraph& graph, BuildGraphParams const& params) override {
         graph.AddMessageNode([this](
             JobContext& jobContext,
             In<Time> time,
@@ -71,7 +71,7 @@ protected:
         return {};
     }
 
-    Error ReceiveMessagesImpl(MessageBus& messages) override {
+    Error ReceiveMessagesImpl(MessageBus& messages, RecieveMessagesParams const& params) override {
         messages.Handle<TransformSolveMessage>([&](TransformSolveMessage const& msg) {
             m_transformStorage->Set(msg.m_entity, msg.m_result);
         });
@@ -86,9 +86,6 @@ public:
 
     PhysicsModule() {
         m_transformStorage = CreateChild<StorageModule<Transform>>();
-        m_transformStorage->m_publishOnAddEvent = true;
-        m_transformStorage->m_publishOnUpdateEvent = true;
-        m_transformStorage->m_publishOnRemoveEvent = true;
     }
 };
 

@@ -37,6 +37,8 @@ namespace okami {
 
         IEntityManager* m_entityManager = nullptr;
 
+        entt::registry m_registry;
+
         InitContext GetInitContext();
 
 	public:
@@ -44,7 +46,7 @@ namespace okami {
 		void Run(std::optional<size_t> frameCount = std::nullopt);
 		void Shutdown();
 
-        entity_t CreateEntity(entity_t parent = kRoot);
+        entity_t CreateEntity(entity_t parent = kNullEntity);
         void RemoveEntity(entity_t entity);
         void SetActiveCamera(entity_t e);
 

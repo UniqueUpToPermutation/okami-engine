@@ -52,10 +52,8 @@ namespace okami {
         public EngineModule,
         public IComponentView<T> {
     private:
-        std::unordered_map<entity_t, T> m_storage;
-        std::vector<OnAddComponentEvent<T>> m_added;
-        std::vector<OnUpdateComponentEvent<T>> m_modified;
-        std::vector<OnRemoveComponentEvent<T>> m_removed;
+        // TODO: Remove this 
+        entt::registry* m_registry = nullptr;
 
     protected:
         Error RegisterImpl(InterfaceCollection& ic) override {
@@ -71,91 +69,28 @@ namespace okami {
             ic.m_messages.EnsurePort<OnAddComponentEvent<T>>();
             ic.m_messages.EnsurePort<OnUpdateComponentEvent<T>>();
             ic.m_messages.EnsurePort<OnRemoveComponentEvent<T>>();
-            return {};
-        }
 
-        void ShutdownImpl(InitContext const& ic) override {
-            m_storage.clear();
-            m_modified.clear();
-            m_removed.clear();
-            m_added.clear();
-        }
-
-        Error BuildGraphImpl(JobGraph& graph, BuildGraphParams const&) override {
-            if (m_publishOnAddEvent) {
-                graph.AddMessageNode([this](JobContext& context, Out<OnAddComponentEvent<T>> port) {
-                    for (auto msg : m_added) {
-                        port.Send(msg);
-                    }
-                    m_added.clear();
-                    return Error{};
-                });
-            }
-
-            if (m_publishOnUpdateEvent) {
-                graph.AddMessageNode([this](JobContext& context, Out<OnUpdateComponentEvent<T>> port) {
-                    for (auto msg : m_modified) {
-                        port.Send(msg);
-                    }
-                    m_modified.clear();
-                    return Error{};
-                });
-            }
-
-            if (m_publishOnRemoveEvent) {
-                graph.AddMessageNode([this](JobContext& context, Out<OnRemoveComponentEvent<T>> port) {
-                    for (auto msg : m_removed) {
-                        port.Send(msg);
-                    }
-                    m_removed.clear();
-                    return Error{};
-                });
-            }
+            m_registry = &ic.m_registry;
 
             return {};
         }
 
-        Error ReceiveMessagesImpl(MessageBus& bus) override {
+        Error ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const& params) override {
             if (!m_overrideAddHandler) {
-                bus.Handle<AddComponentSignal<T>>([this](AddComponentSignal<T> const& signal) {
-                    m_storage[signal.m_entity] = signal.m_component;
-                    m_added.push_back(OnAddComponentEvent<T>{signal.m_entity, signal.m_component});
+                bus.Handle<AddComponentSignal<T>>([this, &params](AddComponentSignal<T> const& signal) {
+                    params.m_registry.emplace<T>(signal.m_entity, signal.m_component); 
                 });
             }
 
             if (!m_overrideUpdateHandler) {
-                bus.Handle<UpdateComponentSignal<T>>([this](UpdateComponentSignal<T> const& signal) {
-                    auto it = m_storage.find(signal.m_entity);
-                    if (it != m_storage.end()) {
-                        it->second = signal.m_component;
-                        m_modified.push_back(OnUpdateComponentEvent<T>{signal.m_entity, signal.m_component});
-                    } else {
-                        OKAMI_LOG_WARNING("Attempted to update non-existent entity: " + std::to_string(signal.m_entity));
-                    }
+                bus.Handle<UpdateComponentSignal<T>>([this, &params](UpdateComponentSignal<T> const& signal) {
+                    params.m_registry.replace<T>(signal.m_entity, signal.m_component);
                 });
             }
 
             if (!m_overrideRemoveHandler) {
-                bus.Handle<RemoveComponentSignal<T>>([this](RemoveComponentSignal<T> const& signal) {
-                    auto it = m_storage.find(signal.m_entity);
-                    if (it != m_storage.end()) {
-                        auto component = it->second;
-                        m_storage.erase(it);
-                        m_removed.push_back(OnRemoveComponentEvent<T>{signal.m_entity, component});
-                    } else {
-                        OKAMI_LOG_WARNING("Attempted to remove non-existent entity: " + std::to_string(signal.m_entity));
-                    }
-                });
-            }
-
-            if (!m_overrideEntityRemoveHandler) {
-                bus.Handle<EntityRemoveMessage>([this](EntityRemoveMessage const& signal) {
-                    auto it = m_storage.find(signal.m_entity);
-                    if (it != m_storage.end()) {
-                        auto component = it->second;
-                        m_storage.erase(it);
-                        m_removed.push_back(OnRemoveComponentEvent<T>{signal.m_entity, component});
-                    }
+                bus.Handle<RemoveComponentSignal<T>>([this, &params](RemoveComponentSignal<T> const& signal) {
+                    params.m_registry.remove<T>(signal.m_entity);
                 });
             }
             
@@ -166,10 +101,6 @@ namespace okami {
         bool m_overrideAddHandler = false;
         bool m_overrideUpdateHandler = false;
         bool m_overrideRemoveHandler = false;
-        bool m_overrideEntityRemoveHandler = false;
-        bool m_publishOnAddEvent = false;
-        bool m_publishOnUpdateEvent = false;
-        bool m_publishOnRemoveEvent = false;
 
         std::string GetName() const override {
             auto typeName = typeid(T).name();
@@ -177,26 +108,32 @@ namespace okami {
         }
 
         void ForEach(std::function<void(entity_t, T const&)> func) override {
-            for (auto const& [entity, component] : m_storage) {
-                func(entity, component);
+            if constexpr (std::is_empty_v<T>) {
+                m_registry->view<T>().each([&](auto entity) {
+                    func(entity, T{});
+                });
+            } else {
+                m_registry->view<T>().each([&](auto entity, auto& component) {
+                    func(entity, component);
+                });
             }
         }
 
         T const* TryGet(entity_t entity) const override {
-            auto it = m_storage.find(entity);
-            if (it != m_storage.end()) {
-                return &it->second;
+            if constexpr (std::is_empty_v<T>) {
+                static T empty{};
+                return &empty;
+            } else {
+                return m_registry->try_get<T>(entity);
             }
-            return nullptr;
         }
 
         void Set(entity_t entity, T const& component) {
-            m_storage[entity] = component;
-            m_modified.push_back(OnUpdateComponentEvent<T>{entity, component});
+            m_registry->emplace_or_replace<T>(entity, component);
         }
 
         bool IsEmpty() const override {
-            return m_storage.empty();
+            return m_registry->view<T>().empty();
         }
     };
 }

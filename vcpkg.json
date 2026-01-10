@@ -26,6 +26,7 @@
     "tinygltf",
     "tmxlite",
     "yaml-cpp",
-    "im3d"
+    "im3d",
+    "entt"
   ]
 }
