@@ -106,7 +106,7 @@ namespace okami {
 	};
 
 	template <typename T>
-	struct OnResourceLoadedSignal {
+	struct OnResourceLoadedEvent {
 		Expected<T> m_data;
 		ResHandle<T> m_handle;
 	};
@@ -133,7 +133,7 @@ namespace okami {
 
 		// Consumes messages regarding newly loaded resources
 		// These are sent by the IO thread
-		DefaultSignalHandler<OnResourceLoadedSignal<T>> m_loaded_handler;
+		DefaultSignalHandler<OnResourceLoadedEvent<T>> m_loaded_handler;
 
 		// Consumes messages regarding new resources to be created
 		DefaultSignalHandler<std::unique_ptr<ImplPair>> m_new_resources;
@@ -143,7 +143,7 @@ namespace okami {
 
 		Error RegisterImpl(InterfaceCollection& ic) override {
 			ic.Register<IContentManager<T>>(this);
-			ic.RegisterSignalHandler<OnResourceLoadedSignal<T>>(&m_loaded_handler);
+			ic.RegisterSignalHandler<OnResourceLoadedEvent<T>>(&m_loaded_handler);
 			
 			return {};
 		}
@@ -165,7 +165,7 @@ namespace okami {
 
 	public:
 		// Protected method to access implementation for derived classes
-		TImpl* GetImpl(const ResHandle<T>& handle) {
+		TImpl* GetImpl(const ResHandle<T>& handle) const {
 			if (!handle.IsLoaded()) {
 				return nullptr;
 			}
@@ -189,7 +189,7 @@ namespace okami {
 			});
 
 			// Process all just loaded resources
-			m_loaded_handler.Handle([this, &e, &userData](OnResourceLoadedSignal<T> msg) {
+			m_loaded_handler.Handle([this, &e, &userData](OnResourceLoadedEvent<T> msg) {
 				if (!msg.m_data) {
 					e += msg.m_data.error();
 					return;
@@ -256,7 +256,7 @@ namespace okami {
 			auto impl = std::make_unique<ImplPair>();
 			auto res = ResHandle<T>(&impl->m_resource);
 			m_new_resources.Send(std::move(impl));
-			m_loaded_handler.Send(OnResourceLoadedSignal<T>{
+			m_loaded_handler.Send(OnResourceLoadedEvent<T>{
 				.m_data = std::move(data),
 				.m_handle = res,
 			});

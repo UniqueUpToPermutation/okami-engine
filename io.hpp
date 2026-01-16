@@ -10,7 +10,7 @@ namespace okami {
         DefaultSignalHandler<LoadResourceSignal<T>> m_load_handler;
 
     protected:
-        virtual OnResourceLoadedSignal<T> LoadResource(LoadResourceSignal<T>&& msg) = 0;
+        virtual OnResourceLoadedEvent<T> LoadResource(LoadResourceSignal<T>&& msg) = 0;
 
         Error RegisterImpl(InterfaceCollection& interfaces) override {
             interfaces.RegisterSignalHandler<LoadResourceSignal<T>>(&m_load_handler);
