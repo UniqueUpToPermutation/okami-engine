@@ -22,7 +22,8 @@ namespace okami {
         
     public:
         Expected<std::pair<typename Geometry::Desc, GeometryImpl>> 
-            CreateResource(Geometry&& data, std::any userData) override;
+            CreateResource(Geometry&& data) override;
+        void DestroyResourceImpl(GeometryImpl& impl) override;
 
         void SetStaticMeshVSInput(glsl::VertexShaderInputInfo info);
     };

@@ -8,7 +8,7 @@
 using namespace okami;
 
 Expected<std::pair<typename Geometry::Desc, GeometryImpl>> 
-    OGLGeometryManager::CreateResource(Geometry&& data, std::any userData) {
+    OGLGeometryManager::CreateResource(Geometry&& data) {
 
     std::vector<std::shared_ptr<GLBuffer>> oglBuffers;
 
@@ -123,6 +123,11 @@ Expected<std::pair<typename Geometry::Desc, GeometryImpl>>
             .m_buffers = std::move(oglBuffers),
         }
     );
+}
+
+void OGLGeometryManager::DestroyResourceImpl(GeometryImpl& impl) {
+    impl.m_buffers.clear();
+    impl.m_meshes.clear();
 }
 
 void OGLGeometryManager::SetStaticMeshVSInput(glsl::VertexShaderInputInfo info) {

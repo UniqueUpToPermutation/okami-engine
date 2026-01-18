@@ -50,7 +50,7 @@ GLenum okami::ToGlType(TextureFormat format) {
 }
 
 Expected<std::pair<typename Texture::Desc, TextureImpl>> 
-    OGLTextureManager::CreateResource(Texture&& data, std::any userData) {
+    OGLTextureManager::CreateResource(Texture&& data) {
 
     TextureImpl impl;
     glGenTextures(1, impl.m_texture.ptr());
@@ -83,4 +83,8 @@ Expected<std::pair<typename Texture::Desc, TextureImpl>>
     OKAMI_UNEXPECTED_RETURN(err);
 
     return std::make_pair(data.GetDesc(), std::move(impl));
+}
+
+void OGLTextureManager::DestroyResourceImpl(TextureImpl& impl) {
+    impl.m_texture = {};
 }

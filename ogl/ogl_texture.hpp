@@ -19,6 +19,7 @@ namespace okami {
     class OGLTextureManager : public ContentModule<Texture, TextureImpl> {
     public:
         Expected<std::pair<typename Texture::Desc, TextureImpl>> 
-            CreateResource(Texture&& data, std::any userData) override;
+            CreateResource(Texture&& data) override;
+        void DestroyResourceImpl(TextureImpl& impl) override;   
     };
 }
