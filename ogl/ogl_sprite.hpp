@@ -24,7 +24,17 @@ namespace okami {
         
         // Uniform locations
         UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
-        GLint u_texture = -1;
+
+        enum class BufferBindingPoints : GLint {
+            SceneGlobals,
+            Count
+        };
+
+        enum class TextureBindingPoints : GLint {
+            SpriteTexture,
+            Count,
+        };
+
 
         // Component storage and views
         StorageModule<SpriteComponent>* m_storage = nullptr;

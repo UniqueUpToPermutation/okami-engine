@@ -10,6 +10,7 @@
 #include "camera.hpp"
 #include "texture.hpp"
 #include "geometry.hpp"	
+#include "material.hpp"
 
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
@@ -64,6 +65,7 @@ namespace okami {
 
 	struct StaticMeshComponent {
 		ResHandle<Geometry> m_geometry;
+		MaterialHandle m_material;
 	};
 
 	struct Rect {

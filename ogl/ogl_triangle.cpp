@@ -21,6 +21,15 @@ Error OGLTriangleRenderer::StartupImpl(InitContext const& context) {
 
     m_program = std::move(*program);
 
+    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create();
+    OKAMI_ERROR_RETURN(sceneUBO);
+    m_sceneUBO = std::move(*sceneUBO);
+
+    Error err;
+    glUseProgram(m_program.get());
+    err += GET_GL_ERROR();
+    err += AssignBufferBindingPoint(m_program, "SceneGlobalsBlock", BufferBindingPoints::SceneGlobals);
+
     // Create and setup VAO (required for modern OpenGL)
     GLuint vaoId;
     glGenVertexArrays(1, &vaoId);
@@ -30,21 +39,13 @@ Error OGLTriangleRenderer::StartupImpl(InitContext const& context) {
     glBindVertexArray(m_vao.get());
     glBindVertexArray(0); // Unbind
 
-    Error uniformErrs;
-    u_world = GetUniformLocation(m_program, "u_world", uniformErrs);
-    OKAMI_ERROR_RETURN(uniformErrs);
-
-    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create(
-        m_program, "SceneGlobalsBlock", 0);
-    OKAMI_ERROR_RETURN(sceneUBO);
-    m_sceneUBO = std::move(*sceneUBO);
+    u_world = GetUniformLocation(m_program, "u_world", err);
 
     m_pipelineState = OGLPipelineState{
         .depthTestEnabled = true,
-        .program = m_program,
     };
 
-    return {};
+    return err;
 }
 
 void OGLTriangleRenderer::ShutdownImpl(InitContext const& context) {
@@ -56,16 +57,15 @@ Error OGLTriangleRenderer::Pass(OGLPass const& pass) {
         return {};
     }
 
-    m_pipelineState.SetToGL();
+    Error err;
 
-    // Bind VAO
-    glBindVertexArray(m_vao.get());
-    OKAMI_DEFER(glBindVertexArray(0)); OKAMI_CHK_GL;
+    m_pipelineState.SetToGL();
+    glUseProgram(m_program.get()); OKAMI_CHK_GL;
+    glBindVertexArray(m_vao.get()); OKAMI_CHK_GL;
     
     // Set view-projection matrix uniform
-    m_sceneUBO.Bind();
-    OKAMI_DEFER(m_sceneUBO.Unbind()); OKAMI_CHK_GL;
-    m_sceneUBO.Write(pass.m_sceneGlobals); OKAMI_CHK_GL;
+    err += m_sceneUBO.Bind(BufferBindingPoints::SceneGlobals);
+    err += m_sceneUBO.Write(pass.m_sceneGlobals);
 
     m_storage->ForEach(
         [&](entity_t entity, DummyTriangleComponent const&) {
@@ -77,7 +77,7 @@ Error OGLTriangleRenderer::Pass(OGLPass const& pass) {
         }
     );
     
-    return {};
+    return err;
 }
 
 std::string OGLTriangleRenderer::GetName() const {

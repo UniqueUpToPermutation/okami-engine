@@ -38,6 +38,9 @@ private:
     OGLIm3D* m_im3d = nullptr;
     OGLImguiRenderer* m_imguiRenderer = nullptr;
 
+    OGLDefaultMaterialManager* m_defaultMaterialManager = nullptr;
+    OGLBasicTexturedMaterialManager* m_basicTexturedMaterialManager = nullptr;
+
     StorageModule<Camera>* m_cameraStorage = nullptr;
     IComponentView<Transform>* m_transformView = nullptr;
 
@@ -137,6 +140,9 @@ public:
         m_staticMeshRenderer = CreateChild<OGLStaticMeshRenderer>(m_geometryManager);
         m_im3d = CreateChild<OGLIm3D>();
         m_imguiRenderer = CreateChild<OGLImguiRenderer>();
+
+        m_defaultMaterialManager = CreateChild<OGLDefaultMaterialManager>();
+        m_basicTexturedMaterialManager = CreateChild<OGLBasicTexturedMaterialManager>(m_textureManager);
     }
 
     std::string GetName() const override {

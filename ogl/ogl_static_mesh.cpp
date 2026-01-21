@@ -11,28 +11,49 @@ Error OGLStaticMeshRenderer::RegisterImpl(InterfaceCollection& interfaces) {
 }
 
 Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
+    Error err;
+    
     auto* cache = context.m_interfaces.Query<IGLShaderCache>();
     OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLSpriteRenderer");
 
     m_transformView = context.m_interfaces.Query<IComponentView<Transform>>();
     OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OGLSpriteRenderer");
 
-    // Create shader program with vertex, geometry, and fragment shaders
-    auto program = CreateProgram(ProgramShaderPaths{
-        .m_vertex = GetGLSLShaderPath("static_mesh.vs"),
-        .m_fragment = GetGLSLShaderPath("static_mesh.fs"),
-    }, *cache);
-    OKAMI_ERROR_RETURN(program);
+    auto vertexShaderPath = GetGLSLShaderPath("static_mesh.vs");
+    context.m_interfaces.ForEachInterface<IOGLMaterialManager>([&](IOGLMaterialManager* manager) {
+        auto shaders = manager->GetShaderPaths();
+        if (shaders.m_vertex.empty()) {
+            shaders.m_vertex = vertexShaderPath;
+        }
 
-    m_program = std::move(*program);
+        // Create shader program with vertex, geometry, and fragment shaders
+        auto program = CreateProgram(shaders, *cache);
+        if (!program) {
+            LOG(ERROR) << "Static Mesh Renderer: Failed to create shader program for material: " << manager->GetMaterialName() << 
+                " with error: " << program.error();
+            err += program.error();
+            return;
+        }
 
-    auto instanceUBO = UniformBuffer<glsl::StaticMeshInstance>::Create(m_program, 
-        "StaticMeshInstanceBlock", 0);
+        // Assign binding points
+        glUseProgram((*program).get());
+        err += GET_GL_ERROR();
+        err += AssignBufferBindingPoint(*program, "SceneGlobalsBlock",  BufferBindingPoints::SceneGlobals);
+        err += AssignBufferBindingPoint(*program, "StaticMeshInstanceBlock", BufferBindingPoints::StaticMeshInstance);
+        err += manager->OnProgramCreated(*program, GetMaterialBindParams());
+
+        m_programs.emplace(manager->GetMaterialType(), 
+            MaterialImpl{
+                .m_program = std::move(*program), 
+                .m_manager = manager
+            });
+    });
+
+    auto instanceUBO = UniformBuffer<glsl::StaticMeshInstance>::Create();
     OKAMI_ERROR_RETURN(instanceUBO);
     m_instanceUBO = std::move(*instanceUBO);
 
-    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create(m_program, 
-        "SceneGlobalsBlock", 1);
+    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create();
     OKAMI_ERROR_RETURN(sceneUBO);
     m_sceneUBO = std::move(*sceneUBO);
 
@@ -40,7 +61,6 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
     m_pipelineState.blendEnabled = false;
     m_pipelineState.cullFaceEnabled = true;
     m_pipelineState.depthMask = true;
-    m_pipelineState.program = m_program.get();
 
     LOG(INFO) << "OGL Static Mesh Renderer initialized successfully";
     return {};
@@ -56,9 +76,15 @@ OGLStaticMeshRenderer::OGLStaticMeshRenderer(OGLGeometryManager* geometryManager
 }
 
 Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
+    struct InstanceData {
+        ResHandle<Geometry> m_geometry;
+        MaterialHandle m_material;
+        glsl::StaticMeshInstance m_glslData;
+    };
+
     // Collect all sprites and their transforms
-    std::vector<std::pair<ResHandle<Geometry>, glsl::StaticMeshInstance>> instances;
-    
+    std::vector<InstanceData> instances;
+
     m_storage->ForEach([&](entity_t entity, const StaticMeshComponent& mesh) {
         // Skip sprites without textures
         if (!mesh.m_geometry || !mesh.m_geometry.IsLoaded()) {
@@ -68,58 +94,78 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
         Transform transform = m_transformView->GetOr(entity, Transform::Identity());
 
         auto matrix = transform.AsMatrix();
-        instances.emplace_back(std::make_pair(mesh.m_geometry, glsl::StaticMeshInstance{
-            .u_model = matrix,
-            .u_normalMatrix = glm::transpose(glm::inverse(matrix)),
-        }));
-    });
-
-    // Sort sprites back-to-front for proper alpha blending
-    std::sort(instances.begin(), instances.end(),
-        [this](const auto& a, const auto& b) {
-            return a.first < b.first;
+        instances.emplace_back(InstanceData{
+            .m_geometry = mesh.m_geometry,
+            .m_material = mesh.m_material,
+            .m_glslData = glsl::StaticMeshInstance{
+                .u_model = matrix,
+                .u_normalMatrix = glm::transpose(glm::inverse(matrix)),
+            }
         });
-
-    // Set up rendering state
-    m_pipelineState.SetToGL(); OKAMI_CHK_GL;
-
-    m_instanceUBO.Bind();
-    OKAMI_DEFER(m_instanceUBO.Unbind());
-
-    m_sceneUBO.Bind();
-    OKAMI_DEFER(m_sceneUBO.Unbind()); OKAMI_CHK_GL;
-    m_sceneUBO.Write(pass.m_sceneGlobals); OKAMI_CHK_GL;
-
-    OKAMI_DEFER(glBindVertexArray(0));
-    
-    // Group sprites by texture to minimize texture binding
-    uint32_t batchStart = 0;
-
-    okami::PrimitiveImpl* currentMeshImpl = nullptr;
-    ResHandle<Geometry> currentGeometry;
+    });
 
     if (instances.empty()) {
         return {};
     }
-    
-    for (auto const& geo : instances) {
-        ResHandle<Geometry> geometry = geo.first;
-        
-        // Check if we need to flush the current batch
-        if (geometry != currentGeometry) {
-            if (geometry.IsLoaded()) {
-                currentMeshImpl = &m_geometryManager->GetImpl(geometry)->m_meshes[0];
-                glBindVertexArray(currentMeshImpl->m_vao.get());
-                OKAMI_CHK_GL;
+
+    Error err;
+
+    // Sort instances by geometry and material to minimize state changes
+    std::sort(instances.begin(), instances.end(),
+        [this](const InstanceData& a, const InstanceData& b) {
+            if (a.m_geometry == b.m_geometry) {
+                return a.m_material.GetEntity() < b.m_material.GetEntity();
             } else {
-                currentMeshImpl = nullptr;
+                return a.m_geometry.GetEntity() < b.m_geometry.GetEntity();
             }
+        });
+
+    // Set up rendering state
+    m_pipelineState.SetToGL(); 
+    err += GET_GL_ERROR();
+    err += m_sceneUBO.Write(pass.m_sceneGlobals);
+
+    okami::PrimitiveImpl* currentMeshImpl = nullptr;
+
+    ResHandle<Geometry> currentGeometry;
+    std::optional<MaterialHandle> currentMaterial;
+
+    for (auto const& inst : instances) {
+        // If there's no geometry, skip
+        if (!inst.m_geometry) {
+            continue;
+        }
         
-            currentGeometry = geometry;
+        // Check if state change is needed
+        if (inst.m_geometry != currentGeometry) {
+            currentMeshImpl = &m_geometryManager->GetImpl(inst.m_geometry)->m_meshes[0];
+            glBindVertexArray(currentMeshImpl->m_vao.get());
+            err += GET_GL_ERROR();
+        
+            currentGeometry = inst.m_geometry;
         }
 
+        // Check if state change is needed
+        if (!currentMaterial || inst.m_material != *currentMaterial) {
+            // If no material, render with default material.
+            auto it = m_programs.find(inst.m_material.Ptr() ? inst.m_material.Ptr()->m_materialType : m_defaultMaterialType);
+            if (it != m_programs.end()) {
+                glUseProgram(it->second.m_program.get());
+                err += GET_GL_ERROR();
+
+                err += m_instanceUBO.Bind(BufferBindingPoints::StaticMeshInstance);
+                err += m_sceneUBO.Bind(BufferBindingPoints::SceneGlobals);
+                err += it->second.m_manager->Bind(inst.m_material, GetMaterialBindParams());
+
+                currentMaterial = inst.m_material;
+            } else {
+                OKAMI_LOG_WARNING("No shader program found for material type");
+            }
+        }
+
+        // Write GLSL instance data and render the mesh
         if (currentMeshImpl) {
-            m_instanceUBO.Write(geo.second);
+            err += m_instanceUBO.Write(inst.m_glslData);
             auto const& desc = currentGeometry.GetDesc();
 
             auto const& primitive = desc.m_primitives[0];
@@ -131,18 +177,20 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
                     GL_TRIANGLES,
                     static_cast<GLsizei>(primitive.m_indices->m_count),
                     indexType,
-                    (void*)primitive.m_indices->m_offset); OKAMI_CHK_GL;
+                    (void*)primitive.m_indices->m_offset);
+                err += GET_GL_ERROR();
             } else {
                 glDrawArrays(
                     GL_TRIANGLES,
                     0,
                     static_cast<GLsizei>(primitive.m_vertexCount)
-                ); OKAMI_CHK_GL;
+                );
+                err += GET_GL_ERROR();
             }
         }
     }
     
-    return {};
+    return err;
 }
 
 std::string OGLStaticMeshRenderer::GetName() const {

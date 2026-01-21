@@ -21,6 +21,11 @@ namespace okami {
 
         UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
 
+        enum class BufferBindingPoints : GLint {
+            SceneGlobals,
+            Count
+        };
+
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
     

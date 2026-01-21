@@ -6,10 +6,11 @@
 #include "../material.hpp"
 
 namespace okami {
-    class OGLMaterialBindings {
-    public:
-        virtual Error FetchBindings(GLProgram const& program) = 0;
-        virtual bool Bind(MaterialHandle handle, OGLTextureManager const& textureManager) const = 0;
+    struct EmptyMaterialImpl {};
+
+    struct OGLMaterialBindParams {
+        GLint m_startBufferBindPoint = -1;
+        GLint m_startTextureBindPoint = -1;
     };
 
     class IOGLMaterialManager {
@@ -17,32 +18,62 @@ namespace okami {
         virtual ~IOGLMaterialManager() = default;
 
         virtual ProgramShaderPaths GetShaderPaths() const = 0;
-        virtual std::unique_ptr<OGLMaterialBindings> CreateBinding() const = 0;
         virtual std::type_index GetMaterialType() const = 0; 
+        virtual Error Bind(MaterialHandle handle,
+            OGLMaterialBindParams const& params) const = 0;
+        virtual Error OnProgramCreated(GLProgram const& program, 
+            OGLMaterialBindParams const& params) const = 0;
+
+        inline std::string GetMaterialName() const {
+            return GetMaterialType().name();
+        }
     };
 
-    class OGLBasicTexturedMaterialManager;
-
-    class OGLBasicTexturedMaterialBindings : public OGLMaterialBindings {
-    private:
-        GLint m_diffuseMap = -1;
-        GLint m_color = -1;
-        OGLBasicTexturedMaterialManager const* m_manager = nullptr;
-
+    template <typename T>
+    class IOGLMaterialManagerT : public IOGLMaterialManager {
     public:
-        inline OGLBasicTexturedMaterialBindings(OGLBasicTexturedMaterialManager const* manager) : m_manager(manager) {} 
+        virtual ~IOGLMaterialManagerT() = default;
 
-        Error FetchBindings(GLProgram const& program) override;
-        bool Bind(MaterialHandle handle, OGLTextureManager const& textureManager) const override;
+        std::type_index GetMaterialType() const override {
+            return std::type_index(typeid(T));
+        }
+    };
+
+    class OGLDefaultMaterialManager final :
+        public EngineModule,
+        public IOGLMaterialManagerT<void> {
+    public:
+        Error RegisterImpl(InterfaceCollection& interfaces) override;
+        Error StartupImpl(InitContext const& context) override;
+
+        ProgramShaderPaths GetShaderPaths() const override;
+        Error Bind(MaterialHandle handle, OGLMaterialBindParams const& params) const override;
+        Error OnProgramCreated(GLProgram const& program, 
+            OGLMaterialBindParams const& params) const override;
     };
 
     class OGLBasicTexturedMaterialManager final :
-        public MaterialModuleBase<BasicTexturedMaterial, std::monostate>,
-        public IOGLMaterialManager {
+        public MaterialModuleBase<BasicTexturedMaterial, EmptyMaterialImpl>,
+        public IOGLMaterialManagerT<BasicTexturedMaterial> {
+    protected:
+        OGLTextureManager* m_textureManager = nullptr;
+
+        enum class TextureUnits : GLint {
+            ColorTexture = 0
+        };
+    
     public:
-        ProgramShaderPaths GetShaderPaths() const override;
+        inline OGLBasicTexturedMaterialManager(OGLTextureManager* textureManager)
+            : m_textureManager(textureManager) {}
+
         Error RegisterImpl(InterfaceCollection& interfaces) override;
-        std::unique_ptr<OGLMaterialBindings> CreateBinding() const override;
-        std::type_index GetMaterialType() const override;
+
+        EmptyMaterialImpl CreateImpl(BasicTexturedMaterial const& material) override;
+		void DestroyImpl(EmptyMaterialImpl& impl) override;
+
+        ProgramShaderPaths GetShaderPaths() const override;
+        Error Bind(MaterialHandle handle, OGLMaterialBindParams const& params) const override;
+        Error OnProgramCreated(GLProgram const& program, 
+            OGLMaterialBindParams const& params) const override;
     };
 }

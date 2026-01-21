@@ -339,9 +339,6 @@ void OGLPipelineState::GetFromGL() {
 
     // Multisampling
     sampleAlphaToCoverageEnabled = glIsEnabled(GL_SAMPLE_ALPHA_TO_COVERAGE);
-
-    // Program
-    glGetIntegerv(GL_CURRENT_PROGRAM, reinterpret_cast<GLint*>(&program));
 }
 
 void OGLPipelineState::SetToGL() const {
@@ -370,7 +367,4 @@ void OGLPipelineState::SetToGL() const {
 
     // Multisampling
     if (sampleAlphaToCoverageEnabled) glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE); else glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-
-    // Program
-    glUseProgram(program);
 }

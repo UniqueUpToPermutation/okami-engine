@@ -31,17 +31,20 @@ Error OGLIm3D::StartupImpl(InitContext const& context) {
     OKAMI_ERROR_RETURN(buffer);
     m_vertexBuffer = std::move(*buffer);
 
-    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create(
-        m_program, "SceneGlobalsBlock", 0);
+    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create();
     OKAMI_ERROR_RETURN(sceneUBO);
     m_sceneUBO = std::move(*sceneUBO);
 
+    Error err;
+    glUseProgram(m_program.get());
+    err += GET_GL_ERROR();
+    err += AssignBufferBindingPoint(m_program, "SceneGlobalsBlock", BufferBindingPoints::SceneGlobals);
+
     m_pipelineState = OGLPipelineState{
         .depthTestEnabled = true,
-        .program = m_program,
     };
 
-    return {};
+    return err;
 }
 
 Error OGLIm3D::Pass(OGLPass const& pass) {
@@ -58,19 +61,23 @@ Error OGLIm3D::Pass(OGLPass const& pass) {
         return {};
     }
 
-    m_pipelineState.SetToGL(); OKAMI_CHK_GL;
-
     size_t vertexCount = 0;
     for (uint32_t i = 0; i < im3dData->getDrawListCount(); ++i) {
         auto const& drawCall = im3dData->getDrawLists()[i];
         vertexCount += drawCall.m_vertexCount;
     }
 
+    Error err;
     // Upload data to GPU
-    m_vertexBuffer.Reserve(vertexCount); OKAMI_CHK_GL;
+    err += m_vertexBuffer.Reserve(vertexCount); 
+
     if (vertexCount == 0) {
-        return {};
+        return err;
     }
+
+    m_pipelineState.SetToGL();
+    glUseProgram(m_program.get());
+    err += GET_GL_ERROR();
     
     {
         auto map = m_vertexBuffer.Map();
@@ -85,12 +92,11 @@ Error OGLIm3D::Pass(OGLPass const& pass) {
     }
 
     // Set uniforms
-    m_sceneUBO.Bind();
-    OKAMI_DEFER(m_sceneUBO.Unbind()); OKAMI_CHK_GL;
-    m_sceneUBO.Write(pass.m_sceneGlobals); OKAMI_CHK_GL;
+    err += m_sceneUBO.Bind(BufferBindingPoints::SceneGlobals);
+    err += m_sceneUBO.Write(pass.m_sceneGlobals); 
 
-    glBindVertexArray(m_vertexBuffer.GetVertexArray()); OKAMI_CHK_GL;
-    OKAMI_DEFER(glBindVertexArray(0));
+    glBindVertexArray(m_vertexBuffer.GetVertexArray());
+    err += GET_GL_ERROR();
 
     GLint currentVertex = 0;
     for (uint32_t i = 0; i < im3dData->getDrawListCount(); ++i) {
@@ -109,11 +115,12 @@ Error OGLIm3D::Pass(OGLPass const& pass) {
                 break;
         }
 
-        glDrawArrays(primitiveType, currentVertex, drawCall.m_vertexCount); OKAMI_CHK_GL;
+        glDrawArrays(primitiveType, currentVertex, drawCall.m_vertexCount);
+        err += GET_GL_ERROR();
         currentVertex += drawCall.m_vertexCount;
     }
 
-    return {};
+    return err;
 }
 
 std::string OGLIm3D::GetName() const { 

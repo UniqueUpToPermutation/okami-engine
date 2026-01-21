@@ -2,40 +2,69 @@
 
 using namespace okami;
 
-Error OGLBasicTexturedMaterialBindings::FetchBindings(GLProgram const& program) {
-    glGetUniformLocation(program.get(), "u_diffuseMap"); OKAMI_CHK_GL;
-    glGetUniformLocation(program.get(), "u_color"); OKAMI_CHK_GL;
+
+Error OGLDefaultMaterialManager::RegisterImpl(InterfaceCollection& interfaces) {
+    interfaces.Register<IOGLMaterialManager>(this);
     return {};
 }
 
-bool OGLBasicTexturedMaterialBindings::Bind(MaterialHandle handle, OGLTextureManager const& textureManager) const {
-    auto const* material = m_manager->GetMaterialInfo(handle);
-    auto const* textureImpl = textureManager.GetImpl(material->m_material.m_colorTexture);
-    if (!material || !textureImpl) {
-        return false;
-    }
+Error OGLDefaultMaterialManager::StartupImpl(InitContext const& context) {
+    return {};
+}
 
-    glUniform4fv(m_color, 1, &material->m_material.m_colorTint[0]);
-    glUniform1i(m_diffuseMap, 0);
+ProgramShaderPaths OGLDefaultMaterialManager::GetShaderPaths() const {
+    return ProgramShaderPaths{
+        .m_fragment = GetGLSLShaderPath("material_default.fs")
+    };
+}
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureImpl->m_texture.get());
-    return true;
+Error OGLDefaultMaterialManager::Bind(MaterialHandle handle, OGLMaterialBindParams const& params) const {
+    return {};
+}
+
+Error OGLDefaultMaterialManager::OnProgramCreated(GLProgram const& program, 
+    OGLMaterialBindParams const& params) const {
+    return {};
+}
+
+
+
+Error OGLBasicTexturedMaterialManager::RegisterImpl(InterfaceCollection& interfaces) {
+    MaterialModuleBase<BasicTexturedMaterial, EmptyMaterialImpl>::RegisterImpl(interfaces);
+    interfaces.Register<IOGLMaterialManager>(this);
+    return {};
+}
+
+EmptyMaterialImpl OGLBasicTexturedMaterialManager::CreateImpl(BasicTexturedMaterial const& material) {
+    return EmptyMaterialImpl{};
+}
+
+void OGLBasicTexturedMaterialManager::DestroyImpl(EmptyMaterialImpl& impl) {
+    // No resources to clean up
 }
 
 ProgramShaderPaths OGLBasicTexturedMaterialManager::GetShaderPaths() const {
     return ProgramShaderPaths{
-        .m_fragment = GetGLSLShaderPath("basic_textured.frag")
+        .m_fragment = GetGLSLShaderPath("material_basic_textured.fs")
     };
 }
-Error OGLBasicTexturedMaterialManager::RegisterImpl(InterfaceCollection& interfaces) {
-    MaterialModuleBase<BasicTexturedMaterial, std::monostate>::RegisterImpl(interfaces);
-    interfaces.Register<IOGLMaterialManager>(this);
-    return {};
+
+Error OGLBasicTexturedMaterialManager::Bind(MaterialHandle handle, OGLMaterialBindParams const& params) const {
+    auto materialInfo = GetMaterialInfo(handle.GetEntity());
+    OKAMI_ERROR_RETURN_IF(!materialInfo, "OGLBasicTexturedMaterialManager: Material info not found for entity");
+    
+    auto textureImpl = m_textureManager->GetImpl(materialInfo->m_colorTexture);
+    OKAMI_ERROR_RETURN_IF(!textureImpl, "OGLBasicTexturedMaterialManager: Texture implementation not found");
+    
+    glActiveTexture(GL_TEXTURE0 + params.m_startTextureBindPoint + static_cast<GLint>(TextureUnits::ColorTexture));
+    glBindTexture(GL_TEXTURE_2D, textureImpl->m_texture.get());
+    return GET_GL_ERROR();
 }
-std::unique_ptr<OGLMaterialBindings> OGLBasicTexturedMaterialManager::CreateBinding() const {
-    return std::make_unique<OGLBasicTexturedMaterialBindings>(this);
-}
-std::type_index OGLBasicTexturedMaterialManager::GetMaterialType() const {
-    return typeid(BasicTexturedMaterial);
+
+Error OGLBasicTexturedMaterialManager::OnProgramCreated(
+    GLProgram const& program,   
+    OGLMaterialBindParams const& params) const {
+    glUseProgram(program.get()); OKAMI_CHK_GL;
+    return AssignTextureBindingPoint(program, "u_diffuseMap",  
+        params.m_startTextureBindPoint, TextureUnits::ColorTexture);
 }

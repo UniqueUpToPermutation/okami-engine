@@ -16,33 +16,34 @@ namespace okami {
 	};
 
 	struct MaterialHandleShared {
+		std::type_index m_materialType = typeid(BasicTexturedMaterial);
 		std::atomic<uint32_t> m_refCount{0};
+		entity_t m_entity = kNullEntity;
 	};
 
 	class IMaterialManagerBase {
 	public:
 		virtual ~IMaterialManagerBase() = default;
 
-		virtual void DestroyMaterial(MaterialHandleShared* counter) = 0;
+		virtual void DestroyMaterial(entity_t entity) = 0;
 	};
 
 	class MaterialHandle {
 	private:
-		std::type_index m_materialType;
 		MaterialHandleShared* m_counter = nullptr;
 		IMaterialManagerBase* m_manager = nullptr;
 
 	public:
 		inline MaterialHandle() = default;
-		inline MaterialHandle(std::type_index materialType, IMaterialManagerBase* manager, MaterialHandleShared* counter) 
-			: m_materialType(materialType), m_counter(counter), m_manager(manager) {
+		inline MaterialHandle(IMaterialManagerBase* manager, MaterialHandleShared* counter) 
+			: m_counter(counter), m_manager(manager) {
 			if (m_counter) {
 				m_counter->m_refCount.fetch_add(1, std::memory_order_relaxed);
 			}
 		}
 
 		inline MaterialHandle(const MaterialHandle& other) 
-			:  m_materialType(other.m_materialType), m_counter(other.m_counter), m_manager(other.m_manager) {
+			: m_counter(other.m_counter), m_manager(other.m_manager) {
 			if (m_counter) {
 				m_counter->m_refCount.fetch_add(1, std::memory_order_relaxed);
 			}
@@ -53,7 +54,6 @@ namespace okami {
 				if (m_counter) {
 					m_counter->m_refCount.fetch_sub(1, std::memory_order_relaxed);
 				}
-				m_materialType = other.m_materialType;
 				m_counter = other.m_counter;
 				m_manager = other.m_manager;
 				if (m_counter) {
@@ -67,17 +67,25 @@ namespace okami {
 			if (m_counter) {
 				auto result = m_counter->m_refCount.fetch_sub(1, std::memory_order_relaxed);
 				if (result == 1 && m_manager) {
-					m_manager->DestroyMaterial(m_counter);
+					m_manager->DestroyMaterial(m_counter->m_entity);
 				}
 			}
 		}
 
 		inline std::type_index GetMaterialType() const {
-			return m_materialType;
+			return m_counter ? m_counter->m_materialType : std::type_index(typeid(void));
 		}
 
 		inline MaterialHandleShared* Ptr() const {
 			return m_counter;
+		}
+
+		inline entity_t GetEntity() const {
+			return m_counter ? m_counter->m_entity : kNullEntity;
+		}
+
+		inline operator bool() const {
+			return m_counter != nullptr;
 		}
 	};
 
@@ -101,15 +109,30 @@ namespace okami {
 		public EngineModule,
 		public IMaterialManager<MaterialT> {
 	protected:
+		using shared_component_t = std::unique_ptr<MaterialHandleShared>;
+
 		struct CreateMaterialSignal {
 			MaterialT m_material;
-			std::unique_ptr<MaterialHandleShared> m_counter;
+			shared_component_t m_counter;
 		};
 
 		DefaultSignalHandler<CreateMaterialSignal> m_createMaterialSignalHandler;
-		DefaultSignalHandler<MaterialHandleShared*> m_destroyMaterialSignalHandler;
+		DefaultSignalHandler<entity_t> m_destroyMaterialSignalHandler;
 
-		std::unordered_map<MaterialHandleShared*, MaterialInfo<MaterialT, ImplT>> m_materials;
+		entt::registry const* m_registry = nullptr;
+		IEntityManager* m_entityManager = nullptr;
+
+		template<bool HasImpl>
+		void DestroyEntity(RecieveMessagesParams const& params, entity_t entity) {
+			if constexpr (HasImpl) {
+				auto it = params.m_registry.template try_get<ImplT>(entity);
+				if (it) {
+					auto& impl = (*it)->m_impl;
+					DestroyImpl(impl);
+				}
+			}
+			params.m_registry.destroy(entity);
+		}
 
 	public:
 		Error RegisterImpl(InterfaceCollection& interfaces) override {
@@ -117,22 +140,31 @@ namespace okami {
 			return {};
 		}
 
-		inline MaterialInfo<MaterialT, ImplT> const* GetMaterialInfo(MaterialHandle const& handle) const {
-			if (handle.GetMaterialType() != typeid(MaterialT)) {
-				return nullptr;
-			}
-			auto it = m_materials.find(handle.Ptr());
-			if (it == m_materials.end()) {
-				return nullptr;
-			}
-			return &it->second;
+		Error StartupImpl(InitContext const& context) override {
+			m_registry = &context.m_registry;
+			m_entityManager = context.m_interfaces.Query<IEntityManager>();
+			OKAMI_ERROR_RETURN_IF(m_entityManager == nullptr, "MaterialModule requires an IEntityManager to function");	
+			return {};
 		}
 
-		virtual ImplT CreateImpl(MaterialT const& material, std::any userData) = 0;
+		inline ImplT const* GetMaterialImpl(entity_t entity) const {
+			return m_registry->template try_get<ImplT const>(entity);
+		}
+
+		inline MaterialT const* GetMaterialInfo(entity_t entity) const {
+			return m_registry->template try_get<MaterialT const>(entity);
+		}
+
+		virtual ImplT CreateImpl(MaterialT const& material) = 0;
+		virtual void DestroyImpl(ImplT& impl) = 0;
 
 		MaterialHandle CreateMaterial(MaterialT material) override final {
+			auto entity = m_entityManager->CreateEntity();
 			auto counter = std::make_unique<MaterialHandleShared>();
-			MaterialHandle handle{typeid(MaterialT), this, counter.get()};
+			counter->m_entity = entity;
+			counter->m_materialType = typeid(MaterialT);
+
+			MaterialHandle handle{this, counter.get()};
 			m_createMaterialSignalHandler.Send(CreateMaterialSignal{
 				.m_material = std::move(material),
 				.m_counter = std::move(counter)
@@ -140,23 +172,24 @@ namespace okami {
 			return handle;
 		}
 
-		void DestroyMaterial(MaterialHandleShared* counter) override final {
-			m_destroyMaterialSignalHandler.Send(counter);
+		void DestroyMaterial(entity_t entity) override final {
+			m_destroyMaterialSignalHandler.Send(entity);
 		}
 
-		void ProcessMaterialSignals(std::any userData) {
-			m_createMaterialSignalHandler.Handle([&](CreateMaterialSignal signal) {
-				auto impl = CreateImpl(signal.m_material, userData);
-				m_materials.emplace(signal.m_counter.get(), MaterialInfo<MaterialT, ImplT>{
-					.m_material = std::move(signal.m_material),
-					.m_impl = std::move(impl),
-					.m_counter = std::move(signal.m_counter)
-				});
+		Error ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const& params) override {
+			m_createMaterialSignalHandler.Handle([&](CreateMaterialSignal msg) {
+				auto impl = CreateImpl(msg.m_material);
+				auto entity = msg.m_counter->m_entity;
+				params.m_registry.template emplace<shared_component_t>(entity, std::move(msg.m_counter));
+				params.m_registry.template emplace<ImplT>(entity, std::move(impl));
+				params.m_registry.template emplace<MaterialT>(entity, std::move(msg.m_material));
 			});
 
-			m_destroyMaterialSignalHandler.Handle([&](MaterialHandleShared* counter) {
-				m_materials.erase(counter);
+			m_destroyMaterialSignalHandler.Handle([&](entity_t entity) {
+				DestroyEntity<!std::is_empty_v<ImplT>>(params, entity);
 			});
+
+			return {};
 		}
 	};
 }

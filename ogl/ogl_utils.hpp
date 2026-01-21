@@ -422,6 +422,73 @@ namespace okami {
 		}
     };
 
+    template<typename T>
+    concept ConvertibleToGLint =
+        std::convertible_to<T, GLint> ||
+        (std::is_enum_v<T> && std::convertible_to<std::underlying_type_t<T>, GLint>);
+
+    Error AssignBufferBindingPoint(
+        GLProgram const& program,
+        std::string_view blockName,
+        ConvertibleToGLint auto bindingPoint) {
+#ifndef NDEBUG
+        GLint currentProgramId = 0;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgramId);
+        OKAMI_ASSERT(currentProgramId == static_cast<GLint>(program.get()),
+            "Program must be bound before assigning buffer binding points");
+#endif
+
+        GLint blockIndex = glGetUniformBlockIndex(program.get(), blockName.data());
+        OKAMI_ERROR_RETURN_IF(blockIndex == GL_INVALID_INDEX,
+            "Uniform block '" + std::string(blockName) + "' not found in program");
+        
+        // Assign binding point
+        glUniformBlockBinding(program, blockIndex, static_cast<GLint>(bindingPoint));
+        return GET_GL_ERROR();
+    }
+
+    Error AssignBufferBindingPoint(
+        GLProgram const& program,
+        std::string_view blockName,
+        ConvertibleToGLint auto bindingPointStart,
+        ConvertibleToGLint auto bindingPointOffset) {
+        return AssignBufferBindingPoint(
+            program,
+            blockName,
+            static_cast<GLint>(bindingPointStart) + static_cast<GLint>(bindingPointOffset));
+    }
+
+    Error AssignTextureBindingPoint(
+        GLProgram const& program,
+        std::string_view samplerName,
+        ConvertibleToGLint auto bindingPoint) {
+#ifndef NDEBUG
+        GLint currentProgramId = 0;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgramId);
+        OKAMI_ASSERT(currentProgramId == static_cast<GLint>(program.get()),
+            "Program must be bound before assigning buffer binding points");
+#endif
+
+        GLint location = glGetUniformLocation(program.get(), samplerName.data());
+        OKAMI_ERROR_RETURN_IF(location == -1,
+            "Sampler uniform '" + std::string(samplerName) + "' not found in program");
+        glUniform1i(location, static_cast<GLint>(bindingPoint));
+
+        // If you get this error, check if the program is currently bound
+        return GET_GL_ERROR();
+    }
+
+    Error AssignTextureBindingPoint(
+        GLProgram const& program,
+        std::string_view samplerName,
+        ConvertibleToGLint auto bindingPointStart,
+        ConvertibleToGLint auto bindingPointOffset) {
+        return AssignTextureBindingPoint(
+            program,
+            samplerName,
+            static_cast<GLint>(bindingPointStart) + static_cast<GLint>(bindingPointOffset));
+    }
+
     template <typename T>
     class UniformBuffer {
     private:
@@ -433,22 +500,8 @@ namespace okami {
             return m_buffer.get();
         }
 
-        static Expected<UniformBuffer<T>> Create(
-            GLProgram const& program,
-            std::string_view blockName,
-            GLint bindingPointToAssign,
-            size_t count = 1) {
-            GLint blockIndex = glGetUniformBlockIndex(program.get(), blockName.data());
-            OKAMI_UNEXPECTED_RETURN_IF(blockIndex == GL_INVALID_INDEX,
-                "Uniform block '" + std::string(blockName) + "' not found in program");
-            
-            // Assign binding point
-            glUniformBlockBinding(program, blockIndex, bindingPointToAssign);
-            Error err = GET_GL_ERROR();
-            OKAMI_UNEXPECTED_RETURN(err);
-
+        static Expected<UniformBuffer<T>> Create(size_t count = 1) {
             UniformBuffer<T> result;
-            result.m_bindingPoint = bindingPointToAssign;
             glGenBuffers(1, result.m_buffer.ptr()); 
             OKAMI_UNEXPECTED_RETURN_IF(!result.m_buffer, "Failed to create uniform buffer");
 
@@ -462,14 +515,10 @@ namespace okami {
             return result;
         }
 
-        Error Bind() {
-            glBindBufferBase(GL_UNIFORM_BUFFER, m_bindingPoint, m_buffer.get()); 
+        Error Bind(ConvertibleToGLint auto bindingPoint) {
+            glBindBufferBase(GL_UNIFORM_BUFFER, static_cast<GLint>(bindingPoint), m_buffer.get()); 
             OKAMI_CHK_GL;
             return {};
-        }
-
-        void Unbind() {
-            glBindBufferBase(GL_UNIFORM_BUFFER, m_bindingPoint, 0); 
         }
 
         Error Write(const T& data) {
@@ -519,9 +568,6 @@ namespace okami {
 
         // Multisampling
         bool sampleAlphaToCoverageEnabled = false;
-
-        // Program
-        GLuint program = 0;
 
         // Get current state from OpenGL
         void GetFromGL();

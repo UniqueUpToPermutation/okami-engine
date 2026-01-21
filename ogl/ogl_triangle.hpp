@@ -19,6 +19,11 @@ namespace okami {
         GLint u_world = -1;
         UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
 
+        enum class BufferBindingPoints : GLint {
+            SceneGlobals,
+            Count
+        };
+
         StorageModule<DummyTriangleComponent>* m_storage = nullptr;
         IComponentView<Transform>* m_transformView = nullptr;
 

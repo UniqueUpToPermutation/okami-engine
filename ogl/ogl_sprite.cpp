@@ -35,14 +35,15 @@ Error OGLSpriteRenderer::StartupImpl(InitContext const& context) {
     m_instanceBuffer = std::move(*buffer);
 
     // Get uniform locations
-    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create(
-        m_program, "SceneGlobalsBlock", 0);
+    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create();
     OKAMI_ERROR_RETURN(sceneUBO);
     m_sceneUBO = std::move(*sceneUBO); 
 
-    Error uniformErrs;
-    u_texture = GetUniformLocation(m_program, "u_texture", uniformErrs);
-    OKAMI_ERROR_RETURN(uniformErrs);
+    Error err;
+    glUseProgram(m_program.get());
+    err += GET_GL_ERROR();
+    err += AssignTextureBindingPoint(m_program, "u_texture", TextureBindingPoints::SpriteTexture);
+    OKAMI_ERROR_RETURN(err);
 
     LOG(INFO) << "OGL Sprite Renderer initialized successfully";
     return {};
@@ -53,6 +54,8 @@ void OGLSpriteRenderer::ShutdownImpl(InitContext const& context) {
 }
 
 Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
+    Error err;
+
     // Collect all sprites and their transforms
     std::vector<std::pair<ResHandle<Texture>, glsl::SpriteInstance>> spriteInstances;
     
@@ -79,14 +82,12 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
     // Resize if necessary
     m_instanceBuffer.Reserve(spriteInstances.size());
 
-    OKAMI_CHK_GL;
-
     // Set up rendering state
     glUseProgram(m_program.get()); 
-    OKAMI_DEFER(glUseProgram(0)); OKAMI_CHK_GL;
+    err += GET_GL_ERROR();
 
     glBindVertexArray(m_instanceBuffer.GetVertexArray()); 
-    OKAMI_DEFER(glBindVertexArray(0)); OKAMI_CHK_GL;
+    err += GET_GL_ERROR();
 
     {
         auto map = m_instanceBuffer.Map();
@@ -97,10 +98,8 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
     }
 
     // Set uniforms
-    m_sceneUBO.Bind();
-    OKAMI_DEFER(m_sceneUBO.Unbind()); OKAMI_CHK_GL;
-    m_sceneUBO.Write(pass.m_sceneGlobals); OKAMI_CHK_GL;
-    glUniform1i(u_texture, 0); OKAMI_CHK_GL; // Texture unit 0
+    err += m_sceneUBO.Bind(BufferBindingPoints::SceneGlobals);
+    err += m_sceneUBO.Write(pass.m_sceneGlobals);
 
     // Enable blending for sprites
     glDisable(GL_CULL_FACE);
@@ -127,12 +126,15 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
                 // For now, render without texture binding
                 if (currentTexture.IsLoaded()) {
                     auto& tex = m_textureManager->GetImpl(currentTexture)->m_texture;
-                    glBindTexture(GL_TEXTURE_2D, tex.get()); OKAMI_CHK_GL;
+                    glActiveTexture(GL_TEXTURE0 + static_cast<GLenum>(TextureBindingPoints::SpriteTexture));
+                    glBindTexture(GL_TEXTURE_2D, tex.get());
+                    err += GET_GL_ERROR();
                 }
 
                 uint32_t instanceCount = i - batchStart;
                 // Draw points, geometry shader will expand them to quads
-                glDrawArrays(GL_POINTS, batchStart, instanceCount); OKAMI_CHK_GL;
+                glDrawArrays(GL_POINTS, batchStart, instanceCount);
+                err += GET_GL_ERROR();
             }
             
             currentTexture = spriteTexture;
