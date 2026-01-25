@@ -378,7 +378,12 @@ protected:
         glm::ivec2 windowSize{0, 0};
         glfwGetWindowSize(m_window, &windowSize.x, &windowSize.y);
 
+        // Compute cursor delta: preserve previous cursor then query new position
+        double prevCursorX = m_mouseState.m_cursorX;
+        double prevCursorY = m_mouseState.m_cursorY;
         glfwGetCursorPos(m_window, &m_mouseState.m_cursorX, &m_mouseState.m_cursorY);
+        m_mouseState.m_deltaX = m_mouseState.m_cursorX - prevCursorX;
+        m_mouseState.m_deltaY = m_mouseState.m_cursorY - prevCursorY;
 
         bus.Send<IOState>(IOState{ 
             .m_keyboard = m_keyboardState, 

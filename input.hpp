@@ -221,6 +221,8 @@ namespace okami {
         std::unordered_map<MouseButton, bool> m_buttonStates;
         double m_cursorX = 0.0;
         double m_cursorY = 0.0;
+        double m_deltaX = 0.0;
+        double m_deltaY = 0.0;
 
         inline bool IsButtonPressed(MouseButton button) const {
             auto it = m_buttonStates.find(button);

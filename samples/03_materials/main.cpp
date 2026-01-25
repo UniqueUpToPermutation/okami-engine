@@ -18,6 +18,7 @@
 #include "geometry.hpp"
 #include "physics.hpp"
 #include "storage.hpp"
+#include "camera_controllers.hpp"
 
 using namespace okami;
 
@@ -29,6 +30,7 @@ int main() {
     // Register renderer based on compile-time options
     en.CreateModule<GLFWModuleFactory>();
     en.CreateModule<OGLRendererFactory>({}, params);
+    en.CreateModule<CameraControllerModuleFactory>();
 
     Error err = en.Startup();
     if (err.IsError()) {
@@ -50,31 +52,14 @@ int main() {
     });
 
     auto cameraEntity = en.CreateEntity();
-    en.AddComponent(cameraEntity, Camera::Orthographic(10.0f, -10.0f, 10.0f));
+    en.AddComponent(cameraEntity, Camera::Perspective(glm::half_pi<float>(), 0.1f, 50.0f));
     en.AddComponent(cameraEntity, Transform::LookAt(
-        glm::vec3(5.0f, 5.0f, 5.0f),
+        glm::vec3(2.0f, 2.0f, 2.0f),
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f)
     ));
+    en.AddComponent(cameraEntity, OrbitCameraControllerComponent{});
     en.SetActiveCamera(cameraEntity);
-    
-    auto transformAccessor = en.QueryInterface<IComponentView<Transform>>();
-
-    // Rotate the camera around the origin
-    en.AddScript([&](
-        JobContext& ctx,
-        In<Time> inTime,
-        Out<UpdateComponentSignal<Transform>> outTransform) -> Error {
-
-        auto transform = transformAccessor->Get(cameraEntity);
-
-        outTransform.Send(UpdateComponentSignal<Transform>{
-            .m_entity = cameraEntity,
-            .m_component = Transform::RotateY(0.5f * inTime->GetDeltaTimeF()) * transform
-        });
-
-        return {};
-    });
 
     en.Run();
     en.Shutdown();
