@@ -8,6 +8,7 @@
 #include "content.hpp"
 #include "entity_manager.hpp"
 #include "jobs.hpp"
+#include "material.hpp"
 
 namespace okami {
     struct SignalExit {};
@@ -79,9 +80,20 @@ namespace okami {
         ResHandle<T> CreateResource(T&& data) {
             auto* cm = m_interfaces.Query<IContentManager<T>>();
             if (!cm) {
-                throw std::runtime_error("No IContentManager<" + std::string(typeid(T).name()) + "> registered in Engine");
+                OKAMI_LOG_ERROR("No IContentManager<" + std::string(typeid(T).name()) + "> registered in Engine");
+                return ResHandle<T>();
             }
             return cm->Create(std::move(data));
+        }
+
+        template <typename T>
+        MaterialHandle CreateMaterial(T material) {
+            auto* mm = m_interfaces.Query<IMaterialManager<T>>();
+            if (!mm) {
+                OKAMI_LOG_ERROR("No IMaterialManager<" + std::string(typeid(T).name()) + "> registered in Engine");
+                return MaterialHandle();
+            }
+            return mm->CreateMaterial(std::move(material));
         }
 
         void AddScriptBundle(

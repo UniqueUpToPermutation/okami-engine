@@ -76,5 +76,6 @@ endfunction()
 
 add_subdirectory(01_hello_world)
 add_subdirectory(02_zoo)
+add_subdirectory(03_materials)
 add_subdirectory(im3d)
 add_subdirectory(imgui)
