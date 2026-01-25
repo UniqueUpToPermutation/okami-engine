@@ -91,7 +91,11 @@ Error Engine::Startup() {
 	OKAMI_ERROR_RETURN_IF(!m_entityManager, "No IEntityManager registered after registering modules");
 
     e += m_modules.Startup(initContext);
-    OKAMI_ERROR_RETURN(e);
+
+	if (e.IsError()) {
+		LOG(ERROR) << "Engine failed to start up with error: " << e << " ( at " << e.m_file << ":" << e.m_line << " )";
+		return e;
+	}
 
 	return {};
 }

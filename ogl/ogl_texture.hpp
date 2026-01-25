@@ -22,4 +22,6 @@ namespace okami {
             CreateResource(Texture&& data) override;
         void DestroyResourceImpl(TextureImpl& impl) override;   
     };
+
+    Expected<Texture> FetchTextureFromGL(GLuint textureId);
 }

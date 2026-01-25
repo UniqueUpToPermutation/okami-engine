@@ -7,7 +7,7 @@ using namespace okami;
 Error& Error::Union(Error const& other) {
     if (IsOk()) {
         // If this is ok, just take the other
-        m_contents = other.m_contents;
+        *this = other;
     }
     else if (!other.IsOk()) {
         // If both are errors, combine them

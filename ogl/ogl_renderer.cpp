@@ -7,6 +7,7 @@
 #include "ogl_static_mesh.hpp"
 #include "ogl_im3d.hpp"
 #include "ogl_imgui.hpp"
+#include "ogl_brdf.hpp"
 
 #include "../config.hpp"
 #include "../storage.hpp"
@@ -37,6 +38,7 @@ private:
     OGLStaticMeshRenderer* m_staticMeshRenderer = nullptr;
     OGLIm3D* m_im3d = nullptr;
     OGLImguiRenderer* m_imguiRenderer = nullptr;
+    OGLBrdfProvider* m_brdfProvider = nullptr;
 
     OGLDefaultMaterialManager* m_defaultMaterialManager = nullptr;
     OGLBasicTexturedMaterialManager* m_basicTexturedMaterialManager = nullptr;
@@ -143,6 +145,8 @@ public:
 
         m_defaultMaterialManager = CreateChild<OGLDefaultMaterialManager>();
         m_basicTexturedMaterialManager = CreateChild<OGLBasicTexturedMaterialManager>(m_textureManager);
+    
+        m_brdfProvider = CreateChild<OGLBrdfProvider>(/*debug = */ false);
     }
 
     std::string GetName() const override {

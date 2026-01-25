@@ -122,8 +122,6 @@ public:
                 }
             );
 
-            (void)0;
-
             return {};
         });
 
