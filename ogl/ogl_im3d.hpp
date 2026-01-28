@@ -8,7 +8,7 @@
 #include "shaders/im3d.glsl"
 
 namespace okami {
-    class OGLIm3D final :
+    class OGLIm3DRenderer final :
         public EngineModule,
         public IOGLRenderModule {
     protected:

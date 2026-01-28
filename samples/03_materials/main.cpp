@@ -18,6 +18,7 @@
 #include "geometry.hpp"
 #include "physics.hpp"
 #include "storage.hpp"
+#include "sky.hpp"
 #include "camera_controllers.hpp"
 
 using namespace okami;
@@ -50,6 +51,9 @@ int main() {
         .m_geometry = geometryHandle, 
         .m_material = materialHandle 
     });
+
+    auto skyEntity = en.CreateEntity();
+    en.AddComponent(skyEntity, SkyComponent{});
 
     auto cameraEntity = en.CreateEntity();
     en.AddComponent(cameraEntity, Camera::Perspective(glm::half_pi<float>(), 0.1f, 50.0f));

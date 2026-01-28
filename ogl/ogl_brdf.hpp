@@ -8,6 +8,8 @@ namespace okami {
     class IOGLCookTorrenceBRDFProvider {
     public:
         virtual GLTexture const& GetBrdfLut() const = 0;
+
+        virtual ~IOGLCookTorrenceBRDFProvider() = default;
     };
 
     class OGLBrdfProvider final : public EngineModule,

@@ -13,6 +13,12 @@ namespace okami {
         GLint m_startTextureBindPoint = -1;
     };
 
+    enum class OGLVertexShaderOutput {
+        Mesh = 0,
+        Sky = 1,
+        Count
+    };
+
     class IOGLMaterialManager {
     public:
         virtual ~IOGLMaterialManager() = default;
@@ -23,16 +29,21 @@ namespace okami {
             OGLMaterialBindParams const& params) const = 0;
         virtual Error OnProgramCreated(GLProgram const& program, 
             OGLMaterialBindParams const& params) const = 0;
+        virtual OGLVertexShaderOutput GetVertexShaderOutput() const = 0;
 
         inline std::string GetMaterialName() const {
             return GetMaterialType().name();
         }
     };
 
-    template <typename T>
+    template <typename T, OGLVertexShaderOutput VSOutput>
     class IOGLMaterialManagerT : public IOGLMaterialManager {
     public:
         virtual ~IOGLMaterialManagerT() = default;
+
+        OGLVertexShaderOutput GetVertexShaderOutput() const override {
+            return VSOutput;
+        }
 
         std::type_index GetMaterialType() const override {
             return std::type_index(typeid(T));
@@ -41,7 +52,7 @@ namespace okami {
 
     class OGLDefaultMaterialManager final :
         public EngineModule,
-        public IOGLMaterialManagerT<void> {
+        public IOGLMaterialManagerT<DefaultMaterial, OGLVertexShaderOutput::Mesh> {
     public:
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
@@ -54,7 +65,7 @@ namespace okami {
 
     class OGLBasicTexturedMaterialManager final :
         public MaterialModuleBase<BasicTexturedMaterial, EmptyMaterialImpl>,
-        public IOGLMaterialManagerT<BasicTexturedMaterial> {
+        public IOGLMaterialManagerT<BasicTexturedMaterial, OGLVertexShaderOutput::Mesh> {
     protected:
         OGLTextureManager* m_textureManager = nullptr;
 

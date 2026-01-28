@@ -1,18 +1,15 @@
 #version 410 core
 
-in VS_OUT {
-    vec3 position;
-    vec2 uv;
-    vec3 normal;
-    vec3 tangent;
-    vec3 bitangent;
-} fs_in;
+#include "vs_outputs.glsl"
+
+// Input from vertex shader
+in MESH_VS_OUT vs_out;
 
 uniform sampler2D u_diffuseMap;
 
 out vec4 FragColor;
 
 void main() {
-    vec3 diffuseColor = texture(u_diffuseMap, fs_in.uv).rgb;
+    vec3 diffuseColor = texture(u_diffuseMap, vs_out.uv).rgb;
     FragColor = vec4(diffuseColor, 1.0);
 }

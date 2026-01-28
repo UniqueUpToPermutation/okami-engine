@@ -9,24 +9,37 @@
 #include "../transform.hpp"
 #include "../renderer.hpp"
 #include "../material.hpp"
+#include "../sky.hpp"
 
 #include "shaders/scene.glsl"
-#include "shaders/static_mesh.glsl"
 
 namespace okami {
-    class OGLStaticMeshRenderer final :
+    class OGLSkyDefaultMaterialManager final :
+        public MaterialModuleBase<SkyDefaultMaterial, EmptyMaterialImpl>,
+        public IOGLMaterialManagerT<SkyDefaultMaterial, OGLVertexShaderOutput::Sky> {
+    public:
+        Error RegisterImpl(InterfaceCollection& interfaces) override;
+
+        EmptyMaterialImpl CreateImpl(SkyDefaultMaterial const& material) override;
+		void DestroyImpl(EmptyMaterialImpl& impl) override;
+
+        ProgramShaderPaths GetShaderPaths() const override;
+        Error Bind(MaterialHandle handle, OGLMaterialBindParams const& params) const override;
+        Error OnProgramCreated(GLProgram const& program, 
+            OGLMaterialBindParams const& params) const override;
+    };
+
+    class OGLSkyRenderer final :
         public EngineModule,
         public IOGLRenderModule {
     protected:
         OGLPipelineState m_pipelineState;
-        std::type_index m_defaultMaterialType = typeid(DefaultMaterial);
+        std::type_index m_defaultMaterialType = typeid(SkyDefaultMaterial);
 
         UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
-        UniformBuffer<glsl::StaticMeshInstance> m_instanceUBO;
 
         enum class BufferBindingPoints : GLint {
             SceneGlobals,
-            StaticMeshInstance,
             Count
         };
 
@@ -42,11 +55,8 @@ namespace okami {
         std::unordered_map<std::type_index, MaterialImpl> m_programs;
 
         // Component storage and views
-        StorageModule<StaticMeshComponent>* m_storage = nullptr;
-        IComponentView<Transform>* m_transformView = nullptr;
-        OGLGeometryManager* m_geometryManager = nullptr;
+        StorageModule<SkyComponent>* m_storage = nullptr;
 
-        Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
 
         constexpr static OGLMaterialBindParams GetMaterialBindParams() {
@@ -57,7 +67,7 @@ namespace okami {
         }
 
     public:
-        OGLStaticMeshRenderer(OGLGeometryManager* geometryManager);
+        OGLSkyRenderer();
 
         Error Pass(OGLPass const& pass) override;
 

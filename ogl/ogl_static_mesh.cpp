@@ -21,6 +21,10 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
 
     auto vertexShaderPath = GetGLSLShaderPath("static_mesh.vs");
     context.m_interfaces.ForEachInterface<IOGLMaterialManager>([&](IOGLMaterialManager* manager) {
+        if (manager->GetVertexShaderOutput() != OGLVertexShaderOutput::Mesh) {
+            return;
+        }
+        
         auto shaders = manager->GetShaderPaths();
         if (shaders.m_vertex.empty()) {
             shaders.m_vertex = vertexShaderPath;
@@ -49,6 +53,8 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
             });
     });
 
+    OKAMI_ERROR_RETURN(err);
+
     auto instanceUBO = UniformBuffer<glsl::StaticMeshInstance>::Create();
     OKAMI_ERROR_RETURN(instanceUBO);
     m_instanceUBO = std::move(*instanceUBO);
@@ -63,11 +69,7 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
     m_pipelineState.depthMask = true;
 
     LOG(INFO) << "OGL Static Mesh Renderer initialized successfully";
-    return {};
-}
-
-void OGLStaticMeshRenderer::ShutdownImpl(InitContext const& context) {
-
+    return err;
 }
 
 OGLStaticMeshRenderer::OGLStaticMeshRenderer(OGLGeometryManager* geometryManager) :

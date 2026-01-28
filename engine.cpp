@@ -105,6 +105,8 @@ void Engine::Shutdown() {
 
 	auto initContext = GetInitContext();
 
+	m_registry.clear();
+
     m_modules.Shutdown(initContext);
 }
 

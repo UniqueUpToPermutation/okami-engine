@@ -30,7 +30,7 @@ Expected<GLTexture> okami::CreateBrdfLut(IGLShaderCache& cache, bool bDebugMode)
     GLTexture brdfLut;
 
     auto blitShader = cache.LoadShader(GL_VERTEX_SHADER, GetGLSLShaderPath("blit.vs"));
-    auto brdfShader = cache.LoadShader(GL_FRAGMENT_SHADER, GetGLSLShaderPath("cook_torrence_brdf.fs"));
+    auto brdfShader = cache.LoadShader(GL_FRAGMENT_SHADER, GetGLSLShaderPath("cook_torrence_brdf_lut.fs"));
     OKAMI_UNEXPECTED_RETURN(blitShader);
     OKAMI_UNEXPECTED_RETURN(brdfShader);
     

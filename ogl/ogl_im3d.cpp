@@ -4,10 +4,10 @@
 
 using namespace okami;
 
-Error OGLIm3D::RegisterImpl(InterfaceCollection& interfaces) {
+Error OGLIm3DRenderer::RegisterImpl(InterfaceCollection& interfaces) {
     return {};
 }
-Error OGLIm3D::StartupImpl(InitContext const& context) {
+Error OGLIm3DRenderer::StartupImpl(InitContext const& context) {
     m_dataProvider = context.m_interfaces.Query<IIm3dProvider>();
 
     if (!m_dataProvider) {
@@ -16,7 +16,7 @@ Error OGLIm3D::StartupImpl(InitContext const& context) {
     }
 
     auto* cache = context.m_interfaces.Query<IGLShaderCache>();
-    OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLIm3D");
+    OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLIm3DRenderer");
 
     auto program = CreateProgram(ProgramShaderPaths{
         .m_vertex = GetGLSLShaderPath("im3d.vs"),
@@ -47,7 +47,7 @@ Error OGLIm3D::StartupImpl(InitContext const& context) {
     return err;
 }
 
-Error OGLIm3D::Pass(OGLPass const& pass) {
+Error OGLIm3DRenderer::Pass(OGLPass const& pass) {
     if (!m_dataProvider) {
         return {};
     }
@@ -123,6 +123,6 @@ Error OGLIm3D::Pass(OGLPass const& pass) {
     return err;
 }
 
-std::string OGLIm3D::GetName() const { 
+std::string OGLIm3DRenderer::GetName() const { 
     return "OGL Im3d Module";
 }

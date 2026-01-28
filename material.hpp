@@ -8,6 +8,9 @@
 #include <glm/vec4.hpp>
 
 namespace okami {
+	struct DefaultMaterial {
+	};
+
 	// TODO: This is just a placeholder for testing content loading.
 	// We should have a more robust material system in the future
 	struct BasicTexturedMaterial {

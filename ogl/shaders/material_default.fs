@@ -1,13 +1,9 @@
 #version 410 core
 
+#include "vs_outputs.glsl"
+
 // Input from vertex shader
-in VS_OUT {
-    vec3 position;
-    vec2 uv;
-    vec3 normal;
-    vec3 tangent;
-    vec3 bitangent;
-} vs_out;
+in MESH_VS_OUT vs_out;
 
 // Output
 layout(location = 0) out vec4 FragColor;
