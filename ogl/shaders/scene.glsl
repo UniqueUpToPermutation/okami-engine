@@ -13,9 +13,9 @@ struct CameraGlobals {
     mat4 u_invProj;
     mat4 u_invViewProj;
 
-    vec2 u_viewport;
-    vec3 u_cameraPosition;
-    vec3 u_cameraDirection;
+    vec4 u_viewport;
+    vec4 u_cameraPosition;
+    vec4 u_cameraDirection;
 };
 
 struct SceneGlobals {

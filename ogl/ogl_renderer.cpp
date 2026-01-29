@@ -105,9 +105,9 @@ protected:
                 .u_invProj = glm::inverse(projMatrix),
                 .u_invViewProj = glm::inverse(viewProjMatrix),
 
-                .u_viewport = m_glProvider->GetFramebufferSize(),
-                .u_cameraPosition = cameraTransform.m_position,
-                .u_cameraDirection = cameraTransform.TransformVector(glm::vec3(0.0f, 0.0f, -1.0f))
+                .u_viewport = glm::vec4(m_glProvider->GetFramebufferSize(), 0.0f, 0.0f),
+                .u_cameraPosition = glm::vec4(cameraTransform.m_position, 1.0f),
+                .u_cameraDirection = glm::vec4(cameraTransform.TransformVector(glm::vec3(0.0f, 0.0f, -1.0f)), 0.0f)
             }
         };
     }
