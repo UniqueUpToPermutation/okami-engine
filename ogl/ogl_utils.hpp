@@ -14,6 +14,8 @@
 #include "shaders/types.glsl"
 #include "shaders/scene.glsl"
 
+#include "entt/entity/registry.hpp"
+
 #define GET_GL_ERROR() []() -> Error { \
     Error glErr = okami::GetGlError(); \
     glErr.m_line = __LINE__; \
@@ -59,11 +61,10 @@ namespace okami {
 
     struct OGL2DPayload {
         int m_layer = 0;
-        std::function<Error(OGLPass const& pass)> m_payload = nullptr;
+        std::function<Error(entt::registry const& registry, OGLPass const& pass)> m_payload = nullptr;
     };
 
     struct OGLPass {
-        glsl::SceneGlobals m_sceneGlobals;
         OGLPassType m_type = OGLPassType::Forward;
         std::vector<OGL2DPayload>* m_2DOutputs = nullptr;
     };
@@ -71,7 +72,7 @@ namespace okami {
     class IOGLRenderModule {
     public:
         virtual ~IOGLRenderModule() = default;
-        virtual Error Pass(OGLPass const& pass) = 0;
+        virtual Error Pass(entt::registry const& registry, OGLPass const& pass) = 0;
     };
 
     GLint ToOpenGL(AccessorComponentType type);
@@ -515,7 +516,7 @@ namespace okami {
             return result;
         }
 
-        Error Bind(ConvertibleToGLint auto bindingPoint) {
+        Error Bind(ConvertibleToGLint auto bindingPoint) const {
             glBindBufferBase(GL_UNIFORM_BUFFER, static_cast<GLint>(bindingPoint), m_buffer.get()); 
             OKAMI_CHK_GL;
             return {};
@@ -532,6 +533,12 @@ namespace okami {
         BufferWriteMap<T> Map() {
             return BufferWriteMap<T>::Map(m_buffer);
         }
+    };
+
+    class IOGLSceneGlobalsProvider {
+    public:
+        virtual ~IOGLSceneGlobalsProvider() = default;
+        virtual UniformBuffer<glsl::SceneGlobals> const& GetSceneGlobalsBuffer() const = 0;
     };
 
     struct OGLPipelineState {

@@ -16,8 +16,8 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
     auto* cache = context.m_interfaces.Query<IGLShaderCache>();
     OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLSpriteRenderer");
 
-    m_transformView = context.m_interfaces.Query<IComponentView<Transform>>();
-    OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OGLSpriteRenderer");
+    m_sceneGlobalsProvider = context.m_interfaces.Query<IOGLSceneGlobalsProvider>();
+    OKAMI_ERROR_RETURN_IF(!m_sceneGlobalsProvider, "IOGLSceneGlobalsProvider interface not available for OGLStaticMeshRenderer");
 
     auto vertexShaderPath = GetGLSLShaderPath("static_mesh.vs");
     context.m_interfaces.ForEachInterface<IOGLMaterialManager>([&](IOGLMaterialManager* manager) {
@@ -59,10 +59,6 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
     OKAMI_ERROR_RETURN(instanceUBO);
     m_instanceUBO = std::move(*instanceUBO);
 
-    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create();
-    OKAMI_ERROR_RETURN(sceneUBO);
-    m_sceneUBO = std::move(*sceneUBO);
-
     m_pipelineState.depthTestEnabled = true;
     m_pipelineState.blendEnabled = false;
     m_pipelineState.cullFaceEnabled = true;
@@ -74,10 +70,9 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
 
 OGLStaticMeshRenderer::OGLStaticMeshRenderer(OGLGeometryManager* geometryManager) :
     m_geometryManager(geometryManager) {
-    m_storage = CreateChild<StorageModule<StaticMeshComponent>>();
 }
 
-Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
+Error OGLStaticMeshRenderer::Pass(entt::registry const& registry, OGLPass const& pass) {
     struct InstanceData {
         ResHandle<Geometry> m_geometry;
         MaterialHandle m_material;
@@ -87,24 +82,23 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
     // Collect all sprites and their transforms
     std::vector<InstanceData> instances;
 
-    m_storage->ForEach([&](entity_t entity, const StaticMeshComponent& mesh) {
-        // Skip sprites without textures
-        if (!mesh.m_geometry || !mesh.m_geometry.IsLoaded()) {
-            return;
-        }
-        
-        Transform transform = m_transformView->GetOr(entity, Transform::Identity());
-
-        auto matrix = transform.AsMatrix();
-        instances.emplace_back(InstanceData{
-            .m_geometry = mesh.m_geometry,
-            .m_material = mesh.m_material,
-            .m_glslData = glsl::StaticMeshInstance{
-                .u_model = matrix,
-                .u_normalMatrix = glm::transpose(glm::inverse(matrix)),
+    registry.view<StaticMeshComponent, Transform>().each(
+        [&](auto entity, StaticMeshComponent const& mesh, Transform const& transform) {
+            // Skip sprites without textures
+            if (!mesh.m_geometry || !mesh.m_geometry.IsLoaded()) {
+                return;
             }
+            
+            auto matrix = transform.AsMatrix();
+            instances.emplace_back(InstanceData{
+                .m_geometry = mesh.m_geometry,
+                .m_material = mesh.m_material,
+                .m_glslData = glsl::StaticMeshInstance{
+                    .u_model = matrix,
+                    .u_normalMatrix = glm::transpose(glm::inverse(matrix)),
+                }
+            });
         });
-    });
 
     if (instances.empty()) {
         return {};
@@ -125,7 +119,7 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
     // Set up rendering state
     m_pipelineState.SetToGL(); 
     err += GET_GL_ERROR();
-    err += m_sceneUBO.Write(pass.m_sceneGlobals);
+    err += m_sceneGlobalsProvider->GetSceneGlobalsBuffer().Bind(BufferBindingPoints::SceneGlobals);
 
     okami::PrimitiveImpl* currentMeshImpl = nullptr;
 
@@ -156,7 +150,7 @@ Error OGLStaticMeshRenderer::Pass(OGLPass const& pass) {
                 err += GET_GL_ERROR();
 
                 err += m_instanceUBO.Bind(BufferBindingPoints::StaticMeshInstance);
-                err += m_sceneUBO.Bind(BufferBindingPoints::SceneGlobals);
+                err += m_sceneGlobalsProvider->GetSceneGlobalsBuffer().Bind(BufferBindingPoints::SceneGlobals);
                 err += it->second.m_manager->Bind(inst.m_material, GetMaterialBindParams());
 
                 currentMaterial = inst.m_material;

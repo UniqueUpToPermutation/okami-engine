@@ -109,6 +109,8 @@ namespace okami {
                 name);
         }
 
+        entt::registry const& GetRegistry() const { return m_registry; }
+
 		std::filesystem::path GetRenderOutputPath(size_t frameIndex);
 
 		Engine(EngineParams params = {});

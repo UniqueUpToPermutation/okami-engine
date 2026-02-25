@@ -27,7 +27,7 @@ void OGLImguiRenderer::ShutdownImpl(InitContext const& context) {
     }
 }
 
-Error OGLImguiRenderer::Pass(OGLPass const& pass) {
+Error OGLImguiRenderer::Pass(entt::registry const& registry, OGLPass const& pass) {
     if (!m_imguiProvider) {
         return {};
     }

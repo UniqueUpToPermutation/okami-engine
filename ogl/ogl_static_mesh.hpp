@@ -5,7 +5,6 @@
 #include "ogl_material.hpp"
 
 #include "../content.hpp"
-#include "../storage.hpp"
 #include "../transform.hpp"
 #include "../renderer.hpp"
 #include "../material.hpp"
@@ -21,7 +20,6 @@ namespace okami {
         OGLPipelineState m_pipelineState;
         std::type_index m_defaultMaterialType = typeid(DefaultMaterial);
 
-        UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
         UniformBuffer<glsl::StaticMeshInstance> m_instanceUBO;
 
         enum class BufferBindingPoints : GLint {
@@ -42,9 +40,8 @@ namespace okami {
         std::unordered_map<std::type_index, MaterialImpl> m_programs;
 
         // Component storage and views
-        StorageModule<StaticMeshComponent>* m_storage = nullptr;
-        IComponentView<Transform>* m_transformView = nullptr;
         OGLGeometryManager* m_geometryManager = nullptr;
+        IOGLSceneGlobalsProvider* m_sceneGlobalsProvider = nullptr;
 
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
@@ -59,7 +56,7 @@ namespace okami {
     public:
         OGLStaticMeshRenderer(OGLGeometryManager* geometryManager);
 
-        Error Pass(OGLPass const& pass) override;
+        Error Pass(entt::registry const& registry, OGLPass const& pass) override;
 
         std::string GetName() const override;
     };

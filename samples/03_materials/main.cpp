@@ -16,8 +16,6 @@
 #include "texture.hpp"
 #include "paths.hpp"
 #include "geometry.hpp"
-#include "physics.hpp"
-#include "storage.hpp"
 #include "sky.hpp"
 #include "camera_controllers.hpp"
 
@@ -51,6 +49,7 @@ int main() {
         .m_geometry = geometryHandle, 
         .m_material = materialHandle 
     });
+    en.AddComponent(boxEntity, Transform::Identity());
 
     auto skyEntity = en.CreateEntity();
     en.AddComponent(skyEntity, SkyComponent{});

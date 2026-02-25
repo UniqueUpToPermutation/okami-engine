@@ -6,7 +6,6 @@
 #include "transform.hpp"
 #include "paths.hpp"
 #include "geometry.hpp"
-#include "storage.hpp"
 
 using namespace okami;
 
@@ -40,15 +39,13 @@ int main() {
     en.AddComponent(meshEntity, StaticMeshComponent{ geometryHandle });
     en.AddComponent(meshEntity, Transform::Scale(0.25f));
 
-    auto transformAccessor = en.QueryInterface<IComponentView<Transform>>();
-
     // Rotate the camera around the origin
     en.AddScript([&](
         JobContext& ctx,
         In<Time> inTime,
         Out<UpdateComponentSignal<Transform>> outTransform) -> Error {
 
-        auto transform = transformAccessor->Get(cameraEntity);
+        auto transform = en.GetRegistry().get<Transform>(cameraEntity);
 
         outTransform.Send(UpdateComponentSignal<Transform>{
             .m_entity = cameraEntity,

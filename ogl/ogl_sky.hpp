@@ -5,7 +5,6 @@
 #include "ogl_material.hpp"
 
 #include "../content.hpp"
-#include "../storage.hpp"
 #include "../transform.hpp"
 #include "../renderer.hpp"
 #include "../material.hpp"
@@ -36,8 +35,6 @@ namespace okami {
         OGLPipelineState m_pipelineState;
         std::type_index m_defaultMaterialType = typeid(SkyDefaultMaterial);
 
-        UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
-
         enum class BufferBindingPoints : GLint {
             SceneGlobals,
             Count
@@ -53,9 +50,7 @@ namespace okami {
         };
 
         std::unordered_map<std::type_index, MaterialImpl> m_programs;
-
-        // Component storage and views
-        StorageModule<SkyComponent>* m_storage = nullptr;
+        IOGLSceneGlobalsProvider* m_sceneGlobalsProvider = nullptr;
 
         Error StartupImpl(InitContext const& context) override;
 
@@ -67,9 +62,7 @@ namespace okami {
         }
 
     public:
-        OGLSkyRenderer();
-
-        Error Pass(OGLPass const& pass) override;
+        Error Pass(entt::registry const& registry, OGLPass const& pass) override;
 
         std::string GetName() const override;
     };

@@ -1,6 +1,5 @@
 #include "camera_controllers.hpp"
 #include "jobs.hpp"
-#include "storage.hpp"
 #include "input.hpp"
 #include "camera.hpp"
 #include <cmath>
@@ -9,8 +8,6 @@ using namespace okami;
 
 class CameraControllerModule final : public EngineModule {
 public:
-    StorageModule<OrbitCameraControllerComponent>* m_orbitStorage = nullptr;
-
     Error BuildGraphImpl(JobGraph& graph, BuildGraphParams const& params) override {
         // Node: handle orbit camera controls (rotate, pan, zoom)
         graph.AddMessageNode([id = GetId(), &registry = params.m_registry](
@@ -126,10 +123,6 @@ public:
         });
 
         return {};
-    }
-
-    CameraControllerModule() {
-        m_orbitStorage = CreateChild<StorageModule<OrbitCameraControllerComponent>>();
     }
 };
 

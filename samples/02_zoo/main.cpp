@@ -16,8 +16,6 @@
 #include "texture.hpp"
 #include "paths.hpp"
 #include "geometry.hpp"
-#include "physics.hpp"
-#include "storage.hpp"
 #include "camera_controllers.hpp"
 
 using namespace okami;

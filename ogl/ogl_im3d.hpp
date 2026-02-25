@@ -6,6 +6,7 @@
 #include "ogl_utils.hpp"
 
 #include "shaders/im3d.glsl"
+#include "ogl_scene.hpp"
 
 namespace okami {
     class OGLIm3DRenderer final :
@@ -18,8 +19,7 @@ namespace okami {
         GLProgram m_program;
 
         UploadVertexBuffer<glsl::Im3dVertex> m_vertexBuffer; // Instance buffer for sprite data
-
-        UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
+        IOGLSceneGlobalsProvider* m_sceneGlobalsProvider = nullptr;
 
         enum class BufferBindingPoints : GLint {
             SceneGlobals,
@@ -30,7 +30,7 @@ namespace okami {
         Error StartupImpl(InitContext const& context) override;
     
     public:
-        Error Pass(OGLPass const& pass) override;
+        Error Pass(entt::registry const& registry, OGLPass const& pass) override;
 
         std::string GetName() const override;
     };

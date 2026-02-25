@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../renderer.hpp"
-#include "../storage.hpp"
 #include "../transform.hpp"
 #include "../texture.hpp"
 
@@ -21,9 +20,6 @@ namespace okami {
 
         GLProgram m_program;
         UploadVertexBuffer<glsl::SpriteInstance> m_instanceBuffer; // Instance buffer for sprite data
-        
-        // Uniform locations
-        UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
 
         enum class BufferBindingPoints : GLint {
             SceneGlobals,
@@ -35,11 +31,9 @@ namespace okami {
             Count,
         };
 
-
         // Component storage and views
-        StorageModule<SpriteComponent>* m_storage = nullptr;
-        IComponentView<Transform>* m_transformView = nullptr;
         OGLTextureManager* m_textureManager = nullptr;
+        IOGLSceneGlobalsProvider* m_sceneGlobalsProvider = nullptr;
         
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
@@ -48,7 +42,7 @@ namespace okami {
     public:
         OGLSpriteRenderer(OGLTextureManager* textureManager);
 
-        Error Pass(OGLPass const& pass) override;
+        Error Pass(entt::registry const& registry, OGLPass const& pass) override;
 
         std::string GetName() const override;
         

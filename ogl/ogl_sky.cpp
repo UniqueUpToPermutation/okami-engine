@@ -37,7 +37,10 @@ Error OGLSkyRenderer::StartupImpl(InitContext const& context) {
     Error err;
     
     auto* cache = context.m_interfaces.Query<IGLShaderCache>();
-    OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLSpriteRenderer");
+    OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLSkyRenderer");
+
+    m_sceneGlobalsProvider = context.m_interfaces.Query<IOGLSceneGlobalsProvider>();
+    OKAMI_ERROR_RETURN_IF(!m_sceneGlobalsProvider, "IOGLSceneGlobalsProvider interface not available for OGLSkyRenderer");
 
     auto vertexShaderPath = GetGLSLShaderPath("sky.vs");
     context.m_interfaces.ForEachInterface<IOGLMaterialManager>([&](IOGLMaterialManager* manager) {
@@ -74,10 +77,6 @@ Error OGLSkyRenderer::StartupImpl(InitContext const& context) {
 
     OKAMI_ERROR_RETURN(err);
 
-    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create();
-    OKAMI_ERROR_RETURN(sceneUBO);
-    m_sceneUBO = std::move(*sceneUBO);
-
     m_pipelineState.depthTestEnabled = true;
     m_pipelineState.blendEnabled = false;
     m_pipelineState.cullFaceEnabled = true;
@@ -88,24 +87,19 @@ Error OGLSkyRenderer::StartupImpl(InitContext const& context) {
     return err;
 }
 
-OGLSkyRenderer::OGLSkyRenderer() {
-    m_storage = CreateChild<StorageModule<SkyComponent>>();
-}
-
-Error OGLSkyRenderer::Pass(OGLPass const& pass) {
+Error OGLSkyRenderer::Pass(entt::registry const& registry, OGLPass const& pass) {
     Error err;
 
     // Set up rendering state
     m_pipelineState.SetToGL(); 
     err += GET_GL_ERROR();
-    err += m_sceneUBO.Write(pass.m_sceneGlobals);
 
     okami::PrimitiveImpl* currentMeshImpl = nullptr;
 
     ResHandle<Geometry> currentGeometry;
     std::optional<MaterialHandle> currentMaterial;
 
-    m_storage->ForEach([&](auto const& entity, SkyComponent const& component) {
+    registry.view<SkyComponent>().each([&](auto entity, SkyComponent const& component) {
         auto currentMaterial = component.m_skyMaterial;
 
         // If no material, render with default material.
@@ -114,7 +108,7 @@ Error OGLSkyRenderer::Pass(OGLPass const& pass) {
             glUseProgram(it->second.m_program.get());
             err += GET_GL_ERROR();
 
-            err += m_sceneUBO.Bind(BufferBindingPoints::SceneGlobals);
+            err += m_sceneGlobalsProvider->GetSceneGlobalsBuffer().Bind(BufferBindingPoints::SceneGlobals);
             err += it->second.m_manager->Bind(currentMaterial, GetMaterialBindParams());
 
             currentMaterial = currentMaterial;

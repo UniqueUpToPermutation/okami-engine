@@ -4,7 +4,6 @@
 #include "../renderer.hpp"
 #include "../camera.hpp"
 #include "../transform.hpp"
-#include "../storage.hpp"
 #include "../texture.hpp"
 #include "../paths.hpp"
 

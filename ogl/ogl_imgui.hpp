@@ -18,7 +18,7 @@ namespace okami {
         void ShutdownImpl(InitContext const& context) override;
 
     public:
-        Error Pass(OGLPass const& pass) override;
+        Error Pass(entt::registry const& registry, OGLPass const& pass) override;
 
         std::string GetName() const override;
     };

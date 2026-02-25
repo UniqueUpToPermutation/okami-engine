@@ -15,6 +15,9 @@ Error OGLIm3DRenderer::StartupImpl(InitContext const& context) {
         return {};
     }
 
+    m_sceneGlobalsProvider = context.m_interfaces.Query<IOGLSceneGlobalsProvider>();
+    OKAMI_ERROR_RETURN_IF(!m_sceneGlobalsProvider, "IOGLSceneGlobalsProvider interface not available for OGLIm3DRenderer");
+
     auto* cache = context.m_interfaces.Query<IGLShaderCache>();
     OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLIm3DRenderer");
 
@@ -31,10 +34,6 @@ Error OGLIm3DRenderer::StartupImpl(InitContext const& context) {
     OKAMI_ERROR_RETURN(buffer);
     m_vertexBuffer = std::move(*buffer);
 
-    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create();
-    OKAMI_ERROR_RETURN(sceneUBO);
-    m_sceneUBO = std::move(*sceneUBO);
-
     Error err;
     glUseProgram(m_program.get());
     err += GET_GL_ERROR();
@@ -47,7 +46,7 @@ Error OGLIm3DRenderer::StartupImpl(InitContext const& context) {
     return err;
 }
 
-Error OGLIm3DRenderer::Pass(OGLPass const& pass) {
+Error OGLIm3DRenderer::Pass(entt::registry const& registry, OGLPass const& pass) {
     if (!m_dataProvider) {
         return {};
     }
@@ -92,8 +91,7 @@ Error OGLIm3DRenderer::Pass(OGLPass const& pass) {
     }
 
     // Set uniforms
-    err += m_sceneUBO.Bind(BufferBindingPoints::SceneGlobals);
-    err += m_sceneUBO.Write(pass.m_sceneGlobals); 
+    err += m_sceneGlobalsProvider->GetSceneGlobalsBuffer().Bind(BufferBindingPoints::SceneGlobals);
 
     glBindVertexArray(m_vertexBuffer.GetVertexArray());
     err += GET_GL_ERROR();

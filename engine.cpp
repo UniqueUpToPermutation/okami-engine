@@ -2,9 +2,9 @@
 
 #include "entity_manager.hpp"
 #include "config.hpp"
-#include "physics.hpp"
 #include "renderer.hpp"
 #include "io.hpp"
+#include "meta.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -36,9 +36,9 @@ Engine::Engine(EngineParams params) :
 #endif
 	}
 
+	CreateModule(MetaDataModuleFactory{});
     CreateModule(EntityManagerFactory{}, std::ref(m_registry));
     CreateModule(ConfigModuleFactory{});
-	CreateModule(PhysicsModuleFactory{});
 
 	CreateModule(TextureIOModuleFactory{});
 	CreateModule(GeometryIOModuleFactory{});
@@ -180,7 +180,7 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 	auto render = [&]() {
 		Error err;
 		m_interfaces.ForEachInterface<IRenderModule>([&](IRenderModule* renderModule) {
-			err += renderModule->Render();
+			err += renderModule->Render(m_registry);
 		});
 		return err;
 	};

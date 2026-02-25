@@ -15,8 +15,8 @@ Error OGLSpriteRenderer::StartupImpl(InitContext const& context) {
     auto* cache = context.m_interfaces.Query<IGLShaderCache>();
     OKAMI_ERROR_RETURN_IF(!cache, "IGLShaderCache interface not available for OGLSpriteRenderer");
 
-    m_transformView = context.m_interfaces.Query<IComponentView<Transform>>();
-    OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OGLSpriteRenderer");
+    m_sceneGlobalsProvider = context.m_interfaces.Query<IOGLSceneGlobalsProvider>();
+    OKAMI_ERROR_RETURN_IF(!m_sceneGlobalsProvider, "IOGLSceneGlobalsProvider interface not available for OGLSpriteRenderer");
 
     // Create shader program with vertex, geometry, and fragment shaders
     auto program = CreateProgram(ProgramShaderPaths{
@@ -34,11 +34,6 @@ Error OGLSpriteRenderer::StartupImpl(InitContext const& context) {
     OKAMI_ERROR_RETURN(buffer);
     m_instanceBuffer = std::move(*buffer);
 
-    // Get uniform locations
-    auto sceneUBO = UniformBuffer<glsl::SceneGlobals>::Create();
-    OKAMI_ERROR_RETURN(sceneUBO);
-    m_sceneUBO = std::move(*sceneUBO); 
-
     Error err;
     glUseProgram(m_program.get());
     err += GET_GL_ERROR();
@@ -53,20 +48,18 @@ void OGLSpriteRenderer::ShutdownImpl(InitContext const& context) {
     // OpenGL resources are automatically cleaned up by RAII wrappers
 }
 
-Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
+Error OGLSpriteRenderer::Pass(entt::registry const& registry, OGLPass const& pass) {
     Error err;
 
     // Collect all sprites and their transforms
     std::vector<std::pair<ResHandle<Texture>, glsl::SpriteInstance>> spriteInstances;
     
-    m_storage->ForEach([&](entity_t entity, const SpriteComponent& sprite) {
+    registry.view<SpriteComponent, Transform>().each([&](entity_t entity, const SpriteComponent& sprite, const Transform& transform) {
         // Skip sprites without textures
         if (!sprite.m_texture || !sprite.m_texture.IsLoaded()) {
             return;
         }
         
-        Transform transform = m_transformView->GetOr(entity, Transform::Identity());
-
         spriteInstances.emplace_back(std::make_pair(sprite.m_texture, CreateSpriteInstance(sprite, transform)));
     });
 
@@ -98,8 +91,7 @@ Error OGLSpriteRenderer::Pass(OGLPass const& pass) {
     }
 
     // Set uniforms
-    err += m_sceneUBO.Bind(BufferBindingPoints::SceneGlobals);
-    err += m_sceneUBO.Write(pass.m_sceneGlobals);
+    err += m_sceneGlobalsProvider->GetSceneGlobalsBuffer().Bind(BufferBindingPoints::SceneGlobals);
 
     // Enable blending for sprites
     glDisable(GL_CULL_FACE);
@@ -151,7 +143,6 @@ std::string OGLSpriteRenderer::GetName() const {
 
 OGLSpriteRenderer::OGLSpriteRenderer(OGLTextureManager* textureManager) :
     m_textureManager(textureManager) {
-    m_storage = CreateChild<StorageModule<SpriteComponent>>();
 }
 
 glsl::SpriteInstance OGLSpriteRenderer::CreateSpriteInstance(const SpriteComponent& sprite, const Transform& transform) const {

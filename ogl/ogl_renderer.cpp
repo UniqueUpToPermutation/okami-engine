@@ -9,11 +9,12 @@
 #include "ogl_imgui.hpp"
 #include "ogl_brdf.hpp"
 #include "ogl_sky.hpp"
+#include "ogl_scene.hpp"
 
 #include "../config.hpp"
-#include "../storage.hpp"
 #include "../camera.hpp"
 #include "../transform.hpp"
+#include "../light.hpp"
 
 #include <glog/logging.h>
 
@@ -49,9 +50,8 @@ private:
     OGLBasicTexturedMaterialManager* m_basicTexturedMaterialManager = nullptr;
     OGLSkyDefaultMaterialManager* m_skyDefaultMaterialManager = nullptr;
 
-    StorageModule<Camera>* m_cameraStorage = nullptr;
-    IComponentView<Transform>* m_transformView = nullptr;
-
+    OGLSceneModule* m_sceneModule = nullptr;
+    
 protected:
     Error RegisterImpl(InterfaceCollection& interfaces) override {
         interfaces.Register<IRenderModule>(this);
@@ -60,9 +60,6 @@ protected:
 
         m_glProvider = interfaces.Query<IGLProvider>();
         OKAMI_ERROR_RETURN_IF(!m_glProvider, "IGLProvider interface not available for OpenGL renderer");
-
-        m_transformView = interfaces.Query<IComponentView<Transform>>();
-        OKAMI_ERROR_RETURN_IF(!m_transformView, "IComponentView<Transform> interface not available for OpenGL renderer");
 
         m_glProvider->NotifyNeedGLContext();
 
@@ -82,53 +79,24 @@ protected:
     void ShutdownImpl(InitContext const& context) override {
     }
 
-    glsl::SceneGlobals GetSceneGlobals() {
-        auto cameraPtr = m_cameraStorage->TryGet(m_activeCamera.load(std::memory_order_relaxed));
-        auto camera = cameraPtr ? *cameraPtr : Camera::Identity();
-
-        auto framebufferSize = m_glProvider->GetFramebufferSize();
-        glViewport(0, 0, framebufferSize.x, framebufferSize.y);
-
-        auto cameraTransform = m_transformView->GetOr(
-            m_activeCamera.load(std::memory_order_relaxed), 
-            Transform::Identity());
-        glm::mat4 viewMatrix = cameraTransform.Inverse().AsMatrix();
-        glm::mat4 projMatrix = camera.GetProjectionMatrix(framebufferSize.x, framebufferSize.y, false);
-        glm::mat4 viewProjMatrix = projMatrix * viewMatrix;
-
-        return glsl::SceneGlobals{
-            .u_camera = {
-                .u_view = viewMatrix,
-                .u_proj = projMatrix,
-                .u_viewProj = viewProjMatrix,
-                .u_invView = cameraTransform.AsMatrix(),
-                .u_invProj = glm::inverse(projMatrix),
-                .u_invViewProj = glm::inverse(viewProjMatrix),
-
-                .u_viewport = glm::vec4(m_glProvider->GetFramebufferSize(), 0.0f, 0.0f),
-                .u_cameraPosition = glm::vec4(cameraTransform.m_position, 1.0f),
-                .u_cameraDirection = glm::vec4(cameraTransform.TransformVector(glm::vec3(0.0f, 0.0f, -1.0f)), 0.0f)
-            }
-        };
-    }
-
-    Error Render() override {
+    Error Render(entt::registry const& registry) override {
         m_shaderCache.reset();
 
         glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
         //glClearDepth(1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        OGLPass pass{
-            .m_sceneGlobals = GetSceneGlobals(),
-        };
+        OGLPass pass{};
 
-        m_staticMeshRenderer->Pass(pass);
-        m_triangleRenderer->Pass(pass);
-        m_spriteRenderer->Pass(pass);
-        m_im3dRenderer->Pass(pass);
-        m_imguiRenderer->Pass(pass);
-        m_skyRenderer->Pass(pass);
+        m_sceneModule->UpdateSceneGlobals(
+            registry, m_activeCamera.load(std::memory_order_relaxed));
+
+        m_staticMeshRenderer->Pass(registry, pass);
+        m_triangleRenderer->Pass(registry, pass);
+        m_spriteRenderer->Pass(registry, pass);
+        m_im3dRenderer->Pass(registry, pass);
+        m_imguiRenderer->Pass(registry, pass);
+        m_skyRenderer->Pass(registry, pass);
         m_glProvider->SwapBuffers();
 
         return {};
@@ -139,8 +107,9 @@ public:
         m_params(params), 
         m_shaderCache(CreateGLShaderCache()) {
         SetChildrenProcessFrame(false);
-        
-        m_cameraStorage = CreateChild<StorageModule<Camera>>();
+
+        m_sceneModule = CreateChild<OGLSceneModule>();
+
         m_triangleRenderer = CreateChild<OGLTriangleRenderer>();
         m_textureManager = CreateChild<OGLTextureManager>();
         m_geometryManager = CreateChild<OGLGeometryManager>();
@@ -154,7 +123,7 @@ public:
         m_basicTexturedMaterialManager = CreateChild<OGLBasicTexturedMaterialManager>(m_textureManager);
         m_skyDefaultMaterialManager = CreateChild<OGLSkyDefaultMaterialManager>();
 
-        m_brdfProvider = CreateChild<OGLBrdfProvider>(/*debug = */ false);
+        // m_brdfProvider = CreateChild<OGLBrdfProvider>(/*debug = */ false);
     }
 
     std::string GetName() const override {

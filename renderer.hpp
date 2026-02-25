@@ -129,12 +129,16 @@ namespace okami {
 		std::string m_headlessRenderOutputDir = "renders"; 
 	};
 
+	struct RenderParams {
+
+	};
+
 	class IRenderModule {
     public:
         virtual ~IRenderModule() = default;
 
 		virtual void SetActiveCamera(entity_t e) = 0;
 		virtual entity_t GetActiveCamera() const = 0;
-        virtual Error Render() = 0;
+        virtual Error Render(entt::registry const& registry) = 0;
 	};
 }
