@@ -4,87 +4,84 @@
 #include "ogl_texture.hpp"
 
 #include "../material.hpp"
+#include "../sky.hpp"
+
+#include <unordered_map>
+#include <vector>
 
 namespace okami {
-    struct EmptyMaterialImpl {};
-
-    struct OGLMaterialBindParams {
-        GLint m_startBufferBindPoint = -1;
-        GLint m_startTextureBindPoint = -1;
+    // Identifies which renderer a material is paired with.  This determines
+    // which vertex shader is used when compiling the GL program at startup.
+    enum class OGLRendererType {
+        StaticMesh,
+        Sky,
     };
 
-    enum class OGLVertexShaderOutput {
-        Mesh = 0,
-        Sky = 1,
-        Count
+    // Binds a single GL texture to a specific texture unit.
+    struct OGLTextureBinding {
+        GLint  m_unit    = 0;
+        GLuint m_texture = 0;
     };
 
-    class IOGLMaterialManager {
+    // The single concrete OpenGL material implementation.
+    //
+    // Each instance holds a (non-owning) pointer to the shared GL program
+    // compiled for its material type plus the per-instance texture bindings.
+    // Calling Bind() activates the program and sets up all texture units.
+    class OGLMaterial : public IMaterial {
     public:
-        virtual ~IOGLMaterialManager() = default;
+        OGLRendererType              m_rendererType;
+        std::type_index              m_type;
+        GLProgram const*             m_program = nullptr; // non-owning – owned by OGLMaterialManager
+        std::vector<OGLTextureBinding> m_textureBindings;
 
-        virtual ProgramShaderPaths GetShaderPaths() const = 0;
-        virtual std::type_index GetMaterialType() const = 0; 
-        virtual Error Bind(MaterialHandle handle,
-            OGLMaterialBindParams const& params) const = 0;
-        virtual Error OnProgramCreated(GLProgram const& program, 
-            OGLMaterialBindParams const& params) const = 0;
-        virtual OGLVertexShaderOutput GetVertexShaderOutput() const = 0;
+        OGLMaterial(OGLRendererType rendererType,
+                    std::type_index  type,
+                    GLProgram const* program)
+            : m_rendererType(rendererType)
+            , m_type(type)
+            , m_program(program) {}
 
-        inline std::string GetMaterialName() const {
-            return GetMaterialType().name();
-        }
+        std::type_index GetType() const override { return m_type; }
+
+        // Activates the GL program and binds all texture units.
+        void Bind() const;
     };
 
-    template <typename T, OGLVertexShaderOutput VSOutput>
-    class IOGLMaterialManagerT : public IOGLMaterialManager {
-    public:
-        virtual ~IOGLMaterialManagerT() = default;
-
-        OGLVertexShaderOutput GetVertexShaderOutput() const override {
-            return VSOutput;
-        }
-
-        std::type_index GetMaterialType() const override {
-            return std::type_index(typeid(T));
-        }
-    };
-
-    class OGLDefaultMaterialManager final :
+    // The single OpenGL material manager.
+    //
+    // At startup it compiles one GL program per material type (pairing each
+    // type's fragment shader with the vertex shader of its target renderer).
+    // CreateMaterial() converts a frontend material struct into a live
+    // OGLMaterial whose lifetime is managed by the returned MaterialHandle.
+    class OGLMaterialManager final :
         public EngineModule,
-        public IOGLMaterialManagerT<DefaultMaterial, OGLVertexShaderOutput::Mesh> {
+        public IMaterialManager<DefaultMaterial>,
+        public IMaterialManager<BasicTexturedMaterial>,
+        public IMaterialManager<SkyDefaultMaterial> {
+    private:
+        OGLTextureManager* m_textureManager = nullptr;
+
+        struct ProgramEntry {
+            GLProgram       m_program;
+            OGLRendererType m_renderer;
+        };
+
+        std::unordered_map<std::type_index, ProgramEntry> m_programs;
+
+        ProgramEntry const* GetProgramEntry(std::type_index type) const;
+
     public:
+        explicit OGLMaterialManager(OGLTextureManager* textureManager);
+
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
 
-        ProgramShaderPaths GetShaderPaths() const override;
-        Error Bind(MaterialHandle handle, OGLMaterialBindParams const& params) const override;
-        Error OnProgramCreated(GLProgram const& program, 
-            OGLMaterialBindParams const& params) const override;
-    };
+        MaterialHandle CreateMaterial(DefaultMaterial        material) override;
+        MaterialHandle CreateMaterial(BasicTexturedMaterial  material) override;
+        MaterialHandle CreateMaterial(SkyDefaultMaterial     material) override;
 
-    class OGLBasicTexturedMaterialManager final :
-        public MaterialModuleBase<BasicTexturedMaterial, EmptyMaterialImpl>,
-        public IOGLMaterialManagerT<BasicTexturedMaterial, OGLVertexShaderOutput::Mesh> {
-    protected:
-        OGLTextureManager* m_textureManager = nullptr;
-
-        enum class TextureUnits : GLint {
-            ColorTexture = 0
-        };
-    
-    public:
-        inline OGLBasicTexturedMaterialManager(OGLTextureManager* textureManager)
-            : m_textureManager(textureManager) {}
-
-        Error RegisterImpl(InterfaceCollection& interfaces) override;
-
-        EmptyMaterialImpl CreateImpl(BasicTexturedMaterial const& material) override;
-		void DestroyImpl(EmptyMaterialImpl& impl) override;
-
-        ProgramShaderPaths GetShaderPaths() const override;
-        Error Bind(MaterialHandle handle, OGLMaterialBindParams const& params) const override;
-        Error OnProgramCreated(GLProgram const& program, 
-            OGLMaterialBindParams const& params) const override;
+        // Creates the default material for the given renderer type.
+        MaterialHandle CreateDefaultMaterial(OGLRendererType renderer);
     };
 }

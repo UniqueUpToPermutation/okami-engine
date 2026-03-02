@@ -46,9 +46,7 @@ private:
 
     OGLBrdfProvider* m_brdfProvider = nullptr;
 
-    OGLDefaultMaterialManager* m_defaultMaterialManager = nullptr;
-    OGLBasicTexturedMaterialManager* m_basicTexturedMaterialManager = nullptr;
-    OGLSkyDefaultMaterialManager* m_skyDefaultMaterialManager = nullptr;
+    OGLMaterialManager* m_materialManager = nullptr;
 
     OGLSceneModule* m_sceneModule = nullptr;
     
@@ -110,6 +108,8 @@ public:
 
         m_sceneModule = CreateChild<OGLSceneModule>();
 
+        m_materialManager = CreateChild<OGLMaterialManager>(m_textureManager);
+
         m_triangleRenderer = CreateChild<OGLTriangleRenderer>();
         m_textureManager = CreateChild<OGLTextureManager>();
         m_geometryManager = CreateChild<OGLGeometryManager>();
@@ -118,10 +118,6 @@ public:
         m_im3dRenderer = CreateChild<OGLIm3DRenderer>();
         m_imguiRenderer = CreateChild<OGLImguiRenderer>();
         m_skyRenderer = CreateChild<OGLSkyRenderer>();
-
-        m_defaultMaterialManager = CreateChild<OGLDefaultMaterialManager>();
-        m_basicTexturedMaterialManager = CreateChild<OGLBasicTexturedMaterialManager>(m_textureManager);
-        m_skyDefaultMaterialManager = CreateChild<OGLSkyDefaultMaterialManager>();
 
         // m_brdfProvider = CreateChild<OGLBrdfProvider>(/*debug = */ false);
     }

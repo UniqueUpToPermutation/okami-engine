@@ -7,7 +7,6 @@
 #include "../content.hpp"
 #include "../transform.hpp"
 #include "../renderer.hpp"
-#include "../material.hpp"
 
 #include "shaders/scene.glsl"
 #include "shaders/static_mesh.glsl"
@@ -18,7 +17,6 @@ namespace okami {
         public IOGLRenderModule {
     protected:
         OGLPipelineState m_pipelineState;
-        std::type_index m_defaultMaterialType = typeid(DefaultMaterial);
 
         UniformBuffer<glsl::StaticMeshInstance> m_instanceUBO;
 
@@ -28,30 +26,14 @@ namespace okami {
             Count
         };
 
-        enum class TextureBindingPoints : GLint {
-            Count = 0
-        };
+        // The fallback material used when a StaticMeshComponent has no material set.
+        MaterialHandle m_defaultMaterial;
 
-        struct MaterialImpl {
-            GLProgram m_program;
-            IOGLMaterialManager* m_manager = nullptr;
-        };
-
-        std::unordered_map<std::type_index, MaterialImpl> m_programs;
-
-        // Component storage and views
-        OGLGeometryManager* m_geometryManager = nullptr;
-        IOGLSceneGlobalsProvider* m_sceneGlobalsProvider = nullptr;
+        OGLGeometryManager*          m_geometryManager      = nullptr;
+        IOGLSceneGlobalsProvider*    m_sceneGlobalsProvider = nullptr;
 
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
-
-        constexpr static OGLMaterialBindParams GetMaterialBindParams() {
-            return OGLMaterialBindParams{
-                .m_startBufferBindPoint = static_cast<GLint>(BufferBindingPoints::Count),
-                .m_startTextureBindPoint = static_cast<GLint>(TextureBindingPoints::Count),
-            };
-        }
 
     public:
         OGLStaticMeshRenderer(OGLGeometryManager* geometryManager);
