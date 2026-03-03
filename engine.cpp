@@ -5,6 +5,7 @@
 #include "renderer.hpp"
 #include "io.hpp"
 #include "meta.hpp"
+#include "paths.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -108,6 +109,12 @@ void Engine::Shutdown() {
 	m_registry.clear();
 
     m_modules.Shutdown(initContext);
+}
+
+std::filesystem::path Engine::GetRenderOutputPath(size_t frameIndex) {
+	char buf[32];
+	std::snprintf(buf, sizeof(buf), "frame_%04zu.png", frameIndex);
+	return GetExecutableRelativePath("render_output") / buf;
 }
 
 struct FrameTimeEstimator {

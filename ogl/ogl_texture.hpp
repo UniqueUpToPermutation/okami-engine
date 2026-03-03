@@ -11,22 +11,6 @@ namespace okami {
     GLenum ToGlFormat(TextureFormat format);
     GLenum ToGlType(TextureFormat format);
 
-    // Thread-safe queue of GL texture IDs pending deletion.
-    // OGLTexture destructors push into this from any thread;
-    // OGLTextureManager::ReceiveMessagesImpl drains it on the GL thread.
-    struct OGLDeletionQueue {
-        std::mutex           mtx;
-        std::vector<GLuint>  texture_ids;
-
-        void Push(GLuint id) {
-            std::lock_guard lock(mtx);
-            texture_ids.push_back(id);
-        }
-
-        // Must be called on the GL thread.
-        void Drain();
-    };
-
     // Concrete OpenGL texture.  Heap-allocated and ref-counted via TextureHandle.
     // IsLoaded() is false until the async GPU upload completes.
     class OGLTexture final : public ITexture {
@@ -54,13 +38,11 @@ namespace okami {
     // the existing IO-thread signal machinery.
     class OGLTextureManager final :
         public EngineModule,
-        public ITextureManager,
-        public IResourceDestroyer {
+        public ITextureManager {
     private:
         // Tracks a single in-flight async load.
         struct PendingLoad {
             std::shared_ptr<OGLTexture> m_texture; // pre-created handle
-            Resource<Texture>           m_resource; // stable address for ResHandle correlation
         };
 
         std::shared_ptr<OGLDeletionQueue> m_deletion_queue =
@@ -85,9 +67,6 @@ namespace okami {
             TextureLoadParams            params,
             InterfaceCollection&         ic) override;
         TextureHandle CreateTexture(Texture data) override;
-
-        // IResourceDestroyer – called when the async ResHandle refcount hits 0
-        void DestroyResource(entity_t id) override;
 
         // Convenience downcast – valid for any TextureHandle produced by this manager.
         static OGLTexture* GetOGLTexture(TextureHandle const& handle) {

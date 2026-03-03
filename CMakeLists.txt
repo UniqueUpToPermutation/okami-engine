@@ -544,6 +544,35 @@ if(CONFIG_FILES)
     )
 endif()
 
+# Always create the golden_images directory for test output.
+# On first run, the headless renderer tests will auto-generate golden images
+# here.  Commit those files to tests/golden_images/ in the source tree; they
+# will be copied back on subsequent builds and the tests will compare against
+# them.
+add_custom_command(
+    TARGET EngineTests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/assets
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/tests/assets
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/tests/golden_images
+    COMMENT "Ensuring output asset directories exist"
+)
+
+# Copy any committed golden images from the source tree to the output dir.
+file(GLOB_RECURSE GOLDEN_IMAGE_FILES
+    "${CMAKE_SOURCE_DIR}/tests/golden_images/*.png"
+    "${CMAKE_SOURCE_DIR}/tests/golden_images/*.jpg"
+)
+foreach(GOLDEN_FILE ${GOLDEN_IMAGE_FILES})
+    get_filename_component(GOLDEN_NAME ${GOLDEN_FILE} NAME)
+    add_custom_command(
+        TARGET EngineTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${GOLDEN_FILE}
+            $<TARGET_FILE_DIR:EngineTests>/tests/golden_images/${GOLDEN_NAME}
+        COMMENT "Copying golden image ${GOLDEN_NAME} to test output directory"
+    )
+endforeach()
+
 # Copy compiled KTX textures for tests as well
 if(ALL_KTX_TEXTURES)
     add_custom_command(
@@ -575,6 +604,14 @@ if(ALL_KTX_TEXTURES)
                 COMMENT "Copying ${KTX_NAME} to EngineTests output directory"
             )
         endif()
+        # All KTX textures also go to assets/ so GetAssetPath() resolves correctly in tests
+        add_custom_command(
+            TARGET EngineTests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${KTX_FILE}
+                $<TARGET_FILE_DIR:EngineTests>/assets/${KTX_NAME}
+            COMMENT "Copying ${KTX_NAME} to EngineTests assets directory"
+        )
     endforeach()
 endif()
 
@@ -607,13 +644,6 @@ list(APPEND TEST_OTHER_ASSET_FILES
 )
 
 if(GLB_FILES OR OTHER_ASSET_FILES OR TEST_GLB_FILES OR TEST_OTHER_ASSET_FILES)
-    add_custom_command(
-        TARGET EngineTests POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/assets
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/tests/assets
-        COMMENT "Copying asset files to test output directory"
-    )
-    
     # Copy main assets GLB files for tests
     foreach(GLB_FILE ${GLB_FILES})
         get_filename_component(GLB_NAME ${GLB_FILE} NAME)
@@ -647,6 +677,14 @@ if(GLB_FILES OR OTHER_ASSET_FILES OR TEST_GLB_FILES OR TEST_OTHER_ASSET_FILES)
                 ${TEST_GLB_FILE}
                 $<TARGET_FILE_DIR:EngineTests>/tests/assets/${TEST_GLB_NAME}
             COMMENT "Copying test ${TEST_GLB_NAME} to test output directory"
+        )
+        # Also copy to assets/ so GetAssetPath() resolves correctly in tests
+        add_custom_command(
+            TARGET EngineTests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${TEST_GLB_FILE}
+                $<TARGET_FILE_DIR:EngineTests>/assets/${TEST_GLB_NAME}
+            COMMENT "Copying test ${TEST_GLB_NAME} to EngineTests assets directory"
         )
     endforeach()
     

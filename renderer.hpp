@@ -64,7 +64,7 @@ namespace okami {
 	struct DummyTriangleComponent {};
 
 	struct StaticMeshComponent {
-		ResHandle<Geometry> m_geometry;
+		GeometryHandle m_geometry;
 		MaterialHandle m_material;
 	};
 

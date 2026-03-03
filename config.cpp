@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <string>
 #include <stack>
+#include <filesystem>
 
 #define DEFAULT_PATH "default.yaml"
 
@@ -254,9 +255,16 @@ protected:
 
 	Error StartupImpl(InitContext const& a) override {
         YAML::Node config;
-        
+
+        auto configPath = GetConfigPath(DEFAULT_PATH);
+        if (!std::filesystem::exists(configPath)) {
+            LOG(WARNING) << "Config file not found at " << configPath
+                         << " – using defaults for all modules.";
+            return {};
+        }
+
         try {
-            config = YAML::LoadFile(GetConfigPath(DEFAULT_PATH).string());
+            config = YAML::LoadFile(configPath.string());
 		}
 		catch (const YAML::Exception& e) {
 			return OKAMI_ERROR(std::string("Failed to load config: ") + e.what());

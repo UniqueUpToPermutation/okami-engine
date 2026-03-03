@@ -4,6 +4,7 @@
 #include <optional>
 #include <span>
 #include <filesystem>
+#include <memory>
 
 #include "common.hpp"
 #include "aabb.hpp"
@@ -315,4 +316,25 @@ namespace okami {
 		using Desc = GeometryDesc;
         using LoadParams = GeometryLoadParams;
 	};
+
+    class InterfaceCollection;
+
+    class IGeometry {
+    public:
+        virtual ~IGeometry() = default;
+        virtual GeometryDesc const& GetDesc()  const = 0;
+        virtual bool                IsLoaded() const = 0;
+    };
+
+    using GeometryHandle = std::shared_ptr<IGeometry>;
+
+    class IGeometryManager {
+    public:
+        virtual ~IGeometryManager() = default;
+        virtual GeometryHandle LoadGeometry(
+            std::filesystem::path const& path,
+            GeometryLoadParams           params,
+            InterfaceCollection&         ic) = 0;
+        virtual GeometryHandle CreateGeometry(Geometry data) = 0;
+    };
 }

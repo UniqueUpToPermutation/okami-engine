@@ -6,6 +6,8 @@
 #include <glad/gl.h>
 
 #include <filesystem>
+#include <mutex>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -581,5 +583,22 @@ namespace okami {
 
         // Set state to OpenGL
         void SetToGL() const;
+    };
+
+    // Thread-safe queue for deferring GL object deletion to the GL thread.
+    // Any thread may push IDs; the owning manager calls Drain() once per frame
+    // from ReceiveMessagesImpl (which runs on the GL thread).
+    struct OGLDeletionQueue {
+        std::mutex           mtx;
+        std::vector<GLuint>  texture_ids;
+        std::vector<GLuint>  buffer_ids;
+        std::vector<GLuint>  vao_ids;
+
+        void PushTexture(GLuint id) { std::lock_guard lock(mtx); texture_ids.push_back(id); }
+        void PushBuffer (GLuint id) { std::lock_guard lock(mtx); buffer_ids .push_back(id); }
+        void PushVAO    (GLuint id) { std::lock_guard lock(mtx); vao_ids    .push_back(id); }
+
+        // Must be called on the GL thread.
+        void Drain();
     };
 }

@@ -9,6 +9,7 @@
 #include "entity_manager.hpp"
 #include "jobs.hpp"
 #include "material.hpp"
+#include "geometry.hpp"
 
 namespace okami {
     struct SignalExit {};
@@ -114,6 +115,26 @@ namespace okami {
                 return TextureHandle();
             }
             return tm->CreateTexture(std::move(data));
+        }
+
+        GeometryHandle LoadGeometry(
+            std::filesystem::path const& path,
+            GeometryLoadParams params = {}) {
+            auto* gm = m_interfaces.Query<IGeometryManager>();
+            if (!gm) {
+                OKAMI_LOG_ERROR("No IGeometryManager registered in Engine");
+                return GeometryHandle();
+            }
+            return gm->LoadGeometry(path, params, m_interfaces);
+        }
+
+        GeometryHandle CreateGeometry(Geometry data) {
+            auto* gm = m_interfaces.Query<IGeometryManager>();
+            if (!gm) {
+                OKAMI_LOG_ERROR("No IGeometryManager registered in Engine");
+                return GeometryHandle();
+            }
+            return gm->CreateGeometry(std::move(data));
         }
 
         void AddScriptBundle(

@@ -56,17 +56,6 @@ GLenum okami::ToGlType(TextureFormat format) {
 // OGLDeletionQueue
 // ---------------------------------------------------------------------------
 
-void OGLDeletionQueue::Drain() {
-    std::vector<GLuint> local;
-    {
-        std::lock_guard lock(mtx);
-        local.swap(texture_ids);
-    }
-    if (!local.empty()) {
-        glDeleteTextures(static_cast<GLsizei>(local.size()), local.data());
-    }
-}
-
 // ---------------------------------------------------------------------------
 // OGLTexture
 // ---------------------------------------------------------------------------
@@ -74,7 +63,7 @@ void OGLDeletionQueue::Drain() {
 OGLTexture::~OGLTexture() {
     if (m_deletion_queue) {
         if (GLuint id = m_texture.release(); id != 0) {
-            m_deletion_queue->Push(id);
+            m_deletion_queue->PushTexture(id);
         }
     }
     // If no queue (e.g. never assigned), ~GLTexture() runs normally
@@ -147,8 +136,6 @@ TextureHandle OGLTextureManager::LoadTexture(
     auto id  = m_next_id.fetch_add(1, std::memory_order_relaxed);
     auto pending = std::make_unique<PendingLoad>();
     pending->m_texture            = std::make_shared<OGLTexture>();
-    pending->m_resource.m_entity  = static_cast<entity_t>(id);
-    pending->m_resource.m_path    = path;
 
     pending->m_texture->m_deletion_queue = m_deletion_queue;
     TextureHandle handle = pending->m_texture; // keep a copy before moving
@@ -159,12 +146,10 @@ TextureHandle OGLTextureManager::LoadTexture(
         m_pending[id]      = std::move(pending);
     }
 
-    // Send load signal to IO thread.  ResHandle points to the stable
-    // m_resource inside PendingLoad; OGLTextureManager is the destroyer.
     ic.SendSignal(LoadResourceSignal<Texture>{
         .m_path   = path,
         .m_params = params,
-        .m_handle = ResHandle<Texture>(&m_pending.at(id)->m_resource, this),
+        .m_id     = id,
     });
 
     return handle; // IsLoaded() = false; becomes true after ReceiveMessagesImpl
@@ -195,7 +180,7 @@ Error OGLTextureManager::ReceiveMessagesImpl(
             return;
         }
 
-        auto id = static_cast<uint32_t>(msg.m_handle.GetEntity());
+        auto id = msg.m_id;
 
         std::shared_ptr<OGLTexture> tex;
         {
@@ -214,14 +199,6 @@ Error OGLTextureManager::ReceiveMessagesImpl(
     return err;
 }
 
-void OGLTextureManager::DestroyResource(entity_t id) {
-    // Called when the ResHandle inside LoadResourceSignal has its refcount
-    // drop to zero (i.e., the signal has been fully processed).
-    // If still pending, remove – the OGLTexture stays alive via external
-    // TextureHandles if any exist.
-    std::lock_guard lock(m_mtx);
-    m_pending.erase(static_cast<uint32_t>(id));
-}
 
 // ---------------------------------------------------------------------------
 // FetchTextureFromGL (unchanged)

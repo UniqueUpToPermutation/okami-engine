@@ -120,13 +120,13 @@ namespace okami {
 	struct LoadResourceSignal {
 		std::filesystem::path m_path;
 		typename T::LoadParams m_params;
-		ResHandle<T> m_handle;
+		uint32_t m_id = 0;   // opaque correlation ID echoed back in OnResourceLoadedEvent
 	};
 
 	template <typename T>
 	struct OnResourceLoadedEvent {
 		Expected<T> m_data;
-		ResHandle<T> m_handle;
+		uint32_t m_id = 0;   // echoed from LoadResourceSignal
 	};
 
 	template <
@@ -229,7 +229,7 @@ namespace okami {
 					return;
 				}
 
-				auto* implPair = params.m_registry.template try_get<component_t>(msg.m_handle.GetEntity());
+				auto* implPair = params.m_registry.template try_get<component_t>(static_cast<entity_t>(msg.m_id));
 				if (!implPair) {
 					e += OKAMI_ERROR("Loaded resource entity not found in registry");
 					return;
@@ -299,7 +299,7 @@ namespace okami {
 			ic.SendSignal(LoadResourceSignal<T>{
 				.m_path = path,
 				.m_params = std::move(params),
-				.m_handle = res,
+				.m_id = static_cast<uint32_t>(entity),
 			});
 			m_new_resources.Send(std::move(impl));
 			
@@ -318,7 +318,7 @@ namespace okami {
 			m_new_resources.Send(std::move(impl));
 			m_loaded_handler.Send(OnResourceLoadedEvent<T>{
 				.m_data = std::move(data),
-				.m_handle = res,
+				.m_id = static_cast<uint32_t>(entity),
 			});
 			return res;
 		}

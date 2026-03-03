@@ -13,7 +13,11 @@ void OGLMaterial::Bind() const {
     if (m_program) {
         glUseProgram(m_program->get());
     }
-    for (auto const& tb : m_textureBindings) {
+    for (auto& tb : m_textureBindings) {
+        // Lazily resolve the GL handle once the texture finishes loading.
+        if (tb.m_texture == 0 && tb.m_handle && tb.m_handle->IsLoaded()) {
+            tb.m_texture = static_cast<OGLTexture*>(tb.m_handle.get())->m_texture.get();
+        }
         glActiveTexture(GL_TEXTURE0 + tb.m_unit);
         glBindTexture(GL_TEXTURE_2D, tb.m_texture);
     }
@@ -137,9 +141,12 @@ MaterialHandle OGLMaterialManager::CreateMaterial(BasicTexturedMaterial material
         typeid(BasicTexturedMaterial),
         entry ? &entry->m_program : nullptr);
 
-    if (material.m_colorTexture && material.m_colorTexture->IsLoaded()) {
-        auto* ogl = static_cast<OGLTexture*>(material.m_colorTexture.get());
-        mat->m_textureBindings.push_back({ 0, ogl->m_texture.get(), material.m_colorTexture });
+    if (material.m_colorTexture) {
+        GLuint glId = 0;
+        if (material.m_colorTexture->IsLoaded()) {
+            glId = static_cast<OGLTexture*>(material.m_colorTexture.get())->m_texture.get();
+        }
+        mat->m_textureBindings.push_back({ 0, glId, material.m_colorTexture });
     }
     return mat;
 }

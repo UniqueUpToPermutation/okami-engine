@@ -5,7 +5,6 @@
 using namespace okami;
 
 Error OGLStaticMeshRenderer::RegisterImpl(InterfaceCollection& interfaces) {
-    m_geometryManager->SetStaticMeshVSInput(glsl::__get_vs_input_infoStaticMeshVertex());
     return {};
 }
 
@@ -40,7 +39,7 @@ OGLStaticMeshRenderer::OGLStaticMeshRenderer(OGLGeometryManager* geometryManager
 
 Error OGLStaticMeshRenderer::Pass(entt::registry const& registry, OGLPass const& pass) {
     struct InstanceData {
-        ResHandle<Geometry>              m_geometry;
+        GeometryHandle                   m_geometry;
         MaterialHandle                   m_material;
         glsl::StaticMeshInstance         m_glslData;
     };
@@ -49,7 +48,7 @@ Error OGLStaticMeshRenderer::Pass(entt::registry const& registry, OGLPass const&
 
     registry.view<StaticMeshComponent, Transform>().each(
         [&](auto entity, StaticMeshComponent const& mesh, Transform const& transform) {
-            if (!mesh.m_geometry || !mesh.m_geometry.IsLoaded()) {
+            if (!mesh.m_geometry || !mesh.m_geometry->IsLoaded()) {
                 return;
             }
             auto matrix = transform.AsMatrix();
@@ -75,16 +74,16 @@ Error OGLStaticMeshRenderer::Pass(entt::registry const& registry, OGLPass const&
             if (a.m_geometry == b.m_geometry) {
                 return a.m_material.get() < b.m_material.get();
             }
-            return a.m_geometry.GetEntity() < b.m_geometry.GetEntity();
+            return a.m_geometry.get() < b.m_geometry.get();
         });
 
     m_pipelineState.SetToGL();
     err += GET_GL_ERROR();
     err += m_sceneGlobalsProvider->GetSceneGlobalsBuffer().Bind(BufferBindingPoints::SceneGlobals);
 
-    PrimitiveImpl*      currentMeshImpl = nullptr;
-    ResHandle<Geometry> currentGeometry;
-    OGLMaterial*        currentMat      = nullptr;
+    PrimitiveImpl*  currentMeshImpl = nullptr;
+    GeometryHandle  currentGeometry;
+    OGLMaterial*    currentMat      = nullptr;
 
     for (auto const& inst : instances) {
         if (!inst.m_geometry) {
@@ -97,7 +96,7 @@ Error OGLStaticMeshRenderer::Pass(entt::registry const& registry, OGLPass const&
 
         // Geometry state change
         if (inst.m_geometry != currentGeometry) {
-            currentMeshImpl = &m_geometryManager->GetImpl(inst.m_geometry)->m_meshes[0];
+            currentMeshImpl = &OGLGeometryManager::GetOGLGeometry(inst.m_geometry)->m_meshes[0];
             glBindVertexArray(currentMeshImpl->m_vao.get());
             err += GET_GL_ERROR();
             currentGeometry = inst.m_geometry;
@@ -117,7 +116,7 @@ Error OGLStaticMeshRenderer::Pass(entt::registry const& registry, OGLPass const&
         // Draw
         if (currentMeshImpl && mat) {
             err += m_instanceUBO.Write(inst.m_glslData);
-            auto const& desc  = currentGeometry.GetDesc();
+            auto const& desc  = currentGeometry->GetDesc();
             auto const& prim  = desc.m_primitives[0];
 
             if (prim.m_indices) {

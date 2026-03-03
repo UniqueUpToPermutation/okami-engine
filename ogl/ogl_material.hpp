@@ -36,7 +36,7 @@ namespace okami {
         OGLRendererType              m_rendererType;
         std::type_index              m_type;
         GLProgram const*             m_program = nullptr; // non-owning – owned by OGLMaterialManager
-        std::vector<OGLTextureBinding> m_textureBindings;
+        mutable std::vector<OGLTextureBinding> m_textureBindings;
 
         OGLMaterial(OGLRendererType rendererType,
                     std::type_index  type,

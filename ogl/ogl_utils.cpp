@@ -368,3 +368,19 @@ void OGLPipelineState::SetToGL() const {
     // Multisampling
     if (sampleAlphaToCoverageEnabled) glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE); else glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 }
+
+void okami::OGLDeletionQueue::Drain() {
+    std::vector<GLuint> textures, buffers, vaos;
+    {
+        std::lock_guard lock(mtx);
+        textures.swap(texture_ids);
+        buffers .swap(buffer_ids);
+        vaos    .swap(vao_ids);
+    }
+    if (!textures.empty())
+        glDeleteTextures     (static_cast<GLsizei>(textures.size()), textures.data());
+    if (!buffers.empty())
+        glDeleteBuffers      (static_cast<GLsizei>(buffers.size()),  buffers.data());
+    if (!vaos.empty())
+        glDeleteVertexArrays (static_cast<GLsizei>(vaos.size()),     vaos.data());
+}
