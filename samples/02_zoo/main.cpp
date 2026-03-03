@@ -36,7 +36,7 @@ int main() {
         return 1;
     }
 
-    auto textureHandle = en.LoadResource<Texture>(GetAssetPath("test.ktx2"));
+    auto textureHandle = en.LoadTexture(GetAssetPath("test.ktx2"));
     auto geometryHandle = en.LoadResource<Geometry>(GetAssetPath("box.glb"));
 
     auto tri1Entity = en.CreateEntity();

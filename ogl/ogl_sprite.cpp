@@ -52,11 +52,10 @@ Error OGLSpriteRenderer::Pass(entt::registry const& registry, OGLPass const& pas
     Error err;
 
     // Collect all sprites and their transforms
-    std::vector<std::pair<ResHandle<Texture>, glsl::SpriteInstance>> spriteInstances;
+    std::vector<std::pair<TextureHandle, glsl::SpriteInstance>> spriteInstances;
     
     registry.view<SpriteComponent, Transform>().each([&](entity_t entity, const SpriteComponent& sprite, const Transform& transform) {
-        // Skip sprites without textures
-        if (!sprite.m_texture || !sprite.m_texture.IsLoaded()) {
+        if (!sprite.m_texture || !sprite.m_texture->IsLoaded()) {
             return;
         }
         
@@ -67,7 +66,7 @@ Error OGLSpriteRenderer::Pass(entt::registry const& registry, OGLPass const& pas
     std::sort(spriteInstances.begin(), spriteInstances.end(),
         [this](const auto& a, const auto& b) {
             if (a.second.a_position.z == b.second.a_position.z) {
-                return a.first < b.first; // Break ties by texture handle
+                return a.first.get() < b.first.get(); // Break ties by texture pointer
             }
             return a.second.a_position.z > b.second.a_position.z;
         });
@@ -101,7 +100,7 @@ Error OGLSpriteRenderer::Pass(entt::registry const& registry, OGLPass const& pas
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     // Group sprites by texture to minimize texture binding
-    ResHandle<Texture> currentTexture;
+    TextureHandle currentTexture;
     uint32_t batchStart = 0;
 
     if (spriteInstances.empty()) {
@@ -109,17 +108,15 @@ Error OGLSpriteRenderer::Pass(entt::registry const& registry, OGLPass const& pas
     }
     
     for (uint32_t i = 0; i <= spriteInstances.size(); ++i) {
-        ResHandle<Texture> spriteTexture = spriteInstances[i < spriteInstances.size() ? i : 0].first;
+        TextureHandle spriteTexture = spriteInstances[i < spriteInstances.size() ? i : 0].first;
         
         // Check if we need to flush the current batch
-        if (i == spriteInstances.size() || spriteTexture.Ptr() != currentTexture.Ptr()) {
-            if (currentTexture && currentTexture.IsLoaded() && i > batchStart) {
-                // TODO: Bind texture here when texture system is integrated
-                // For now, render without texture binding
-                if (currentTexture.IsLoaded()) {
-                    auto& tex = m_textureManager->GetImpl(currentTexture)->m_texture;
+        if (i == spriteInstances.size() || spriteTexture.get() != currentTexture.get()) {
+            if (currentTexture && currentTexture->IsLoaded() && i > batchStart) {
+                if (currentTexture->IsLoaded()) {
+                    auto* ogl = static_cast<OGLTexture*>(currentTexture.get());
                     glActiveTexture(GL_TEXTURE0 + static_cast<GLenum>(TextureBindingPoints::SpriteTexture));
-                    glBindTexture(GL_TEXTURE_2D, tex.get());
+                    glBindTexture(GL_TEXTURE_2D, ogl->m_texture.get());
                     err += GET_GL_ERROR();
                 }
 
@@ -141,9 +138,7 @@ std::string OGLSpriteRenderer::GetName() const {
     return "OpenGL Sprite Renderer";
 }
 
-OGLSpriteRenderer::OGLSpriteRenderer(OGLTextureManager* textureManager) :
-    m_textureManager(textureManager) {
-}
+OGLSpriteRenderer::OGLSpriteRenderer() {}
 
 glsl::SpriteInstance OGLSpriteRenderer::CreateSpriteInstance(const SpriteComponent& sprite, const Transform& transform) const {
     glsl::SpriteInstance instance;
@@ -155,8 +150,8 @@ glsl::SpriteInstance OGLSpriteRenderer::CreateSpriteInstance(const SpriteCompone
     instance.a_rotation = std::atan2(transform.m_rotation.z, transform.m_rotation.w); // Z-axis rotation for 2D sprites
 
     // Get size from sprite or use default
-    if (sprite.m_texture && sprite.m_texture.IsLoaded()) {
-        const TextureDesc& texDesc = sprite.m_texture.GetDesc();
+    if (sprite.m_texture && sprite.m_texture->IsLoaded()) {
+        const TextureDesc& texDesc = sprite.m_texture->GetDesc();
         instance.a_size = glm::vec2(
             texDesc.width * transform.m_scaleShear[0][0], 
             texDesc.height * transform.m_scaleShear[1][1]

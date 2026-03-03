@@ -60,8 +60,6 @@ namespace okami {
         public IMaterialManager<BasicTexturedMaterial>,
         public IMaterialManager<SkyDefaultMaterial> {
     private:
-        OGLTextureManager* m_textureManager = nullptr;
-
         struct ProgramEntry {
             GLProgram       m_program;
             OGLRendererType m_renderer;
@@ -72,7 +70,7 @@ namespace okami {
         ProgramEntry const* GetProgramEntry(std::type_index type) const;
 
     public:
-        explicit OGLMaterialManager(OGLTextureManager* textureManager);
+        explicit OGLMaterialManager();
 
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;

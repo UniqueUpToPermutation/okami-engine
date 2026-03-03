@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common.hpp"
-#include "content.hpp"
 #include "texture.hpp"
 
 #include <glm/vec4.hpp>
@@ -13,7 +12,7 @@ namespace okami {
 	};
 
 	struct BasicTexturedMaterial {
-		ResHandle<Texture> m_colorTexture;
+		TextureHandle m_colorTexture;
 		glm::vec4 m_colorTint{1.0f};
 	};
 

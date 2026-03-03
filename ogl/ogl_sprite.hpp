@@ -32,7 +32,6 @@ namespace okami {
         };
 
         // Component storage and views
-        OGLTextureManager* m_textureManager = nullptr;
         IOGLSceneGlobalsProvider* m_sceneGlobalsProvider = nullptr;
         
         Error RegisterImpl(InterfaceCollection& interfaces) override;
@@ -40,7 +39,7 @@ namespace okami {
         void ShutdownImpl(InitContext const& context) override;
 
     public:
-        OGLSpriteRenderer(OGLTextureManager* textureManager);
+        OGLSpriteRenderer();
 
         Error Pass(entt::registry const& registry, OGLPass const& pass) override;
 

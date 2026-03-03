@@ -4,12 +4,16 @@
 #include <span>
 #include <filesystem>
 #include <any>
+#include <memory>
 
 #include "common.hpp"
 
 #include <glm/vec2.hpp>
 
 namespace okami {
+
+    // Forward declarations
+    class InterfaceCollection;
     enum class TextureType {
         TEXTURE_1D,
         TEXTURE_2D,
@@ -99,5 +103,34 @@ namespace okami {
 
         using Desc = TextureDesc;
         using LoadParams = TextureLoadParams;
+    };
+
+    // ---------------------------------------------------------------------------
+    // ITexture – abstract GPU-side texture handle
+    // ---------------------------------------------------------------------------
+
+    class ITexture {
+    public:
+        virtual ~ITexture() = default;
+        virtual TextureDesc const& GetDesc()  const = 0;
+        virtual bool              IsLoaded()  const = 0;
+    };
+
+    using TextureHandle = std::shared_ptr<ITexture>;
+
+    // Factory interface – implemented by the backend texture manager.
+    class ITextureManager {
+    public:
+        virtual ~ITextureManager() = default;
+
+        // Asynchronously load a texture file.  Returns a handle immediately;
+        // IsLoaded() becomes true once the GPU upload is complete.
+        virtual TextureHandle LoadTexture(
+            std::filesystem::path const& path,
+            TextureLoadParams            params,
+            InterfaceCollection&         ic) = 0;
+
+        // Synchronously upload CPU-side Texture data and return a ready handle.
+        virtual TextureHandle CreateTexture(Texture data) = 0;
     };
 }

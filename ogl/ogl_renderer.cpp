@@ -108,12 +108,12 @@ public:
 
         m_sceneModule = CreateChild<OGLSceneModule>();
 
-        m_materialManager = CreateChild<OGLMaterialManager>(m_textureManager);
+        m_textureManager = CreateChild<OGLTextureManager>();
+        m_materialManager = CreateChild<OGLMaterialManager>();
+        m_geometryManager = CreateChild<OGLGeometryManager>();
 
         m_triangleRenderer = CreateChild<OGLTriangleRenderer>();
-        m_textureManager = CreateChild<OGLTextureManager>();
-        m_geometryManager = CreateChild<OGLGeometryManager>();
-        m_spriteRenderer = CreateChild<OGLSpriteRenderer>(m_textureManager);
+        m_spriteRenderer = CreateChild<OGLSpriteRenderer>();
         m_staticMeshRenderer = CreateChild<OGLStaticMeshRenderer>(m_geometryManager);
         m_im3dRenderer = CreateChild<OGLIm3DRenderer>();
         m_imguiRenderer = CreateChild<OGLImguiRenderer>();

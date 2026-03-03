@@ -96,6 +96,26 @@ namespace okami {
             return mm->CreateMaterial(std::move(material));
         }
 
+        TextureHandle LoadTexture(
+            std::filesystem::path const& path,
+            TextureLoadParams params = {}) {
+            auto* tm = m_interfaces.Query<ITextureManager>();
+            if (!tm) {
+                OKAMI_LOG_ERROR("No ITextureManager registered in Engine");
+                return TextureHandle();
+            }
+            return tm->LoadTexture(path, params, m_interfaces);
+        }
+
+        TextureHandle CreateTexture(Texture data) {
+            auto* tm = m_interfaces.Query<ITextureManager>();
+            if (!tm) {
+                OKAMI_LOG_ERROR("No ITextureManager registered in Engine");
+                return TextureHandle();
+            }
+            return tm->CreateTexture(std::move(data));
+        }
+
         void AddScriptBundle(
             std::function<void(JobGraph&, BuildGraphParams const&)> script, 
             std::string_view name = "Unnamed Script");

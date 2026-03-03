@@ -23,8 +23,8 @@ void OGLMaterial::Bind() const {
 // OGLMaterialManager
 // ---------------------------------------------------------------------------
 
-OGLMaterialManager::OGLMaterialManager(OGLTextureManager* textureManager)
-    : m_textureManager(textureManager) {}
+OGLMaterialManager::OGLMaterialManager()
+{}
 
 Error OGLMaterialManager::RegisterImpl(InterfaceCollection& interfaces) {
     interfaces.Register<IMaterialManager<DefaultMaterial>>(this);
@@ -137,10 +137,9 @@ MaterialHandle OGLMaterialManager::CreateMaterial(BasicTexturedMaterial material
         typeid(BasicTexturedMaterial),
         entry ? &entry->m_program : nullptr);
 
-    if (material.m_colorTexture && material.m_colorTexture.IsLoaded()) {
-        if (auto* texImpl = m_textureManager->GetImpl(material.m_colorTexture)) {
-            mat->m_textureBindings.push_back({ 0, texImpl->m_texture.get() });
-        }
+    if (material.m_colorTexture && material.m_colorTexture->IsLoaded()) {
+        auto* ogl = static_cast<OGLTexture*>(material.m_colorTexture.get());
+        mat->m_textureBindings.push_back({ 0, ogl->m_texture.get() });
     }
     return mat;
 }
