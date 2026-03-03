@@ -3,6 +3,11 @@
 #include "config.hpp"
 #include "input.hpp"
 
+// Headless capture: GL pixel readback + PNG encoding.
+// glad must come before any OpenGL headers.
+#include "ogl/glad/gl.h"
+#include "lodepng.h"
+
 #include <glog/logging.h>
 
 #include <GLFW/glfw3.h>
@@ -14,6 +19,11 @@
 #define GLFW_EXPOSE_NATIVE_COCOA
 #endif
 #include <GLFW/glfw3native.h>
+
+#include <cstdio>
+#include <cstring>
+#include <optional>
+#include <vector>
 
 using namespace okami;
 
@@ -168,10 +178,16 @@ class GLFWModule final :
     public INativeWindowProvider,
     public IGLProvider,
     public IGUIModule {
+public:
+    explicit GLFWModule(std::optional<HeadlessGLParams> headless = {})
+        : m_headless(std::move(headless)) {}
+
 private:
     GLFWwindow* m_window = nullptr;
     WindowConfig m_config;
     bool m_createContext = false;
+    std::optional<HeadlessGLParams> m_headless;  // set → headless capture mode
+    size_t m_frameIndex = 0;
 
     KeyboardState m_keyboardState;
     MouseState m_mouseState;
@@ -213,28 +229,49 @@ public:
 
 protected:
     Error RegisterImpl(InterfaceCollection& interfaces) override {
-        interfaces.Register<INativeWindowProvider>(this);
         interfaces.Register<IGLProvider>(this);
         interfaces.Register<IGUIModule>(this);
 
-        interfaces.RegisterSignalHandler<KeyMessage>(&m_keySignalHandler);
-        interfaces.RegisterSignalHandler<MouseButtonMessage>(&m_mouseButtonSignalHandler);
-        interfaces.RegisterSignalHandler<MousePosMessage>(&m_mousePosSignalHandler);
-        interfaces.RegisterSignalHandler<ScrollMessage>(&m_scrollSignalHandler);
-        interfaces.RegisterSignalHandler<SetCursorMessage>(&m_setCursorSignalHandler);
+        if (!m_headless) {
+            interfaces.Register<INativeWindowProvider>(this);
 
-        RegisterConfig<WindowConfig>(interfaces, LOG_WRAP(WARNING));
+            interfaces.RegisterSignalHandler<KeyMessage>(&m_keySignalHandler);
+            interfaces.RegisterSignalHandler<MouseButtonMessage>(&m_mouseButtonSignalHandler);
+            interfaces.RegisterSignalHandler<MousePosMessage>(&m_mousePosSignalHandler);
+            interfaces.RegisterSignalHandler<ScrollMessage>(&m_scrollSignalHandler);
+            interfaces.RegisterSignalHandler<SetCursorMessage>(&m_setCursorSignalHandler);
+
+            RegisterConfig<WindowConfig>(interfaces, LOG_WRAP(WARNING));
+        }
         return {};
     }
 
     Error StartupImpl(InitContext const& context) override {
-        m_config = ReadConfig<WindowConfig>(context.m_interfaces, LOG_WRAP(WARNING));
-
         glfwSetErrorCallback(glfw_errorCallback);
-        
+
         if (!glfwInit()) {
             return OKAMI_ERROR("Failed to initialize GLFW");
         }
+
+        if (m_headless) {
+            // Headless: always create a GL 4.1 core context, hidden window.
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+            glfwWindowHint(GLFW_VISIBLE,   GLFW_FALSE);
+            glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+            m_window = glfwCreateWindow(
+                m_headless->m_size.x, m_headless->m_size.y,
+                "Headless", nullptr, nullptr);
+            OKAMI_ERROR_RETURN_IF(!m_window, "Failed to create headless GLFW window");
+
+            glfwMakeContextCurrent(m_window);
+            return {};
+        }
+
+        // Normal windowed path.
+        m_config = ReadConfig<WindowConfig>(context.m_interfaces, LOG_WRAP(WARNING));
 
         if (m_createContext) {
             glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -323,7 +360,7 @@ protected:
     Error MessagePump(InterfaceCollection& interfaces) override {
         glfwPollEvents();
 
-        if (glfwWindowShouldClose(m_window)) {
+        if (!m_headless && glfwWindowShouldClose(m_window)) {
             interfaces.SendSignal(SignalExit{});
         }
 
@@ -341,6 +378,20 @@ protected:
     }
 
     Error SendMessagesImpl(MessageBus& bus) override {
+        if (m_headless) {
+            auto size = m_headless->m_size;
+            bus.Send<IOState>(IOState{});
+            bus.Send<DisplayState>(DisplayState{
+                .m_framebufferSize = size,
+                .m_windowSize      = size,
+                .m_windowPosition  = {0, 0},
+                .m_contentScale    = {1.0f, 1.0f},
+                .m_focused         = true,
+                .m_iconified       = false,
+            });
+            return {};
+        }
+
         // Forward input events    
         m_keySignalHandler.HandleSpan([&](std::span<KeyMessage> messages) {
             bus.SendBatch<KeyMessage>(messages);
@@ -388,20 +439,25 @@ protected:
         bus.Send<IOState>(IOState{ 
             .m_keyboard = m_keyboardState, 
             .m_mouse = m_mouseState,
-            .m_display = DisplayState{
-                .m_framebufferSize = GetFramebufferSize(),
-                .m_windowSize = windowSize, 
-                .m_windowPosition = winPos,
-                .m_contentScale = contentScale,
-                .m_focused = glfwGetWindowAttrib(m_window, GLFW_FOCUSED) != 0,
-                .m_iconified = glfwGetWindowAttrib(m_window, GLFW_ICONIFIED) != 0
-            }
+        });
+        
+        bus.Send<DisplayState>(DisplayState{
+            .m_framebufferSize = GetFramebufferSize(),
+            .m_windowSize = windowSize, 
+            .m_windowPosition = winPos,
+            .m_contentScale = contentScale,
+            .m_focused = glfwGetWindowAttrib(m_window, GLFW_FOCUSED) != 0,
+            .m_iconified = glfwGetWindowAttrib(m_window, GLFW_ICONIFIED) != 0
         });
 
         return {};
     }
 
     Error ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const& params) override {
+        if (m_headless) {
+            return {};
+        }
+
         // Forward cursor messages to GLFW
         bus.Handle<SetCursorMessage>([this](SetCursorMessage const& msg) {
             m_setCursorSignalHandler.Send(msg);
@@ -424,7 +480,48 @@ public:
     }
 
     void SwapBuffers() override {
-        glfwSwapBuffers(m_window);
+        if (!m_headless) {
+            glfwSwapBuffers(m_window);
+            return;
+        }
+
+        // Headless: read back the rendered pixels and save as PNG.
+        if (!m_headless->m_captureDir.empty()) {
+            int w = m_headless->m_size.x;
+            int h = m_headless->m_size.y;
+
+            std::vector<uint8_t> pixels(static_cast<size_t>(w * h * 4));
+            glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+            // Flip rows: OpenGL is bottom-left origin, PNG is top-left.
+            std::vector<uint8_t> flipped(pixels.size());
+            const size_t rowBytes = static_cast<size_t>(w * 4);
+            for (int y = 0; y < h; ++y) {
+                std::memcpy(
+                    flipped.data() + static_cast<size_t>(y) * rowBytes,
+                    pixels.data() + static_cast<size_t>(h - 1 - y) * rowBytes,
+                    rowBytes);
+            }
+
+            std::filesystem::create_directories(m_headless->m_captureDir);
+
+            char nameBuf[32];
+            std::snprintf(nameBuf, sizeof(nameBuf), "frame_%04zu.png", m_frameIndex);
+            auto outPath = m_headless->m_captureDir / nameBuf;
+
+            unsigned err = lodepng_encode32_file(
+                outPath.string().c_str(),
+                flipped.data(),
+                static_cast<unsigned>(w),
+                static_cast<unsigned>(h));
+
+            if (err) {
+                LOG(WARNING) << "GLFWModule (headless): lodepng error " << err
+                             << " (" << lodepng_error_text(err) << ") writing " << outPath;
+            }
+        }
+
+        ++m_frameIndex;
     }
 
     void SetSwapInterval(int interval) override {
@@ -434,4 +531,8 @@ public:
 
 std::unique_ptr<EngineModule> GLFWModuleFactory::operator()() {
     return std::make_unique<GLFWModule>();
+}
+
+std::unique_ptr<EngineModule> GLFWModuleFactory::operator()(HeadlessGLParams params) {
+    return std::make_unique<GLFWModule>(std::move(params));
 }

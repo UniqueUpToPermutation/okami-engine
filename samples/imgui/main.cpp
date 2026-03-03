@@ -1,26 +1,10 @@
-#include "engine.hpp"
-
-#include "ogl/ogl_renderer.hpp"
-#include "glfw_module.hpp"
-
-#include "transform.hpp"
-#include "paths.hpp"
-#include "geometry.hpp"
-
-#include "imgui.hpp"
+#include "scene.hpp"
 
 using namespace okami;
 
 int main() {
     Engine en;
-
-    RendererParams params;
-
-    // Register renderer based on compile-time options
-    en.CreateModule<GLFWModuleFactory>();
-    en.CreateModule<ImGuiModuleFactory>();
-
-    en.CreateModule<OGLRendererFactory>({}, params);
+    sample_imgui::SetupModules(en);
 
     Error err = en.Startup();
     if (err.IsError()) {
@@ -28,16 +12,7 @@ int main() {
         return 1;
     }
 
-    auto cameraEntity = en.CreateEntity();
-    en.AddComponent(cameraEntity, Camera::Orthographic(2.25f, -1.0f, 1.0f));
-    en.SetActiveCamera(cameraEntity);
-
-    bool windowOpen = true;
-
-    en.AddScript([&](JobContext& jc, Pipe<ImGuiContextObject> imgui) -> Error {
-        ImGui::ShowDemoWindow(&windowOpen);
-        return {};
-    });
+    sample_imgui::SetupScene(en);
 
     en.Run();
     en.Shutdown();

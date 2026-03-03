@@ -10,8 +10,22 @@
 #include "sky.hpp"
 #include "camera.hpp"
 #include "camera_controllers.hpp"
+#include "ogl/ogl_renderer.hpp"
+#include "glfw_module.hpp"
+
+#include <optional>
 
 namespace sample_materials {
+
+    inline void SetupModules(okami::Engine& en, std::optional<okami::HeadlessGLParams> headless = {}) {
+        if (headless) {
+            en.CreateModule<okami::GLFWModuleFactory>({}, std::move(*headless));
+        } else {
+            en.CreateModule<okami::GLFWModuleFactory>();
+        }
+        en.CreateModule<okami::OGLRendererFactory>({}, okami::RendererParams{});
+        en.CreateModule<okami::CameraControllerModuleFactory>();
+    }
 
     inline void SetupScene(okami::Engine& en) {
         using namespace okami;

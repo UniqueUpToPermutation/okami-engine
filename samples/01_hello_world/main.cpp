@@ -1,17 +1,10 @@
-#include "engine.hpp"
-#include "ogl/ogl_renderer.hpp"
-#include "glfw_module.hpp"
 #include "scene.hpp"
 
 using namespace okami;
 
 int main() {
     Engine en;
-
-    RendererParams params;
-
-    en.CreateModule<GLFWModuleFactory>();
-    en.CreateModule<OGLRendererFactory>({}, params);
+    sample_hello_world::SetupModules(en);
 
     Error err = en.Startup();
     if (err.IsError()) {

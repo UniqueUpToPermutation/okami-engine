@@ -6,8 +6,21 @@
 #include "geometry.hpp"
 #include "renderer.hpp"
 #include "camera.hpp"
+#include "ogl/ogl_renderer.hpp"
+#include "glfw_module.hpp"
+
+#include <optional>
 
 namespace sample_hello_world {
+
+    inline void SetupModules(okami::Engine& en, std::optional<okami::HeadlessGLParams> headless = {}) {
+        if (headless) {
+            en.CreateModule<okami::GLFWModuleFactory>({}, std::move(*headless));
+        } else {
+            en.CreateModule<okami::GLFWModuleFactory>();
+        }
+        en.CreateModule<okami::OGLRendererFactory>({}, okami::RendererParams{});
+    }
 
     struct SceneContext {
         okami::entity_t cameraEntity = okami::kNullEntity;

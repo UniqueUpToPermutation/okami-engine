@@ -1,18 +1,15 @@
 #include <gtest/gtest.h>
 #include <filesystem>
 #include "../engine.hpp"
-#include "../renderer.hpp"
 #include "../paths.hpp"
 #include "../texture.hpp"
-#include "../glfw_module.hpp"
-#include "../ogl/ogl_renderer.hpp"
-#include "../ogl/ogl_headless.hpp"
-#include "../camera_controllers.hpp"
 
-// Sample scene setup functions – each sample exposes SetupScene() in scene.hpp.
+// Sample scene setup functions – each sample exposes SetupScene() and SetupModules() in scene.hpp.
 #include "../samples/01_hello_world/scene.hpp"
 #include "../samples/02_zoo/scene.hpp"
 #include "../samples/03_materials/scene.hpp"
+#include "../samples/im3d/scene.hpp"
+#include "../samples/imgui/scene.hpp"
 
 using namespace okami;
 
@@ -109,12 +106,7 @@ TEST_F(HeadlessRendererTest, HelloWorld) {
     auto captureDir = CaptureDir("hello_world");
 
     Engine en;
-    en.CreateModule<HeadlessGLFWModuleFactory>({}, HeadlessGLParams{
-        .m_size       = {800, 600},
-        .m_captureDir = captureDir,
-    });
-    en.CreateModule<OGLRendererFactory>({}, RendererParams{});
-
+    sample_hello_world::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
     ASSERT_FALSE(en.Startup().IsError());
 
     // Use the exact same scene setup as the sample (camera rotation script
@@ -135,13 +127,7 @@ TEST_F(HeadlessRendererTest, Zoo) {
     auto captureDir = CaptureDir("zoo");
 
     Engine en;
-    en.CreateModule<HeadlessGLFWModuleFactory>({}, HeadlessGLParams{
-        .m_size       = {800, 600},
-        .m_captureDir = captureDir,
-    });
-    en.CreateModule<OGLRendererFactory>({}, RendererParams{});
-    en.CreateModule<CameraControllerModuleFactory>();
-
+    sample_zoo::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
     ASSERT_FALSE(en.Startup().IsError());
 
     sample_zoo::SetupScene(en);
@@ -160,13 +146,7 @@ TEST_F(HeadlessRendererTest, Materials) {
     auto captureDir = CaptureDir("materials");
 
     Engine en;
-    en.CreateModule<HeadlessGLFWModuleFactory>({}, HeadlessGLParams{
-        .m_size       = {800, 600},
-        .m_captureDir = captureDir,
-    });
-    en.CreateModule<OGLRendererFactory>({}, RendererParams{});
-    en.CreateModule<CameraControllerModuleFactory>();
-
+    sample_materials::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
     ASSERT_FALSE(en.Startup().IsError());
 
     sample_materials::SetupScene(en);
@@ -175,5 +155,43 @@ TEST_F(HeadlessRendererTest, Materials) {
     en.Shutdown();
 
     CompareWithGoldenImage(FramePath(captureDir, kFrameCount - 1), "materials.png");
+}
+
+// ---------------------------------------------------------------------------
+// Sample im3d
+// ---------------------------------------------------------------------------
+
+TEST_F(HeadlessRendererTest, Im3d) {
+    auto captureDir = CaptureDir("im3d");
+
+    Engine en;
+    sample_im3d::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
+    ASSERT_FALSE(en.Startup().IsError());
+
+    sample_im3d::SetupScene(en);
+
+    en.Run(kFrameCount);
+    en.Shutdown();
+
+    CompareWithGoldenImage(FramePath(captureDir, kFrameCount - 1), "im3d.png");
+}
+
+// ---------------------------------------------------------------------------
+// Sample imgui
+// ---------------------------------------------------------------------------
+
+TEST_F(HeadlessRendererTest, ImGui) {
+    auto captureDir = CaptureDir("imgui");
+
+    Engine en;
+    sample_imgui::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
+    ASSERT_FALSE(en.Startup().IsError());
+
+    sample_imgui::SetupScene(en);
+
+    en.Run(kFrameCount);
+    en.Shutdown();
+
+    CompareWithGoldenImage(FramePath(captureDir, kFrameCount - 1), "imgui.png");
 }
 

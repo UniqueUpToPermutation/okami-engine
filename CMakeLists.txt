@@ -529,16 +529,18 @@ set_tests_properties(EngineUnitTests PROPERTIES
 # Post-build Steps
 #==============================================================================
 
-# Collect all files in config/ directory
+# Collect all files in config/ and samples/config/ directories
 file(GLOB CONFIG_FILES "${CMAKE_SOURCE_DIR}/config/*")
+file(GLOB SAMPLES_CONFIG_FILES "${CMAKE_SOURCE_DIR}/samples/config/*")
+list(APPEND ALL_CONFIG_FILES ${CONFIG_FILES} ${SAMPLES_CONFIG_FILES})
 
 # Copy config files for tests as well
-if(CONFIG_FILES)
+if(ALL_CONFIG_FILES)
     add_custom_command(
         TARGET EngineTests POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/config
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${CONFIG_FILES}
+            ${ALL_CONFIG_FILES}
             $<TARGET_FILE_DIR:EngineTests>/config/
         COMMENT "Copying config files to test output directory if newer"
     )

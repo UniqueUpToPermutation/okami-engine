@@ -246,7 +246,6 @@ namespace okami {
 
     struct IOState {
         KeyboardState m_keyboard;
-        MouseState m_mouse;
-        DisplayState m_display;
+        MouseState m_mouse;  
     };
 }

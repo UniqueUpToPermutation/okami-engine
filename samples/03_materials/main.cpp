@@ -1,19 +1,10 @@
-#include "engine.hpp"
-#include "ogl/ogl_renderer.hpp"
-#include "glfw_module.hpp"
-#include "camera_controllers.hpp"
 #include "scene.hpp"
 
 using namespace okami;
 
 int main() {
     Engine en;
-
-    RendererParams params;
-
-    en.CreateModule<GLFWModuleFactory>();
-    en.CreateModule<OGLRendererFactory>({}, params);
-    en.CreateModule<CameraControllerModuleFactory>();
+    sample_materials::SetupModules(en);
 
     Error err = en.Startup();
     if (err.IsError()) {

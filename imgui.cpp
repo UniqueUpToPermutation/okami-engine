@@ -120,6 +120,7 @@ protected:
         graph.AddMessageNode([id = GetId(), &lastScaleFactor = m_lastScaleFactor](JobContext& jobContext,
             In<Time> time,
             In<IOState> io,
+            In<DisplayState> display,
             Pipe<KeyMessage, kImGuiInputPriority> keyMessages,
             Pipe<MouseButtonMessage, kImGuiInputPriority> mouseMessages,
             Pipe<MousePosMessage> mousePosMessages,
@@ -128,16 +129,26 @@ protected:
             Out<SetCursorMessage> outSetCursor,
             Pipe<ImGuiContextObject, kPipePriorityFirst>) -> Error {
 
-            if (io) {
-                // Update ImGui IO state
-                ImGuiIO& imgui_io = ImGui::GetIO();
+            // Update ImGui IO state
+            ImGuiIO& imgui_io = ImGui::GetIO();
+            imgui_io.DeltaTime = (float)time->m_deltaTime;
 
+            if (display) {
                 imgui_io.DisplaySize = ImVec2(
-                    (float)io->m_display.m_framebufferSize.x, 
-                    (float)io->m_display.m_framebufferSize.y
+                    (float)display->m_framebufferSize.x, 
+                    (float)display->m_framebufferSize.y
                 );
-                imgui_io.DeltaTime = (float)time->m_deltaTime;
 
+                // Scale everything for DPI changes
+                if (lastScaleFactor != display->m_contentScale.x) {
+                    auto newScaleFactor = display->m_contentScale.x;
+                    ImGui::GetStyle().ScaleAllSizes(newScaleFactor / lastScaleFactor);
+                    lastScaleFactor = newScaleFactor;
+                }
+                imgui_io.FontGlobalScale = lastScaleFactor;
+            }
+
+            if (io) {
                 imgui_io.MousePos = ImVec2((float)io->m_mouse.m_cursorX, (float)io->m_mouse.m_cursorY);
 
                 keyMessages.Handle([&imgui_io](KeyMessage& msg) {
@@ -198,15 +209,7 @@ protected:
                     }
                     imgui_io.AddMouseWheelEvent((float)msg.m_xOffset, (float)msg.m_yOffset);
                 });
-
-                // Scale everything for DPI changes
-                if (lastScaleFactor != io->m_display.m_contentScale.x) {
-                    auto newScaleFactor = io->m_display.m_contentScale.x;
-                    ImGui::GetStyle().ScaleAllSizes(newScaleFactor / lastScaleFactor);
-                    lastScaleFactor = newScaleFactor;
-                }
-                imgui_io.FontGlobalScale = lastScaleFactor;
-
+              
                 // Capture input messages if not captured by others
                 if (imgui_io.WantCaptureKeyboard) {
                     keyMessages.Handle([id](KeyMessage& msg) {
