@@ -11,6 +11,22 @@ namespace okami {
     GLenum ToGlFormat(TextureFormat format);
     GLenum ToGlType(TextureFormat format);
 
+    // Thread-safe queue of GL texture IDs pending deletion.
+    // OGLTexture destructors push into this from any thread;
+    // OGLTextureManager::ReceiveMessagesImpl drains it on the GL thread.
+    struct OGLDeletionQueue {
+        std::mutex           mtx;
+        std::vector<GLuint>  texture_ids;
+
+        void Push(GLuint id) {
+            std::lock_guard lock(mtx);
+            texture_ids.push_back(id);
+        }
+
+        // Must be called on the GL thread.
+        void Drain();
+    };
+
     // Concrete OpenGL texture.  Heap-allocated and ref-counted via TextureHandle.
     // IsLoaded() is false until the async GPU upload completes.
     class OGLTexture final : public ITexture {
@@ -18,9 +34,12 @@ namespace okami {
         GLTexture         m_texture;
         TextureDesc       m_desc{};
         std::atomic<bool> m_loaded{false};
+        // Set by OGLTextureManager at construction; may be null for unit tests.
+        std::shared_ptr<OGLDeletionQueue> m_deletion_queue;
 
         OGLTexture() = default;
         OKAMI_NO_COPY(OGLTexture);
+        ~OGLTexture();
 
         TextureDesc const& GetDesc()  const override { return m_desc; }
         bool               IsLoaded() const override {
@@ -43,6 +62,9 @@ namespace okami {
             std::shared_ptr<OGLTexture> m_texture; // pre-created handle
             Resource<Texture>           m_resource; // stable address for ResHandle correlation
         };
+
+        std::shared_ptr<OGLDeletionQueue> m_deletion_queue =
+            std::make_shared<OGLDeletionQueue>();
 
         std::mutex m_mtx;
         std::unordered_map<std::filesystem::path, std::weak_ptr<OGLTexture>, PathHash>

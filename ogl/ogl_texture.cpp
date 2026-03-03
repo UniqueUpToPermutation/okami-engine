@@ -53,6 +53,35 @@ GLenum okami::ToGlType(TextureFormat format) {
 }
 
 // ---------------------------------------------------------------------------
+// OGLDeletionQueue
+// ---------------------------------------------------------------------------
+
+void OGLDeletionQueue::Drain() {
+    std::vector<GLuint> local;
+    {
+        std::lock_guard lock(mtx);
+        local.swap(texture_ids);
+    }
+    if (!local.empty()) {
+        glDeleteTextures(static_cast<GLsizei>(local.size()), local.data());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OGLTexture
+// ---------------------------------------------------------------------------
+
+OGLTexture::~OGLTexture() {
+    if (m_deletion_queue) {
+        if (GLuint id = m_texture.release(); id != 0) {
+            m_deletion_queue->Push(id);
+        }
+    }
+    // If no queue (e.g. never assigned), ~GLTexture() runs normally
+    // — only safe if destruction is already on the GL thread.
+}
+
+// ---------------------------------------------------------------------------
 // Helper: upload a Texture to an OGLTexture on the GL thread
 // ---------------------------------------------------------------------------
 
@@ -121,6 +150,7 @@ TextureHandle OGLTextureManager::LoadTexture(
     pending->m_resource.m_entity  = static_cast<entity_t>(id);
     pending->m_resource.m_path    = path;
 
+    pending->m_texture->m_deletion_queue = m_deletion_queue;
     TextureHandle handle = pending->m_texture; // keep a copy before moving
 
     {
@@ -142,6 +172,7 @@ TextureHandle OGLTextureManager::LoadTexture(
 
 TextureHandle OGLTextureManager::CreateTexture(Texture data) {
     auto tex = std::make_shared<OGLTexture>();
+    tex->m_deletion_queue = m_deletion_queue;
     auto err = UploadToGL(*tex, data);
     if (err.IsError()) {
         LOG(ERROR) << "OGLTextureManager::CreateTexture: GL upload failed: " << err;
@@ -151,6 +182,9 @@ TextureHandle OGLTextureManager::CreateTexture(Texture data) {
 
 Error OGLTextureManager::ReceiveMessagesImpl(
     MessageBus& /*bus*/, RecieveMessagesParams const& /*params*/) {
+
+    // Drain GL deletions deferred from non-GL threads.
+    m_deletion_queue->Drain();
 
     Error err;
 
