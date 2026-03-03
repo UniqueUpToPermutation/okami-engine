@@ -18,9 +18,12 @@ namespace okami {
     };
 
     // Binds a single GL texture to a specific texture unit.
+    // Holds a TextureHandle to keep the texture alive for as long as the
+    // material exists.
     struct OGLTextureBinding {
-        GLint  m_unit    = 0;
-        GLuint m_texture = 0;
+        GLint         m_unit    = 0;
+        GLuint        m_texture = 0;
+        TextureHandle m_handle;           // owns the ref-count
     };
 
     // The single concrete OpenGL material implementation.

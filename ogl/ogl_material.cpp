@@ -139,7 +139,7 @@ MaterialHandle OGLMaterialManager::CreateMaterial(BasicTexturedMaterial material
 
     if (material.m_colorTexture && material.m_colorTexture->IsLoaded()) {
         auto* ogl = static_cast<OGLTexture*>(material.m_colorTexture.get());
-        mat->m_textureBindings.push_back({ 0, ogl->m_texture.get() });
+        mat->m_textureBindings.push_back({ 0, ogl->m_texture.get(), material.m_colorTexture });
     }
     return mat;
 }
