@@ -1,15 +1,15 @@
 #pragma once
 
-#include "engine.hpp"
+#include "../sample.hpp"
 #include "camera.hpp"
 #include "im3d.hpp"
 #include "ogl/ogl_renderer.hpp"
-#include "glfw_module.hpp"
-
-#include <optional>
 
 namespace sample_im3d {
-    inline void SetupModules(okami::Engine& en, std::optional<okami::HeadlessGLParams> headless = {}) {
+
+class Im3dSample : public okami::Sample {
+public:
+    void SetupModules(okami::Engine& en, std::optional<okami::HeadlessGLParams> headless = {}) override {
         if (headless) {
             en.CreateModule<okami::GLFWModuleFactory>({}, std::move(*headless));
         } else {
@@ -19,7 +19,7 @@ namespace sample_im3d {
         en.CreateModule<okami::OGLRendererFactory>({}, okami::RendererParams{});
     }
 
-    inline void SetupScene(okami::Engine& en) {
+    void SetupScene(okami::Engine& en) override {
         using namespace okami;
 
         auto cameraEntity = en.CreateEntity();
@@ -50,5 +50,6 @@ namespace sample_im3d {
             return {};
         });
     }
+};
 
 } // namespace sample_im3d

@@ -24,6 +24,11 @@ namespace okami {
 
     class IEntityManager;
 
+    struct RunParams {
+        std::optional<size_t> frameCount = std::nullopt;
+        std::optional<double> frameTime = std::nullopt;
+    };
+
     class Engine final {
 	private:
 		EngineParams m_params;
@@ -45,7 +50,7 @@ namespace okami {
 
 	public:
 		Error Startup();
-		void Run(std::optional<size_t> frameCount = std::nullopt);
+		void Run(RunParams params = {});
 		void Shutdown();
 
         entity_t CreateEntity(entity_t parent = kNullEntity);

@@ -117,21 +117,23 @@ std::filesystem::path Engine::GetRenderOutputPath(size_t frameIndex) {
 	return GetExecutableRelativePath("render_output") / buf;
 }
 
-struct FrameTimeEstimator {
+constexpr double kDefaultFrameTime = 1.0 / 60.0;
+
+struct DefaultFrameTimeEstimator final {
 	size_t m_nextFrame = 0;
 	std::chrono::high_resolution_clock::time_point m_startTime;
 	std::chrono::high_resolution_clock::time_point m_lastFrameTime;
-	double m_nextDelta = 1.0 / 60.0; // Default to 60 FPS
-	double m_frameTimeEstimate = 1.0 / 60.0; // Smoothed estimate of frame time
+	double m_nextDelta = kDefaultFrameTime; // Default to 60 FPS
+	double m_frameTimeEstimate = kDefaultFrameTime; // Smoothed estimate of frame time
 	double m_smoothingFactor = 0.1; // Smoothing factor for frame time estimate
 
-	FrameTimeEstimator() {
+	DefaultFrameTimeEstimator() {
 		m_startTime = std::chrono::high_resolution_clock::now();
 		m_lastFrameTime = m_startTime;
 	}
 
-	FrameTimeEstimator Step() const {
-		FrameTimeEstimator next = *this;
+	DefaultFrameTimeEstimator Step() const {
+		DefaultFrameTimeEstimator next = *this;
 
 		auto now = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> deltaTime = now - m_lastFrameTime;
@@ -160,13 +162,56 @@ struct FrameTimeEstimator {
 	}
 };
 
-void Engine::Run(std::optional<size_t> runFrameCount) {
+struct FixedFrameTimeEstimator {
+	size_t m_nextFrame = 0;
+	double m_fixedDelta = kDefaultFrameTime; // Default to 60 FPS
+
+	FixedFrameTimeEstimator Step() const {
+		FixedFrameTimeEstimator next = *this;
+		next.m_nextFrame++;
+		return next;
+	} 
+
+	Time GetTime() const {
+		return Time{
+			.m_deltaTime = m_fixedDelta,
+			.m_nextFrameTime = m_nextFrame * m_fixedDelta,
+			.m_lastFrameTime = (m_nextFrame - 1) * m_fixedDelta,
+			.m_nextFrame = m_nextFrame
+		};
+	}
+};
+
+class IFrameTimeEstimator {
+public:
+	virtual ~IFrameTimeEstimator() = default;
+	virtual void Step() = 0;
+	virtual Time GetTime() const = 0;
+};
+
+template <typename ImplT>
+class FrameTimeEstimatorImpl : public IFrameTimeEstimator {
+private:
+	ImplT m_impl;
+public:
+	FrameTimeEstimatorImpl(ImplT impl = {}) : m_impl(std::move(impl)) {}
+
+	void Step() override {
+		m_impl = m_impl.Step();
+	}
+
+	Time GetTime() const override {
+		return m_impl.GetTime();
+	}
+};
+
+void Engine::Run(RunParams params) {
 	bool shouldExit = false;
 
 	auto beginTick = std::chrono::high_resolution_clock::now();
 	auto lastTick = beginTick;
 
-	std::optional<size_t> maxFrames = runFrameCount;
+	std::optional<size_t> maxFrames = params.frameCount;
 
 	auto processIO = [&]() {
 		Error err;
@@ -199,17 +244,31 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 	RecieveMessagesParams receiveParams{ .m_registry = m_registry };
 	m_modules.ReceiveMessages(m_messages, receiveParams);
 
-	FrameTimeEstimator timeEstimator;
+	// Initialize the time estimator
+	auto frameTimeEstimator = [&]() -> std::unique_ptr<IFrameTimeEstimator> {
+		if (params.frameTime) {
+			return std::make_unique<FrameTimeEstimatorImpl<FixedFrameTimeEstimator>>(
+				FixedFrameTimeEstimator{ .m_fixedDelta = *params.frameTime });
+		} else {
+			return std::make_unique<FrameTimeEstimatorImpl<DefaultFrameTimeEstimator>>();
+		}
+	}();
+
 	DefaultJobGraphExecutor executor;
 
 	while (!shouldExit) {
-		auto time = timeEstimator.GetTime();
+		okami::Time time = frameTimeEstimator->GetTime();
 
 		// Clear message bus for this frame
 		m_messages.Clear();
 
        	processIO();
 		render();
+
+		// Check for exit conditions
+		if (maxFrames && frameTimeEstimator->GetTime().m_nextFrame >= *maxFrames) {
+			return;
+		}
 
 		// Execute the update job graph
 		JobGraph updateJobGraph;
@@ -230,12 +289,7 @@ void Engine::Run(std::optional<size_t> runFrameCount) {
 		m_modules.ReceiveMessages(m_messages, receiveParams);
 
 		// Frame timing
-		timeEstimator = timeEstimator.Step();
-
-		// Check for exit conditions
-		if (maxFrames && timeEstimator.m_nextFrame >= *maxFrames) {
-			shouldExit = true;
-		}
+		frameTimeEstimator->Step();
 
 		if (m_exitHandler.FetchAndReset() > 0) {
 			shouldExit = true;

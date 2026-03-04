@@ -4,7 +4,7 @@
 #include "../paths.hpp"
 #include "../texture.hpp"
 
-// Sample scene setup functions – each sample exposes SetupScene() and SetupModules() in scene.hpp.
+// Each sample exposes a Sample-derived class in scene.hpp.
 #include "../samples/01_hello_world/scene.hpp"
 #include "../samples/02_zoo/scene.hpp"
 #include "../samples/03_materials/scene.hpp"
@@ -24,7 +24,7 @@ protected:
 
     // Returns the capture directory for a named test.
     static std::filesystem::path CaptureDir(const char* testName) {
-        return GetTestAssetsPath() / "headless_output" / testName;
+        return GetExecutablePath().parent_path() / "headless_output" / testName;
     }
 
     // Returns the path of the frame captured at the given index.
@@ -93,9 +93,29 @@ protected:
             << " (max allowed: " << maxAllowedDifferences << ")";
     }
 
-    // Number of frames rendered per test.  15 frames gives async texture /
-    // geometry loads enough ticks to upload to the GPU.
-    static constexpr size_t kFrameCount = 15;
+    // Run a sample headlessly and compare frame 0 (the initial rendered frame,
+    // before any accumulated script updates) against the named golden image.
+    template <typename TSample>
+    void RunHeadlessSample(const char* captureName, const char* goldenName) {
+        auto captureDir = CaptureDir(captureName);
+
+        TSample sample;
+        Engine en;
+        sample.SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
+        ASSERT_FALSE(en.Startup().IsError());
+        sample.SetupScene(en);
+
+        RunParams params;
+        params.frameCount = sample.GetTestFrameCount();
+        params.frameTime = 1.0 / 60.0; // 60 FPS
+        en.Run(params);
+        en.Shutdown();
+
+        // Frame 0 is the first rendered output, before any script updates have
+        // had a chance to mutate scene state, so it is deterministic regardless
+        // of frame timing.
+        CompareWithGoldenImage(FramePath(captureDir, sample.GetTestFrameCount()), goldenName);
+    }
 };
 
 // ---------------------------------------------------------------------------
@@ -103,20 +123,7 @@ protected:
 // ---------------------------------------------------------------------------
 
 TEST_F(HeadlessRendererTest, HelloWorld) {
-    auto captureDir = CaptureDir("hello_world");
-
-    Engine en;
-    sample_hello_world::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
-    ASSERT_FALSE(en.Startup().IsError());
-
-    // Use the exact same scene setup as the sample (camera rotation script
-    // is intentionally omitted to keep output deterministic).
-    sample_hello_world::SetupScene(en);
-
-    en.Run(kFrameCount);
-    en.Shutdown();
-
-    CompareWithGoldenImage(FramePath(captureDir, kFrameCount - 1), "hello_world.png");
+    RunHeadlessSample<sample_hello_world::HelloWorldSample>("hello_world", "hello_world.png");
 }
 
 // ---------------------------------------------------------------------------
@@ -124,18 +131,7 @@ TEST_F(HeadlessRendererTest, HelloWorld) {
 // ---------------------------------------------------------------------------
 
 TEST_F(HeadlessRendererTest, Zoo) {
-    auto captureDir = CaptureDir("zoo");
-
-    Engine en;
-    sample_zoo::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
-    ASSERT_FALSE(en.Startup().IsError());
-
-    sample_zoo::SetupScene(en);
-
-    en.Run(kFrameCount);
-    en.Shutdown();
-
-    CompareWithGoldenImage(FramePath(captureDir, kFrameCount - 1), "zoo.png");
+    RunHeadlessSample<sample_zoo::ZooSample>("zoo", "zoo.png");
 }
 
 // ---------------------------------------------------------------------------
@@ -143,18 +139,7 @@ TEST_F(HeadlessRendererTest, Zoo) {
 // ---------------------------------------------------------------------------
 
 TEST_F(HeadlessRendererTest, Materials) {
-    auto captureDir = CaptureDir("materials");
-
-    Engine en;
-    sample_materials::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
-    ASSERT_FALSE(en.Startup().IsError());
-
-    sample_materials::SetupScene(en);
-
-    en.Run(kFrameCount);
-    en.Shutdown();
-
-    CompareWithGoldenImage(FramePath(captureDir, kFrameCount - 1), "materials.png");
+    RunHeadlessSample<sample_materials::MaterialsSample>("materials", "materials.png");
 }
 
 // ---------------------------------------------------------------------------
@@ -162,18 +147,7 @@ TEST_F(HeadlessRendererTest, Materials) {
 // ---------------------------------------------------------------------------
 
 TEST_F(HeadlessRendererTest, Im3d) {
-    auto captureDir = CaptureDir("im3d");
-
-    Engine en;
-    sample_im3d::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
-    ASSERT_FALSE(en.Startup().IsError());
-
-    sample_im3d::SetupScene(en);
-
-    en.Run(kFrameCount);
-    en.Shutdown();
-
-    CompareWithGoldenImage(FramePath(captureDir, kFrameCount - 1), "im3d.png");
+    RunHeadlessSample<sample_im3d::Im3dSample>("im3d", "im3d.png");
 }
 
 // ---------------------------------------------------------------------------
@@ -181,17 +155,6 @@ TEST_F(HeadlessRendererTest, Im3d) {
 // ---------------------------------------------------------------------------
 
 TEST_F(HeadlessRendererTest, ImGui) {
-    auto captureDir = CaptureDir("imgui");
-
-    Engine en;
-    sample_imgui::SetupModules(en, HeadlessGLParams{ .m_size = {800, 600}, .m_captureDir = captureDir });
-    ASSERT_FALSE(en.Startup().IsError());
-
-    sample_imgui::SetupScene(en);
-
-    en.Run(kFrameCount);
-    en.Shutdown();
-
-    CompareWithGoldenImage(FramePath(captureDir, kFrameCount - 1), "imgui.png");
+    RunHeadlessSample<sample_imgui::ImGuiSample>("imgui", "imgui.png");
 }
 

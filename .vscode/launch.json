@@ -26,6 +26,18 @@
             "preLaunchTask": "Build Tests"
         },
         {
+            "name": "HeadlessRendererTest.HelloWorld",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/build/x64-debug/Debug/EngineTests.exe",
+            "args": [
+                "--gtest_filter=HeadlessRendererTest.HelloWorld"
+            ],
+            "cwd": "${workspaceFolder}/out/build/x64-debug/Debug",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build Tests"
+        },
+        {
             "name": "All Tests",
             "type": "cppvsdbg",
             "request": "launch",

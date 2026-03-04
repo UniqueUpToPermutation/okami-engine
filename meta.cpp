@@ -45,6 +45,10 @@ protected:
 
         return {};
     }
+
+    std::string GetName() const override {
+        return "MergeModule (Default for " + std::string(entt::resolve<ComponentT>().info().name()) + ")";
+    }
 };
 
 class MetaDataModule final : public EngineModule {
@@ -86,6 +90,10 @@ protected:
 public:
     MetaDataModule() {
         Build();
+    }
+
+    std::string GetName() const override {
+        return "MetaDataModule";
     }
 };
 

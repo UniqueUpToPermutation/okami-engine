@@ -560,20 +560,14 @@ add_custom_command(
 )
 
 # Copy any committed golden images from the source tree to the output dir.
-file(GLOB_RECURSE GOLDEN_IMAGE_FILES
-    "${CMAKE_SOURCE_DIR}/tests/golden_images/*.png"
-    "${CMAKE_SOURCE_DIR}/tests/golden_images/*.jpg"
+# Using copy_directory so new files are picked up at build time without reconfiguring.
+add_custom_command(
+    TARGET EngineTests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+        "${CMAKE_SOURCE_DIR}/tests/golden_images"
+        "$<TARGET_FILE_DIR:EngineTests>/tests/golden_images"
+    COMMENT "Copying golden images to test output directory"
 )
-foreach(GOLDEN_FILE ${GOLDEN_IMAGE_FILES})
-    get_filename_component(GOLDEN_NAME ${GOLDEN_FILE} NAME)
-    add_custom_command(
-        TARGET EngineTests POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${GOLDEN_FILE}
-            $<TARGET_FILE_DIR:EngineTests>/tests/golden_images/${GOLDEN_NAME}
-        COMMENT "Copying golden image ${GOLDEN_NAME} to test output directory"
-    )
-endforeach()
 
 # Copy compiled KTX textures for tests as well
 if(ALL_KTX_TEXTURES)

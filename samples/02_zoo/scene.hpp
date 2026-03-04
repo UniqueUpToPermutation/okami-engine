@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine.hpp"
+#include "../sample.hpp"
 #include "renderer.hpp"
 #include "transform.hpp"
 #include "texture.hpp"
@@ -9,12 +9,12 @@
 #include "camera.hpp"
 #include "camera_controllers.hpp"
 #include "ogl/ogl_renderer.hpp"
-#include "glfw_module.hpp"
-
-#include <optional>
 
 namespace sample_zoo {
-    inline void SetupModules(okami::Engine& en, std::optional<okami::HeadlessGLParams> headless = {}) {
+
+class ZooSample : public okami::Sample {
+public:
+    void SetupModules(okami::Engine& en, std::optional<okami::HeadlessGLParams> headless = {}) override {
         if (headless) {
             en.CreateModule<okami::GLFWModuleFactory>({}, std::move(*headless));
         } else {
@@ -24,11 +24,11 @@ namespace sample_zoo {
         en.CreateModule<okami::CameraControllerModuleFactory>();
     }
 
-    inline void SetupScene(okami::Engine& en) {
+    void SetupScene(okami::Engine& en) override {
         using namespace okami;
 
-        auto textureHandle  = en.LoadTexture(GetAssetPath("test.ktx2"));
-        auto geometryHandle = en.LoadGeometry(GetAssetPath("box.glb"));
+        auto textureHandle  = en.LoadTexture(GetSampleAssetPath("test.ktx2"));
+        auto geometryHandle = en.LoadGeometry(GetSampleAssetPath("box.glb"));
 
         auto tri1Entity = en.CreateEntity();
         en.AddComponent(tri1Entity, DummyTriangleComponent{});
@@ -63,5 +63,6 @@ namespace sample_zoo {
         en.AddComponent(geometryEntity, StaticMeshComponent{ geometryHandle });
         en.AddComponent(geometryEntity, Transform::Translate(0.5f, 0.1f, 0.1f) * Transform::Scale(0.25f));
     }
+};
 
 } // namespace sample_zoo

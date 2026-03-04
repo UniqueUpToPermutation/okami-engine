@@ -70,6 +70,10 @@ static std::filesystem::path FindTestAssetsPath() {
     return SearchForPath(std::filesystem::current_path(), "tests/assets");
 }
 
+static std::filesystem::path FindSampleAssetPath() {
+    return SearchForPath(std::filesystem::current_path(), "samples/assets");
+}
+
 static std::filesystem::path FindConfigsPath() {
     return SearchForPath(std::filesystem::current_path(), "config");
 }
@@ -178,6 +182,17 @@ std::filesystem::path okami::GetTestAssetsPath() {
 
 std::filesystem::path okami::GetTestAssetPath(const std::filesystem::path& relativePath) {
     return GetTestAssetsPath() / relativePath;
+}
+
+std::filesystem::path okami::GetSampleAssetsPath() {
+    if (!g_assetsPath.has_value()) {
+        g_assetsPath = FindSampleAssetPath();
+    }
+    return *g_assetsPath;
+}
+
+std::filesystem::path okami::GetSampleAssetPath(const std::filesystem::path& relativePath) {
+    return GetSampleAssetsPath() / relativePath;
 }
 
 std::filesystem::path okami::GetConfigsPath() {
