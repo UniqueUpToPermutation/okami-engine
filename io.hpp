@@ -42,4 +42,8 @@ namespace okami {
     struct GeometryIOModuleFactory {
         std::unique_ptr<EngineModule> operator()();
     };
+
+    struct GltfSceneIOModuleFactory {
+        std::unique_ptr<EngineModule> operator()();
+    };
 }

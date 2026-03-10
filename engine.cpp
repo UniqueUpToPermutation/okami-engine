@@ -43,6 +43,7 @@ Engine::Engine(EngineParams params) :
 
 	CreateModule(TextureIOModuleFactory{});
 	CreateModule(GeometryIOModuleFactory{});
+	CreateModule(GltfSceneIOModuleFactory{});
 }
 
 entity_t Engine::CreateEntity(entity_t parent) {

@@ -1,0 +1,95 @@
+#pragma once
+
+#include "renderer.hpp"   // StaticMeshComponent, Engine, texture/geometry/material headers
+#include "transform.hpp"  // Transform
+
+#include <filesystem>
+#include <vector>
+
+#include <glm/vec4.hpp>
+
+namespace okami {
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Parameters
+    // ─────────────────────────────────────────────────────────────────────────
+
+    struct GltfSceneLoadParams {
+        // When true, texture URIs found in the GLTF are rewritten to use the
+        // pre-converted KTX2 files produced by png2ktx.
+        bool m_useKtx2 = true;
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Prototype data types
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // CPU-side description of one material slot from the GLTF asset.
+    struct GltfSceneMaterialDef {
+        // Absolute path to the base-colour texture file.
+        // Empty means "no texture found" – a 1×1 white fallback is used at spawn time.
+        std::filesystem::path m_colorTexturePath;
+        glm::vec4             m_colorTint{1.0f};
+    };
+
+    // One flattened renderable primitive: world transform + raw geometry + material index.
+    // Geometry is move-only; this struct is therefore non-copyable.
+    struct GltfSceneMeshInstance {
+        Transform m_worldTransform;
+        Geometry  m_geometry;
+        int       m_materialIndex = -1;  // index into GltfSceneDesc::m_materials; -1 = none
+    };
+
+    // The complete scene prototype.  Produced by GltfScene::FromFile() and
+    // consumed (moved) by SpawnGltfScene().
+    struct GltfSceneDesc {
+        std::vector<GltfSceneMeshInstance> m_meshInstances;
+        std::vector<GltfSceneMaterialDef>  m_materials;
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GltfScene resource type (satisfies the ResourceType concept)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    class GltfScene {
+    public:
+        using Desc       = GltfSceneDesc;
+        using LoadParams = GltfSceneLoadParams;
+
+        GltfSceneDesc m_data;
+
+        OKAMI_NO_COPY(GltfScene);
+        OKAMI_MOVE(GltfScene);
+
+        GltfScene() = default;
+        explicit GltfScene(GltfSceneDesc data) : m_data(std::move(data)) {}
+
+        // Synchronously load and parse a GLTF/GLB file, building the scene
+        // prototype.  The returned GltfScene owns all the parsed Geometry data.
+        // On failure an error is returned and nothing is loaded.
+        static Expected<GltfScene> FromFile(
+            std::filesystem::path const& path,
+            GltfSceneLoadParams   const& params = {});
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Spawn helper
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Instantiate all mesh primitives described by the prototype as entities in
+    // the engine world.  Each entity receives a StaticMeshComponent (with a
+    // freshly uploaded GeometryHandle and a MaterialHandle) and a Transform.
+    //
+    // The prototype is consumed (moved): geometry data is transferred to the GPU
+    // and can no longer be accessed through the desc after this call.
+    //
+    // Materials that reference a missing texture fall back to a programmatically
+    // generated 1×1 white texture.
+    //
+    // An optional root transform can be supplied to reposition the entire scene.
+    void SpawnGltfScene(
+        Engine&          en,
+        GltfSceneDesc&&  proto,
+        Transform const& root = Transform::Identity());
+
+} // namespace okami

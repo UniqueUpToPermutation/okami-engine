@@ -1,6 +1,7 @@
 #include "io.hpp"
 #include "texture.hpp"
 #include "geometry.hpp"
+#include "gltf_scene.hpp"
 #include "paths.hpp"
 
 #include <glog/logging.h>
@@ -40,5 +41,16 @@ namespace okami {
 
     std::unique_ptr<EngineModule> GeometryIOModuleFactory::operator()() {
         return std::make_unique<GeometryIOModule>();
+    }
+
+    class GltfSceneIOModule : public IOModule<GltfScene> {
+    protected:
+        OnResourceLoadedEvent<GltfScene> LoadResource(LoadResourceSignal<GltfScene>&& msg) override {
+            return { GltfScene::FromFile(msg.m_path, msg.m_params), msg.m_id };
+        }
+    };
+
+    std::unique_ptr<EngineModule> GltfSceneIOModuleFactory::operator()() {
+        return std::make_unique<GltfSceneIOModule>();
     }
 }
