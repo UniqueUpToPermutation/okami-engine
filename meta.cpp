@@ -85,6 +85,7 @@ protected:
         RegisterComponent<OrbitCameraControllerComponent>("OrbitCameraController"_hs);
         RegisterComponent<SpriteComponent>("Sprite"_hs);
         RegisterComponent<DummyTriangleComponent>("DummyTriangle"_hs);
+        RegisterComponent<FirstPersonCameraControllerComponent>("FirstPersonCameraController"_hs);
     }
 
 public:

@@ -27,6 +27,9 @@ void main() {
     // Compute UV in 0..1 from clip-space position
     sky_vs_out.uv = pos.xy * 0.5 + 0.5;
 
-    // Compute direction vector from camera position through the pixel
-    sky_vs_out.direction = (sceneGlobals.u_camera.u_invView * vec4(pos, 0.0)).xyz;
+    // Unproject clip-space position to view space, then rotate to world space.
+    // Applying u_invProj first is essential — skipping it would ignore the camera's
+    // FOV and aspect ratio, causing the sky to shift/distort as the camera moves.
+    vec4 viewDir = sceneGlobals.u_camera.u_invProj * vec4(pos.xy, 1.0, 1.0);
+    sky_vs_out.direction = (sceneGlobals.u_camera.u_invView * vec4(viewDir.xyz, 0.0)).xyz;
 }

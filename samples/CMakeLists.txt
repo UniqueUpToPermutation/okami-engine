@@ -51,15 +51,15 @@ if(SHARED_GLB_FILES)
     )
 endif()
 
-# Extra assets that live under samples/assets/.
-file(GLOB_RECURSE SAMPLES_ASSET_FILES "${CMAKE_SOURCE_DIR}/samples/assets/*")
-if(SAMPLES_ASSET_FILES)
-    add_custom_command(TARGET SamplesSharedAssets POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${SAMPLES_ASSET_FILES}
-            "${SHARED_ASSETS_DIR}/"
-    )
-endif()
+# Extra assets that live under samples/assets/ – copy_directory preserves the
+# full subdirectory tree (e.g. sponza/, im3d/, etc.) so assets that reference
+# sibling files by relative path continue to work at runtime.
+add_custom_command(TARGET SamplesSharedAssets POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/samples/assets"
+        "${SHARED_ASSETS_DIR}"
+    COMMENT "Copying samples/assets/ recursively to shared assets"
+)
 
 # Config files (root config/ merged with samples/config/).
 file(GLOB SHARED_CONFIG_FILES
@@ -93,5 +93,6 @@ endfunction()
 add_subdirectory(01_hello_world)
 add_subdirectory(02_zoo)
 add_subdirectory(03_materials)
+add_subdirectory(04_sponza)
 add_subdirectory(im3d)
 add_subdirectory(imgui)

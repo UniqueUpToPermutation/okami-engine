@@ -153,10 +153,10 @@ set(SHADER_ENTRY_POINTS
 # PNG to KTX2 Converter Tool
 #==============================================================================
 
-# Standalone tool to convert PNG images to KTX2 format with mipmaps
+# Standalone tool to convert PNG/JPEG images to KTX2 format with mipmaps
 add_executable(png2ktx tools/png2ktx.cpp lodepng.cpp)
 target_link_libraries(png2ktx PRIVATE KTX::ktx)
-target_include_directories(png2ktx PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(png2ktx PRIVATE ${CMAKE_SOURCE_DIR} ${TINYGLTF_INCLUDE_DIRS})
 
 if(USE_D3D12)
     # Process all HLSL files and compile shaders
@@ -302,13 +302,18 @@ endif() # USE_OGL
 # KTX Image Compilation System
 #==============================================================================
 
-# Find all image files in assets and test/assets folders
+# Find all image files in assets, samples/assets, and tests/assets folders
 file(GLOB_RECURSE IMAGE_FILES 
     "${CMAKE_SOURCE_DIR}/assets/*.png"
     "${CMAKE_SOURCE_DIR}/assets/*.jpg"
     "${CMAKE_SOURCE_DIR}/assets/*.jpeg"
     "${CMAKE_SOURCE_DIR}/assets/*.tga"
     "${CMAKE_SOURCE_DIR}/assets/*.bmp"
+    "${CMAKE_SOURCE_DIR}/samples/assets/*.png"
+    "${CMAKE_SOURCE_DIR}/samples/assets/*.jpg"
+    "${CMAKE_SOURCE_DIR}/samples/assets/*.jpeg"
+    "${CMAKE_SOURCE_DIR}/samples/assets/*.tga"
+    "${CMAKE_SOURCE_DIR}/samples/assets/*.bmp"
     "${CMAKE_SOURCE_DIR}/tests/assets/*.png"
     "${CMAKE_SOURCE_DIR}/tests/assets/*.jpg"
     "${CMAKE_SOURCE_DIR}/tests/assets/*.jpeg"
@@ -322,6 +327,7 @@ if(IMAGE_FILES)
     
     # Ensure KTX output directory exists
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/assets)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/samples/assets)
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/assets)
     
     set(ALL_KTX_TEXTURES "")
@@ -333,8 +339,8 @@ if(IMAGE_FILES)
         get_filename_component(IMAGE_EXT ${IMAGE_FILE} EXT)
         get_filename_component(IMAGE_DIR ${IMAGE_FILE} DIRECTORY)
         
-        # Only process PNG files with png2ktx (it only supports PNG)
-        if(IMAGE_EXT STREQUAL ".png")
+        # Process PNG, JPEG files with png2ktx
+        if(IMAGE_EXT STREQUAL ".png" OR IMAGE_EXT STREQUAL ".jpg" OR IMAGE_EXT STREQUAL ".jpeg")
             # Determine output path relative to source
             file(RELATIVE_PATH REL_DIR ${CMAKE_SOURCE_DIR} ${IMAGE_DIR})
             set(KTX_OUTPUT_DIR "${CMAKE_BINARY_DIR}/${REL_DIR}")
@@ -343,15 +349,15 @@ if(IMAGE_FILES)
             list(APPEND ALL_KTX_TEXTURES ${KTX_OUTPUT_PATH})
             math(EXPR KTX_TEXTURE_COUNT "${KTX_TEXTURE_COUNT} + 1")
             
-            message(STATUS "Will convert ${IMAGE_NAME}.png to KTX2 with mipmaps")
+            message(STATUS "Will convert ${IMAGE_NAME}${IMAGE_EXT} to KTX2 with mipmaps")
             
-            # Add custom command to convert this PNG to KTX2 with mipmaps
+            # Add custom command to convert this image to KTX2 with mipmaps
             add_custom_command(
                 OUTPUT ${KTX_OUTPUT_PATH}
                 COMMAND ${CMAKE_COMMAND} -E make_directory "${KTX_OUTPUT_DIR}"
                 COMMAND png2ktx ${IMAGE_FILE} ${KTX_OUTPUT_PATH} --quiet
                 DEPENDS png2ktx ${IMAGE_FILE}
-                COMMENT "Converting PNG to KTX2 with mipmaps: ${IMAGE_NAME}"
+                COMMENT "Converting ${IMAGE_EXT} to KTX2 with mipmaps: ${IMAGE_NAME}"
                 VERBATIM
             )
         endif()
@@ -361,11 +367,11 @@ if(IMAGE_FILES)
     if(ALL_KTX_TEXTURES)
         add_custom_target(CompileKTXTextures ALL
             DEPENDS ${ALL_KTX_TEXTURES}
-            COMMENT "Converting all PNG images to KTX2 format"
+            COMMENT "Converting all PNG/JPEG images to KTX2 format"
         )
         
         # add_dependencies(Engine CompileKTXTextures)
-        message(STATUS "Created CompileKTXTextures target with ${KTX_TEXTURE_COUNT} PNG textures")
+        message(STATUS "Created CompileKTXTextures target with ${KTX_TEXTURE_COUNT} PNG/JPEG textures")
         message(STATUS "Converted KTX2 textures will be available in: ${CMAKE_BINARY_DIR}/assets/")
         message(STATUS "Note: png2ktx generates uncompressed RGBA8 textures with full mipmap chains")
     endif()

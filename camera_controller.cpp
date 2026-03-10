@@ -1,8 +1,10 @@
 #include "camera_controllers.hpp"
 #include "jobs.hpp"
+#include "module.hpp"
 #include "input.hpp"
 #include "camera.hpp"
 #include <cmath>
+#include <glm/gtc/quaternion.hpp>
 
 using namespace okami;
 
@@ -116,6 +118,70 @@ public:
 
                     Transform newTransform = Transform::LookAt(finalPos, controller.m_target, glm::vec3(0.0f, 1.0f, 0.0f));
                     outTransform.Send(UpdateComponentSignal<Transform>{ entity, newTransform });
+                }
+            );
+
+            return {};
+        });
+
+        // Node: handle first-person camera controls (look + WASD move)
+        graph.AddMessageNode([id = GetId(), &registry = params.m_registry](
+            JobContext& ctx,
+            In<IOState> io,
+            In<Time> inTime,
+            Out<UpdateComponentSignal<Transform>> outTransform) -> Error {
+
+            float dt = inTime ? inTime->GetDeltaTimeF() : 0.0f;
+
+            bool rightDown = false;
+            double deltaX = 0.0, deltaY = 0.0;
+            bool wDown = false, aDown = false, sDown = false, dDown = false;
+
+            if (io) {
+                rightDown = io->m_mouse.IsButtonPressed(MouseButton::Right);
+                deltaX    = io->m_mouse.m_deltaX;
+                deltaY    = io->m_mouse.m_deltaY;
+                wDown     = io->m_keyboard.IsKeyPressed(Key::W);
+                aDown     = io->m_keyboard.IsKeyPressed(Key::A);
+                sDown     = io->m_keyboard.IsKeyPressed(Key::S);
+                dDown     = io->m_keyboard.IsKeyPressed(Key::D);
+            }
+
+            registry.view<FirstPersonCameraControllerComponent const, Transform const, Camera const>().each(
+                [&](auto entity,
+                    FirstPersonCameraControllerComponent const& controller,
+                    Transform const& transform,
+                    Camera const& /*camera*/) {
+
+                    // Derive yaw and pitch from the current camera rotation so no
+                    // state needs to be stored on the component.
+                    glm::vec3 fwd = transform.m_rotation * glm::vec3(0.0f, 0.0f, -1.0f);
+                    float pitch = std::asin(glm::clamp(fwd.y, -1.0f, 1.0f));
+                    float yaw   = std::atan2(-fwd.x, -fwd.z);
+
+                    // Update angles while right mouse is held
+                    if (rightDown) {
+                        yaw   -= static_cast<float>(deltaX) * controller.m_lookSensitivity;
+                        pitch -= static_cast<float>(deltaY) * controller.m_lookSensitivity;
+                        const float kMaxPitch = glm::half_pi<float>() - 0.001f;
+                        pitch = glm::clamp(pitch, -kMaxPitch, kMaxPitch);
+                    }
+
+                    // Rebuild orientation: yaw around world Y, then pitch around local X
+                    glm::quat rotYaw = glm::angleAxis(yaw,   glm::vec3(0.0f, 1.0f, 0.0f));
+                    glm::quat rot    = rotYaw * glm::angleAxis(pitch, glm::vec3(1.0f, 0.0f, 0.0f));
+
+                    // Forward follows the full camera direction (including pitch); right is yaw-only.
+                    glm::vec3 forward = rot    * glm::vec3(0.0f, 0.0f, -1.0f);
+                    glm::vec3 right   = rotYaw * glm::vec3(1.0f, 0.0f,  0.0f);
+
+                    glm::vec3 pos = transform.m_position;
+                    if (wDown) pos += forward * (controller.m_moveSpeed * dt);
+                    if (sDown) pos -= forward * (controller.m_moveSpeed * dt);
+                    if (dDown) pos += right   * (controller.m_moveSpeed * dt);
+                    if (aDown) pos -= right   * (controller.m_moveSpeed * dt);
+
+                    outTransform.Send(UpdateComponentSignal<Transform>{ entity, Transform(pos, rot, 1.0f) });
                 }
             );
 

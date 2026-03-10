@@ -1,5 +1,5 @@
-// PNG to KTX2 converter with mipmap generation
-// Usage: png2ktx input.png output.ktx2 [--quiet]
+// PNG / JPEG to KTX2 converter with mipmap generation
+// Usage: png2ktx input.[png|jpg|jpeg] output.ktx2 [--quiet] [--debug] [--linear]
 
 #include <iostream>
 #include <cstring>
@@ -8,6 +8,8 @@
 #include <vector>
 #include <cmath>
 #include "lodepng.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 #include <ktx.h>
 
 bool g_quiet = false;
@@ -121,7 +123,7 @@ unsigned int calculateMipLevels(unsigned int width, unsigned int height) {
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " input.png output.ktx2 [--quiet] [--debug] [--linear]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " input.[png|jpg|jpeg] output.ktx2 [--quiet] [--debug] [--linear]" << std::endl;
         return 1;
     }
     
@@ -138,7 +140,7 @@ int main(int argc, char* argv[]) {
             g_linear = true;
         } else {
             std::cerr << "Unknown flag: " << argv[i] << std::endl;
-            std::cerr << "Usage: " << argv[0] << " input.png output.ktx2 [--quiet] [--debug] [--linear]" << std::endl;
+            std::cerr << "Usage: " << argv[0] << " input.[png|jpg|jpeg] output.ktx2 [--quiet] [--debug] [--linear]" << std::endl;
             return 1;
         }
     }
@@ -147,16 +149,19 @@ int main(int argc, char* argv[]) {
         std::cout << "Using linear blending (no gamma correction)" << std::endl;
     }
     
-    // Load PNG file
-    if (!g_quiet) std::cout << "Loading PNG: " << inputFile << std::endl;
-    unsigned char* imageData = nullptr;
-    unsigned int width = 0, height = 0;
-    unsigned int error = lodepng_decode32_file(&imageData, &width, &height, inputFile);
-    
-    if (error) {
-        std::cerr << "Error loading PNG: " << lodepng_error_text(error) << std::endl;
+    // Load image file – stb_image handles both PNG and JPEG and always returns
+    // 4-channel RGBA8 when req_comp=4 (JPEG alpha channel is filled with 0xFF).
+    if (!g_quiet) std::cout << "Loading image: " << inputFile << std::endl;
+    int imgWidth = 0, imgHeight = 0, imgChannels = 0;
+    unsigned char* imageData = stbi_load(inputFile, &imgWidth, &imgHeight, &imgChannels, 4);
+
+    if (!imageData) {
+        std::cerr << "Error loading image: " << stbi_failure_reason() << std::endl;
         return 1;
     }
+
+    unsigned int width  = static_cast<unsigned int>(imgWidth);
+    unsigned int height = static_cast<unsigned int>(imgHeight);
     
     if (!g_quiet) std::cout << "Image loaded: " << width << "x" << height << std::endl;
     
@@ -185,7 +190,7 @@ int main(int argc, char* argv[]) {
     
     if (result != KTX_SUCCESS) {
         std::cerr << "Error creating KTX2 texture: " << ktxErrorString(result) << std::endl;
-        free(imageData);
+        stbi_image_free(imageData);
         return 1;
     }
     
@@ -213,7 +218,7 @@ int main(int argc, char* argv[]) {
             std::cerr << "Error setting image data for level " << level << ": " 
                       << ktxErrorString(result) << std::endl;
             ktxTexture_Destroy(ktxTexture(texture));
-            free(imageData);
+            stbi_image_free(imageData);
             return 1;
         }
         
@@ -262,7 +267,7 @@ int main(int argc, char* argv[]) {
     if (result != KTX_SUCCESS) {
         std::cerr << "Error writing KTX2 file: " << ktxErrorString(result) << std::endl;
         ktxTexture_Destroy(ktxTexture(texture));
-        free(imageData);
+        stbi_image_free(imageData);
         return 1;
     }
     
@@ -270,7 +275,7 @@ int main(int argc, char* argv[]) {
     
     // Cleanup
     ktxTexture_Destroy(ktxTexture(texture));
-    free(imageData);
+    stbi_image_free(imageData);
     
     return 0;
 }

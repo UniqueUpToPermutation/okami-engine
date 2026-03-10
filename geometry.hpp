@@ -191,6 +191,12 @@ namespace okami {
 
 	public:
 		Geometry() = default;
+
+		// Construct from pre-built buffer data and descriptor.
+		// Used when assembling geometry programmatically (e.g., from a loaded GLTF model).
+		Geometry(std::vector<std::vector<uint8_t>> buffers, GeometryDesc desc)
+			: m_buffers(std::move(buffers)), m_desc(std::move(desc)) {}
+
 		OKAMI_NO_COPY(Geometry);
 		OKAMI_MOVE(Geometry);
 
