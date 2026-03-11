@@ -27,7 +27,7 @@ Engine::Engine(EngineParams params) :
 		google::InitGoogleLogging(name.c_str());
 
 #ifndef NDEBUG
-		google::SetStderrLogging(google::LogSeverity::GLOG_INFO); // Enable INFO and WARNING printouts in debug mode
+		google::SetStderrLogging(google::LogSeverity::GLOG_WARNING); // Enable INFO and WARNING printouts in debug mode
 		google::LogToStderr(); // Ensure logs are printed to stderr
 #else
 		google::SetStderrLogging(google::LogSeverity::GLOG_ERROR);

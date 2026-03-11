@@ -180,7 +180,7 @@ GeometryHandle OGLGeometryManager::CreateGeometry(Geometry data) {
     geo->m_deletion_queue = m_deletion_queue;
     auto err = UploadToGL(*geo, std::move(data));
     if (err.IsError()) {
-        LOG(ERROR) << "OGLGeometryManager::CreateGeometry: GL upload failed: " << err;
+        LOG(WARNING) << "OGLGeometryManager::CreateGeometry: GL upload failed: " << err;
     }
     return geo;
 }
