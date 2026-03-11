@@ -19,10 +19,27 @@ VERTEX_ARRAY_DEF(StaticMeshVertex)
     VERTEX_ARRAY_ITEM(a_tangent)
 VERTEX_ARRAY_DEF_END()
 
-struct StaticMeshInstance {
-    mat4 u_model;
-    mat4 u_normalMatrix;
-};
+BEGIN_INPUT_STRUCT(StaticMeshInstance, Frequency::PerInstance)
+    IN_MEMBER(vec4, a_instanceModel_col0,   4,  okami::AttributeType::Unknown)
+    IN_MEMBER(vec4, a_instanceModel_col1,   5,  okami::AttributeType::Unknown)
+    IN_MEMBER(vec4, a_instanceModel_col2,   6,  okami::AttributeType::Unknown)
+    IN_MEMBER(vec4, a_instanceModel_col3,   7,  okami::AttributeType::Unknown)
+    IN_MEMBER(vec4, a_instanceNormal_col0,  8,  okami::AttributeType::Unknown)
+    IN_MEMBER(vec4, a_instanceNormal_col1,  9,  okami::AttributeType::Unknown)
+    IN_MEMBER(vec4, a_instanceNormal_col2,  10, okami::AttributeType::Unknown)
+    IN_MEMBER(vec4, a_instanceNormal_col3,  11, okami::AttributeType::Unknown)
+END_INPUT_STRUCT()
+
+VERTEX_ARRAY_DEF(StaticMeshInstance)
+    VERTEX_ARRAY_ITEM(a_instanceModel_col0)
+    VERTEX_ARRAY_ITEM(a_instanceModel_col1)
+    VERTEX_ARRAY_ITEM(a_instanceModel_col2)
+    VERTEX_ARRAY_ITEM(a_instanceModel_col3)
+    VERTEX_ARRAY_ITEM(a_instanceNormal_col0)
+    VERTEX_ARRAY_ITEM(a_instanceNormal_col1)
+    VERTEX_ARRAY_ITEM(a_instanceNormal_col2)
+    VERTEX_ARRAY_ITEM(a_instanceNormal_col3)
+VERTEX_ARRAY_DEF_END()
 
 #ifdef __cplusplus
 } // namespace glsl

@@ -52,10 +52,7 @@ Error OGLMaterialManager::StartupImpl(InitContext const& context) {
     };
 
     auto setupStaticMesh = [](GLProgram const& prog) -> Error {
-        Error e;
-        e += AssignBufferBindingPoint(prog, "SceneGlobalsBlock",       0);
-        e += AssignBufferBindingPoint(prog, "StaticMeshInstanceBlock", 1);
-        return e;
+        return AssignBufferBindingPoint(prog, "SceneGlobalsBlock", 0);
     };
     auto setupSky = [](GLProgram const& prog) -> Error {
         return AssignBufferBindingPoint(prog, "SceneGlobalsBlock", 0);

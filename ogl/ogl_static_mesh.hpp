@@ -18,11 +18,10 @@ namespace okami {
     protected:
         OGLPipelineState m_pipelineState;
 
-        UniformBuffer<glsl::StaticMeshInstance> m_instanceUBO;
+        UploadVertexBuffer<glsl::StaticMeshInstance> m_instanceVBO;
 
         enum class BufferBindingPoints : GLint {
             SceneGlobals,
-            StaticMeshInstance,
             Count
         };
 
