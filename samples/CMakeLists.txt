@@ -1,82 +1,31 @@
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Shared assets target
+# Shared assets
 #
-# Populates ${CMAKE_BINARY_DIR}/samples/assets/ and
-#           ${CMAKE_BINARY_DIR}/samples/config/ once.
-#
-# All sample executables sit under subdirectories of
+# samples/assets/ is processed by AssetBuilder into
+# ${CMAKE_BINARY_DIR}/samples/assets/ via the BuildSampleAssets target defined
+# in the root CMakeLists.  Sample executables sit under subdirectories of
 # ${CMAKE_BINARY_DIR}/samples/, so SearchForPath (which walks up from the exe)
-# will find the shared directories without any per-sample copying.
+# will find the shared directory without any per-sample copying.
+#
+# Config files are copied by the root CMakeLists post-build step.
 # ──────────────────────────────────────────────────────────────────────────────
 
-set(SHARED_ASSETS_DIR "${CMAKE_BINARY_DIR}/samples/assets")
-set(SHARED_CONFIG_DIR "${CMAKE_BINARY_DIR}/samples/config")
+# ──────────────────────────────────────────────────────────────────────────────
+# Sample assets
+#
+# Runs AssetBuilder on samples/assets/ -> ${CMAKE_BINARY_DIR}/samples/assets/.
+# Sample executables sit under subdirectories of ${CMAKE_BINARY_DIR}/samples/,
+# so SearchForPath (which walks up from the exe) finds the shared output
+# directory without any per-sample copying.
+# ──────────────────────────────────────────────────────────────────────────────
 
-add_custom_target(SamplesSharedAssets ALL
-    COMMENT "Preparing shared sample assets and config"
-)
-
-# KTX textures must be compiled before we copy them.
-if(TARGET CompileKTXTextures)
-    add_dependencies(SamplesSharedAssets CompileKTXTextures)
-endif()
-
-# Ensure output directories exist.
-add_custom_command(TARGET SamplesSharedAssets POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${SHARED_ASSETS_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${SHARED_CONFIG_DIR}"
-)
-
-# KTX textures (generated into ${CMAKE_BINARY_DIR}/assets/).
-if(ALL_KTX_TEXTURES)
-    foreach(KTX_FILE ${ALL_KTX_TEXTURES})
-        get_filename_component(KTX_NAME ${KTX_FILE} NAME)
-        add_custom_command(TARGET SamplesSharedAssets POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${KTX_FILE}"
-                "${SHARED_ASSETS_DIR}/${KTX_NAME}"
-            COMMENT "Copying ${KTX_NAME} to shared samples assets"
-        )
-    endforeach()
-endif()
-
-# GLB / binary assets from the source assets/ directory.
-file(GLOB_RECURSE SHARED_GLB_FILES "${CMAKE_SOURCE_DIR}/assets/*.glb")
-if(SHARED_GLB_FILES)
-    add_custom_command(TARGET SamplesSharedAssets POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${SHARED_GLB_FILES}
-            "${SHARED_ASSETS_DIR}/"
-    )
-endif()
-
-# Extra assets that live under samples/assets/ – copy_directory preserves the
-# full subdirectory tree (e.g. sponza/, im3d/, etc.) so assets that reference
-# sibling files by relative path continue to work at runtime.
-add_custom_command(TARGET SamplesSharedAssets POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
+if(EXISTS "${CMAKE_SOURCE_DIR}/samples/assets")
+    add_asset_build_target(BuildSampleAssets
         "${CMAKE_SOURCE_DIR}/samples/assets"
-        "${SHARED_ASSETS_DIR}"
-    COMMENT "Copying samples/assets/ recursively to shared assets"
-)
-
-# Config files (root config/ merged with samples/config/).
-file(GLOB SHARED_CONFIG_FILES
-    "${CMAKE_SOURCE_DIR}/config/*"
-    "${CMAKE_SOURCE_DIR}/samples/config/*"
-)
-if(SHARED_CONFIG_FILES)
-    add_custom_command(TARGET SamplesSharedAssets POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${SHARED_CONFIG_FILES}
-            "${SHARED_CONFIG_DIR}/"
+        "${CMAKE_BINARY_DIR}/samples/assets"
     )
 endif()
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Helper function for individual sample targets
-# ──────────────────────────────────────────────────────────────────────────────
 
 function(add_engine_sample TARGET_NAME)
     add_executable(${TARGET_NAME} ${ARGN})
@@ -86,8 +35,10 @@ function(add_engine_sample TARGET_NAME)
         set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 23)
     endif()
 
-    # Assets and config are in the shared directory – no per-sample copying needed.
-    add_dependencies(${TARGET_NAME} SamplesSharedAssets)
+    # Wait for AssetBuilder to finish processing samples/assets/.
+    if(TARGET BuildSampleAssets)
+        add_dependencies(${TARGET_NAME} BuildSampleAssets)
+    endif()
 endfunction()
 
 add_subdirectory(01_hello_world)

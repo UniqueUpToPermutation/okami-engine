@@ -8,6 +8,7 @@
 #include "../samples/01_hello_world/scene.hpp"
 #include "../samples/02_zoo/scene.hpp"
 #include "../samples/03_materials/scene.hpp"
+#include "../samples/04_sponza/scene.hpp"
 #include "../samples/im3d/scene.hpp"
 #include "../samples/imgui/scene.hpp"
 
@@ -58,6 +59,9 @@ protected:
                          << ". Re-run the test to compare.";
             return;
         }
+
+        std::cout << "Comparing:\n  rendered: " << renderedPath
+                  << "\n   golden:  " << goldenPath << "\n";
 
         auto goldenResult = Texture::FromPNG(goldenPath);
         ASSERT_TRUE(goldenResult.has_value())
@@ -141,6 +145,15 @@ TEST_F(HeadlessRendererTest, Zoo) {
 TEST_F(HeadlessRendererTest, Materials) {
     RunHeadlessSample<sample_materials::MaterialsSample>("materials", "materials.png");
 }
+
+// ---------------------------------------------------------------------------
+// Sample 04 – Sponza
+// ---------------------------------------------------------------------------
+
+TEST_F(HeadlessRendererTest, Sponza) {
+    RunHeadlessSample<sample_sponza::SponzaSample>("sponza", "sponza.png");
+}
+
 
 // ---------------------------------------------------------------------------
 // Sample im3d

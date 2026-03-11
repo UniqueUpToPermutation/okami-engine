@@ -10,6 +10,7 @@
 #include <glog/logging.h>
 
 #include <filesystem>
+#include <sstream>
 
 namespace okami {
 
@@ -209,7 +210,23 @@ Expected<GltfScene> GltfScene::FromFile(
     else
         ok = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
 
-    if (!warn.empty()) LOG(WARNING) << "[GltfScene] " << path << ": " << warn;
+    if (!warn.empty()) {
+        // TinyGLTF emits "File not found" / "Failed to load external 'uri' for
+        // image" lines for every external image it can't resolve.  Since we use
+        // a noop image loader and load textures via our own KTX2 pipeline, these
+        // are expected noise – strip them before deciding whether to log.
+        std::istringstream warnStream(warn);
+        std::string warnLine, filteredWarn;
+        while (std::getline(warnStream, warnLine)) {
+            if (warnLine.find("File not found") != std::string::npos ||
+                warnLine.find("Failed to load external 'uri' for image") != std::string::npos)
+                continue;
+            if (!filteredWarn.empty()) filteredWarn += '\n';
+            filteredWarn += warnLine;
+        }
+        if (!filteredWarn.empty())
+            LOG(WARNING) << "[GltfScene] " << path << ": " << filteredWarn;
+    }
     if (!ok || !err.empty()) {
         LOG(ERROR) << "[GltfScene] Failed to load " << path << " – " << err;
         return OKAMI_UNEXPECTED("Failed to load GLTF file: " + err);
