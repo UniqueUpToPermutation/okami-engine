@@ -90,36 +90,6 @@ static YAML::Node ResolveSettings(const fs::path& inputRoot,
     return merged;
 }
 
-// Return all YAML settings files that affect 'fileRelPath' (same walk order as
-// ResolveSettings).  Only existing files are included.
-static std::vector<fs::path> CollectSettingsFiles(const fs::path& inputRoot,
-                                                   const fs::path& fileRelPath,
-                                                   const std::string& settingsFile) {
-    std::vector<fs::path> result;
-    if (settingsFile.empty())
-        return result;
-
-    auto tryAdd = [&](const fs::path& dir) {
-        fs::path p = dir / settingsFile;
-        if (fs::exists(p)) result.push_back(p);
-    };
-
-    fs::path dir = inputRoot;
-    tryAdd(dir);
-    for (const auto& part : fileRelPath.parent_path()) {
-        if (part == fs::path(".")) continue;
-        dir /= part;
-        tryAdd(dir);
-    }
-
-    fs::path fileOverride = inputRoot / fileRelPath.parent_path() /
-                            (fileRelPath.filename().string() + ".yaml");
-    if (fs::exists(fileOverride))
-        result.push_back(fileOverride);
-
-    return result;
-}
-
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         std::cerr << "Usage: " << argv[0]
@@ -151,15 +121,44 @@ int main(int argc, char* argv[]) {
 
     // Register processors in priority order.
     // The first processor whose CanProcess() returns true wins.
+    //
+    // TextureProcessor is also shared with GeometryProcessor so that
+    // GLTF-referenced textures are imported with semantically-correct mip
+    // settings (sRGB for albedo, linear for normal maps) before the standalone
+    // texture pass runs.
     std::vector<std::unique_ptr<AssetProcessor>> processors;
-    processors.push_back(std::make_unique<TextureProcessor>(/*quiet=*/quiet));
+
+    // Allocate TextureProcessor first and keep a raw reference for sharing.
+    auto texProcOwned = std::make_unique<TextureProcessor>(/*quiet=*/quiet);
+    TextureProcessor& texProcRef = *texProcOwned;
+    processors.push_back(std::move(texProcOwned));
+
     processors.push_back(std::make_unique<ShaderAssetProcessor>(inputRoot, /*quiet=*/quiet));
-    processors.push_back(std::make_unique<GeometryProcessor>(/*quiet=*/quiet));
+
+    // GeometryProcessor borrows the TextureProcessor for embedded texture import.
+    auto geoProcOwned = std::make_unique<GeometryProcessor>(texProcRef, /*quiet=*/quiet);
+    GeometryProcessor* geoProcPtr = geoProcOwned.get();
+    processors.push_back(std::move(geoProcOwned));
 
     int processed = 0;
     int skipped   = 0;
     int errors    = 0;
 
+    // Pre-pass: parse every GLTF/GLB unconditionally to register virtual
+    // overrides on the TextureProcessor.  This must happen before any
+    // NeedsProcessing or Process calls so that the correct mip mode
+    // (sRGB-aware vs linear) is known for each texture, even when the geometry
+    // output file is already up-to-date and is therefore not re-copied.
+    for (const auto& entry : fs::recursive_directory_iterator(inputRoot)) {
+        if (!entry.is_regular_file()) continue;
+        const fs::path& p = entry.path();
+        auto ext = p.extension();
+        if (ext == ".gltf" || ext == ".glb")
+            geoProcPtr->RegisterOverrides(p);
+    }
+
+    // Main pass: process all assets, settings are pushed before NeedsProcessing
+    // so sidecar comparison sees the fully resolved (override-inclusive) params.
     for (const auto& entry : fs::recursive_directory_iterator(inputRoot)) {
         if (!entry.is_regular_file())
             continue;
@@ -167,73 +166,49 @@ int main(int argc, char* argv[]) {
         const fs::path& inputPath = entry.path();
         fs::path relPath = fs::relative(inputPath, inputRoot);
 
-        // Skip YAML settings files — they are configuration, not assets.
         if (inputPath.extension() == ".yaml")
             continue;
 
-        // Find a matching processor.
         AssetProcessor* proc = nullptr;
         for (auto& p : processors) {
-            if (p->CanProcess(inputPath)) {
-                proc = p.get();
-                break;
-            }
+            if (p->CanProcess(inputPath)) { proc = p.get(); break; }
         }
+        if (!proc) continue;
 
-        fs::path outputRelPath = proc ? proc->OutputPath(relPath) : relPath;
-        fs::path outputPath    = outputRoot / outputRelPath;
+        fs::path outputPath = outputRoot / proc->OutputPath(relPath);
 
-        if (!proc) {
-            // No processor claims this file — skip it silently.
-            continue;
-        }
+        auto settings = ResolveSettings(inputRoot, relPath, proc->SettingsFileName());
+        proc->PushSettings(settings);
 
-        // Check whether the asset needs (re)processing: compare the processor's
-        // own staleness check AND whether any YAML settings file is newer.
-        auto settingsFiles = CollectSettingsFiles(inputRoot, relPath,
-                                                  proc->SettingsFileName());
         bool needsRebuild = proc->NeedsProcessing(inputPath, outputPath);
-        if (!needsRebuild && fs::exists(outputPath)) {
-            auto outputTime = fs::last_write_time(outputPath);
-            for (const auto& sf : settingsFiles) {
-                if (fs::last_write_time(sf) > outputTime) {
-                    needsRebuild = true;
-                    break;
-                }
-            }
-        }
 
         if (!needsRebuild) {
+            proc->PopSettings();
             if (verbose)
                 std::cout << "  skip  " << relPath.string() << "\n";
             ++skipped;
             continue;
         }
 
-        // Ensure the output directory exists.
         try {
             fs::create_directories(outputPath.parent_path());
         } catch (const std::exception& e) {
+            proc->PopSettings();
             std::cerr << "Error creating directory "
                       << outputPath.parent_path() << ": " << e.what() << "\n";
             ++errors;
             continue;
         }
 
-        if (proc) {
-            try {
-                auto settings = ResolveSettings(inputRoot, relPath,
-                                                proc->SettingsFileName());
-                proc->PushSettings(settings);
-                proc->Process(inputPath, outputPath);
-                proc->PopSettings();
-                ++processed;
-            } catch (const std::exception& e) {
-                std::cerr << "Error processing " << relPath << ": "
-                          << e.what() << "\n";
-                ++errors;
-            }
+        try {
+            proc->Process(inputPath, outputPath);
+            ++processed;
+        } catch (const std::exception& e) {
+            std::cerr << "Error processing " << relPath << ": "
+                      << e.what() << "\n";
+            ++errors;
         }
+        proc->PopSettings();
     }
 
     if (!quiet) {

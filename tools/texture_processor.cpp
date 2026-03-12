@@ -1,6 +1,7 @@
 #include "texture_processor.hpp"
 
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 #include <vector>
 #include <cmath>
@@ -142,11 +143,73 @@ void TextureProcessor::PopSettings() {
         m_stack.pop_back();
 }
 
+void TextureProcessor::SetVirtualOverride(const std::filesystem::path& absInputPath,
+                                          const YAML::Node& overrides) {
+    m_overrides[absInputPath] = overrides;
+}
+
+TextureProcessorParams TextureProcessor::EffectiveParams(
+        const std::filesystem::path& input) const {
+    TextureProcessorParams p = m_stack.back();
+    auto it = m_overrides.find(input);
+    if (it != m_overrides.end()) {
+        const YAML::Node& ovr = it->second;
+        if (ovr["build_mips"])  p.buildMips  = ovr["build_mips"].as<bool>();
+        if (ovr["linear_mips"]) p.linearMips = ovr["linear_mips"].as<bool>();
+        if (ovr["copy_source"]) p.copySource = ovr["copy_source"].as<bool>();
+    }
+    return p;
+}
+
+std::filesystem::path TextureProcessor::SidecarPath(
+        const std::filesystem::path& output) {
+    return std::filesystem::path(output.string() + ".settings");
+}
+
+void TextureProcessor::WriteSidecar(const std::filesystem::path& output,
+                                     const TextureProcessorParams& params) const {
+    YAML::Node n;
+    n["build_mips"]  = params.buildMips;
+    n["linear_mips"] = params.linearMips;
+    n["copy_source"] = params.copySource;
+    std::ofstream f(SidecarPath(output));
+    if (f.is_open())
+        f << n;
+}
+
+bool TextureProcessor::NeedsProcessing(const std::filesystem::path& input,
+                                        const std::filesystem::path& output) const {
+    if (!std::filesystem::exists(output))
+        return true;
+    if (std::filesystem::last_write_time(input) >
+        std::filesystem::last_write_time(output))
+        return true;
+
+    // Compare stored settings (sidecar) against current effective settings.
+    std::filesystem::path sidecar = SidecarPath(output);
+    if (!std::filesystem::exists(sidecar))
+        return true; // first build with new sidecar feature
+
+    try {
+        auto stored  = YAML::LoadFile(sidecar.string());
+        auto current = EffectiveParams(input);
+        if (stored["build_mips"].as<bool>(true)   != current.buildMips)  return true;
+        if (stored["linear_mips"].as<bool>(false)  != current.linearMips) return true;
+        if (stored["copy_source"].as<bool>(false)  != current.copySource) return true;
+    } catch (...) {
+        return true; // unreadable sidecar — rebuild to be safe
+    }
+    return false;
+}
+
 void TextureProcessor::Process(const std::filesystem::path& input,
                                  const std::filesystem::path& output) {
     if (!m_quiet)
         std::cout << "texture: " << input.filename().string()
                   << " -> " << output.filename().string() << std::endl;
+
+    // Compute effective settings once: YAML stack + any virtual override for this file.
+    auto params = EffectiveParams(input);
 
     int imgWidth = 0, imgHeight = 0, imgChannels = 0;
     unsigned char* imageData = stbi_load(input.string().c_str(),
@@ -157,7 +220,7 @@ void TextureProcessor::Process(const std::filesystem::path& input,
 
     unsigned int width  = static_cast<unsigned int>(imgWidth);
     unsigned int height = static_cast<unsigned int>(imgHeight);
-    unsigned int numLevels = m_stack.back().buildMips ? CalculateMipLevels(width, height) : 1;
+    unsigned int numLevels = params.buildMips ? CalculateMipLevels(width, height) : 1;
 
     if (!m_quiet)
         std::cout << "  " << width << "x" << height
@@ -212,7 +275,7 @@ void TextureProcessor::Process(const std::filesystem::path& input,
             unsigned int nextHeight = std::max(1u, mipHeight / 2);
             mipmaps[level + 1].resize(nextWidth * nextHeight * 4);
             GenerateMipmap(srcData, mipmaps[level + 1].data(),
-                           mipWidth, mipHeight, m_stack.back().linearMips);
+                           mipWidth, mipHeight, params.linearMips);
             mipWidth  = nextWidth;
             mipHeight = nextHeight;
         }
@@ -227,9 +290,12 @@ void TextureProcessor::Process(const std::filesystem::path& input,
         throw std::runtime_error("Failed to write KTX2 file '" + output.string()
                                  + "': " + std::string(ktxErrorString(result)));
 
-    if (m_stack.back().copySource) {
+    if (params.copySource) {
         std::filesystem::path sourceCopy = output.parent_path() / input.filename();
         std::filesystem::copy_file(input, sourceCopy,
                                    std::filesystem::copy_options::overwrite_existing);
     }
+
+    // Record the settings used so future runs can detect changes via NeedsProcessing.
+    WriteSidecar(output, params);
 }

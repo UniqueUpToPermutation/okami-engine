@@ -60,7 +60,7 @@ namespace okami {
     class OGLMaterialManager final :
         public EngineModule,
         public IMaterialManager<DefaultMaterial>,
-        public IMaterialManager<BasicTexturedMaterial>,
+        public IMaterialManager<LambertMaterial>,
         public IMaterialManager<SkyDefaultMaterial> {
     private:
         struct ProgramEntry {
@@ -69,6 +69,7 @@ namespace okami {
         };
 
         std::unordered_map<std::type_index, ProgramEntry> m_programs;
+        GLTexture m_flatNormalTexture; // 1x1 (0.5,0.5,1.0) fallback for materials without a normal map
 
         ProgramEntry const* GetProgramEntry(std::type_index type) const;
 
@@ -79,7 +80,7 @@ namespace okami {
         Error StartupImpl(InitContext const& context) override;
 
         MaterialHandle CreateMaterial(DefaultMaterial        material) override;
-        MaterialHandle CreateMaterial(BasicTexturedMaterial  material) override;
+        MaterialHandle CreateMaterial(LambertMaterial  material) override;
         MaterialHandle CreateMaterial(SkyDefaultMaterial     material) override;
 
         // Creates the default material for the given renderer type.

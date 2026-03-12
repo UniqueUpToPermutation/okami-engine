@@ -6,6 +6,7 @@
 #include "tonemapping.glsl"
 #include "stochastic_transparency.glsl"
 #include "lights.glsl"
+#include "normal.glsl"
 
 // Input from vertex shader
 in MESH_VS_OUT vs_out;
@@ -23,7 +24,7 @@ void main() {
 
     // Coverage-preserved alpha: counteracts the alpha-averaging that occurs
     // at higher mip levels, preventing distant geometry from looking too
-    // transparent.  Adjust referenceAlpha to match the texture's midpoint.
+    // transparent.
     float alpha = alphaCoveragePreserved(u_diffuseMap, vs_out.uv, 0.5);
 
     // Stochastic transparency: discard fragments based on the corrected alpha.
@@ -32,7 +33,7 @@ void main() {
     // Decode sRGB albedo to linear light before shading.
     vec3 albedo = sRGBToLinear(diffuseSample.rgb);
 
-    vec3 N = normalize(vs_out.normal);
+    vec3 N = sampleNormalMap(vs_out.uv, vs_out.normal, vs_out.tangent);
 
     // Ambient term
     vec3 color = albedo * sceneGlobals.u_lighting.u_ambientLightColor.rgb;

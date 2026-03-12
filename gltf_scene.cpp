@@ -1,6 +1,6 @@
 #include "gltf_scene.hpp"
 
-#include "material.hpp"   // BasicTexturedMaterial, DefaultMaterial
+#include "material.hpp"   // LambertMaterial, DefaultMaterial
 
 #include <tiny_gltf.h>
 
@@ -241,6 +241,7 @@ Expected<GltfScene> GltfScene::FromFile(
     for (auto const& mat : model.materials) {
         GltfSceneMaterialDef def;
 
+        // Base colour (albedo) – sRGB
         int texIdx = mat.pbrMetallicRoughness.baseColorTexture.index;
         if (texIdx >= 0 && texIdx < static_cast<int>(model.textures.size())) {
             int imgIdx = model.textures[texIdx].source;
@@ -259,6 +260,21 @@ Expected<GltfScene> GltfScene::FromFile(
         if (cf.size() == 4)
             def.m_colorTint = glm::vec4(cf[0], cf[1], cf[2], cf[3]);
 
+        // Normal map – linear (tangent-space, not sRGB)
+        int normalTexIdx = mat.normalTexture.index;
+        if (normalTexIdx >= 0 && normalTexIdx < static_cast<int>(model.textures.size())) {
+            int imgIdx = model.textures[normalTexIdx].source;
+            if (imgIdx >= 0 && imgIdx < static_cast<int>(model.images.size())) {
+                auto const& img = model.images[imgIdx];
+                if (!img.uri.empty()) {
+                    std::filesystem::path texPath = basePath / img.uri;
+                    if (params.m_useKtx2)
+                        texPath.replace_extension(".ktx2");
+                    def.m_normalTexturePath = std::move(texPath);
+                }
+            }
+        }
+
         desc.m_materials.push_back(std::move(def));
     }
 
@@ -276,15 +292,30 @@ Expected<GltfScene> GltfScene::FromFile(
 
 void SpawnGltfScene(Engine& en, GltfSceneDesc&& proto, Transform const& root) {
     // Build one material handle per GLTF material.
-    // Materials with a resolvable texture path use BasicTexturedMaterial;
+    // Materials with a resolvable texture path use LambertMaterial;
     // those without fall back to DefaultMaterial.
     std::vector<MaterialHandle> materials;
     materials.reserve(proto.m_materials.size());
     for (auto const& matDef : proto.m_materials) {
+        // Pre-load the normal map (linear) first so it is cached with the
+        // correct sRGB=false flag before anything else touches it.
+        if (!matDef.m_normalTexturePath.empty() &&
+            std::filesystem::exists(matDef.m_normalTexturePath)) {
+            en.LoadTexture(matDef.m_normalTexturePath, TextureLoadParams{ .m_srgb = false });
+        }
+
         if (!matDef.m_colorTexturePath.empty() &&
             std::filesystem::exists(matDef.m_colorTexturePath)) {
-            BasicTexturedMaterial bm;
-            bm.m_colorTexture = en.LoadTexture(matDef.m_colorTexturePath);
+            LambertMaterial bm;
+            // Albedo textures are sRGB – pass the flag so mips are built correctly.
+            bm.m_colorTexture = en.LoadTexture(matDef.m_colorTexturePath,
+                                               TextureLoadParams{ .m_srgb = true });
+            // Normal map is linear.
+            if (!matDef.m_normalTexturePath.empty() &&
+                std::filesystem::exists(matDef.m_normalTexturePath)) {
+                bm.m_normalTexture = en.LoadTexture(matDef.m_normalTexturePath,
+                                                    TextureLoadParams{ .m_srgb = false });
+            }
             bm.m_colorTint    = matDef.m_colorTint;
             materials.push_back(en.CreateMaterial(std::move(bm)));
         } else {

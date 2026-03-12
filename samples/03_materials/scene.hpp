@@ -33,7 +33,7 @@ public:
         auto textureHandle  = en.LoadTexture(GetSampleAssetPath("test.ktx2"));
         auto geometryHandle = en.LoadGeometry(GetSampleAssetPath("box.glb"));
 
-        BasicTexturedMaterial material;
+        LambertMaterial material;
         material.m_colorTexture = textureHandle;
         auto materialHandle = en.CreateMaterial(material);
 

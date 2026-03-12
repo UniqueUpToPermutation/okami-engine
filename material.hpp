@@ -11,8 +11,9 @@ namespace okami {
 	struct DefaultMaterial {
 	};
 
-	struct BasicTexturedMaterial {
+	struct LambertMaterial {
 		TextureHandle m_colorTexture;
+		TextureHandle m_normalTexture; // tangent-space normal map; may be null
 		glm::vec4 m_colorTint{1.0f};
 	};
 

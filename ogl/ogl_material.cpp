@@ -32,7 +32,7 @@ OGLMaterialManager::OGLMaterialManager()
 
 Error OGLMaterialManager::RegisterImpl(InterfaceCollection& interfaces) {
     interfaces.Register<IMaterialManager<DefaultMaterial>>(this);
-    interfaces.Register<IMaterialManager<BasicTexturedMaterial>>(this);
+    interfaces.Register<IMaterialManager<LambertMaterial>>(this);
     interfaces.Register<IMaterialManager<SkyDefaultMaterial>>(this);
     return {};
 }
@@ -67,15 +67,16 @@ Error OGLMaterialManager::StartupImpl(InitContext const& context) {
             GetGLSLShaderPath("material_default.fs"),
             setupStaticMesh,
         },
-        // BasicTexturedMaterial – static mesh, one diffuse texture at unit 0
+        // LambertMaterial – Lambertian + optional normal map
         {
-            typeid(BasicTexturedMaterial),
+            typeid(LambertMaterial),
             OGLRendererType::StaticMesh,
             GetGLSLShaderPath("static_mesh.vs"),
-            GetGLSLShaderPath("material_basic_textured.fs"),
+            GetGLSLShaderPath("lambert.fs"),
             [setupStaticMesh](GLProgram const& prog) -> Error {
                 auto e = setupStaticMesh(prog);
                 e += AssignTextureBindingPoint(prog, "u_diffuseMap", 0);
+                e += AssignTextureBindingPoint(prog, "u_normalMap",  1);
                 return e;
             },
         },
@@ -114,6 +115,22 @@ Error OGLMaterialManager::StartupImpl(InitContext const& context) {
     }
 
     glUseProgram(0);
+
+    // Create a 1x1 flat-normal texture used as the unit-1 fallback for
+    // materials that don't have a normal map.  Decodes to tangent-space (0,0,1)
+    // which leaves the geometric normal unchanged.
+    {
+        GLuint id;
+        glGenTextures(1, &id);
+        m_flatNormalTexture = GLTexture(id);
+        glBindTexture(GL_TEXTURE_2D, id);
+        const uint8_t pixel[4] = { 128, 128, 255, 255 }; // (0.5, 0.5, 1.0, 1.0)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
     return err;
 }
 
@@ -131,20 +148,31 @@ MaterialHandle OGLMaterialManager::CreateMaterial(DefaultMaterial /*material*/) 
         entry ? &entry->m_program : nullptr);
 }
 
-MaterialHandle OGLMaterialManager::CreateMaterial(BasicTexturedMaterial material) {
-    auto* entry = GetProgramEntry(typeid(BasicTexturedMaterial));
+MaterialHandle OGLMaterialManager::CreateMaterial(LambertMaterial material) {
+    auto* entry = GetProgramEntry(typeid(LambertMaterial));
     auto mat = std::make_shared<OGLMaterial>(
         OGLRendererType::StaticMesh,
-        typeid(BasicTexturedMaterial),
+        typeid(LambertMaterial),
         entry ? &entry->m_program : nullptr);
 
+    // Unit 0: diffuse/albedo
     if (material.m_colorTexture) {
         GLuint glId = 0;
-        if (material.m_colorTexture->IsLoaded()) {
+        if (material.m_colorTexture->IsLoaded())
             glId = static_cast<OGLTexture*>(material.m_colorTexture.get())->m_texture.get();
-        }
         mat->m_textureBindings.push_back({ 0, glId, material.m_colorTexture });
     }
+
+    // Unit 1: normal map (fall back to flat-normal 1x1 if absent)
+    if (material.m_normalTexture) {
+        GLuint glId = 0;
+        if (material.m_normalTexture->IsLoaded())
+            glId = static_cast<OGLTexture*>(material.m_normalTexture.get())->m_texture.get();
+        mat->m_textureBindings.push_back({ 1, glId, material.m_normalTexture });
+    } else {
+        mat->m_textureBindings.push_back({ 1, m_flatNormalTexture.get(), nullptr });
+    }
+
     return mat;
 }
 

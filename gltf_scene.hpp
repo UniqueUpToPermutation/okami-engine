@@ -26,10 +26,14 @@ namespace okami {
 
     // CPU-side description of one material slot from the GLTF asset.
     struct GltfSceneMaterialDef {
-        // Absolute path to the base-colour texture file.
+        // Absolute path to the base-colour (albedo) texture file.  sRGB.
         // Empty means "no texture found" – a 1×1 white fallback is used at spawn time.
         std::filesystem::path m_colorTexturePath;
         glm::vec4             m_colorTint{1.0f};
+
+        // Absolute path to the tangent-space normal map texture file.  Linear.
+        // Empty means no normal map is present for this material.
+        std::filesystem::path m_normalTexturePath;
     };
 
     // One flattened renderable primitive: world transform + raw geometry + material index.
