@@ -129,6 +129,18 @@ namespace okami {
 		std::string m_headlessRenderOutputDir = "renders"; 
 	};
 
+	struct PostProcessComponent {
+		// Uncharted 2 filmic tonemap parameters
+		float m_tonemapA = 0.15f; // Shoulder strength
+		float m_tonemapB = 0.50f; // Linear strength
+		float m_tonemapC = 0.10f; // Linear angle
+		float m_tonemapD = 0.20f; // Toe strength
+		float m_tonemapE = 0.02f; // Toe numerator
+		float m_tonemapF = 0.30f; // Toe denominator
+		float m_exposure  = 1.0f; // Pre-tonemap exposure multiplier
+		float m_whitePoint = 11.2f; // Scene white point
+	};
+
 	struct RenderParams {
 
 	};

@@ -72,6 +72,57 @@
             "problemMatcher": [
                 "$msCompile"
             ]
+        },
+        {
+            "label": "Build 01_hello_world",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "out/build/x64-debug",
+                "--target",
+                "01_hello_world"
+            ],
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": {
+                "echo": true, "reveal": "always", "focus": false,
+                "panel": "shared", "showReuseMessage": true, "clear": false
+            },
+            "problemMatcher": [ "$msCompile" ]
+        },
+        {
+            "label": "Build 04_sponza",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "out/build/x64-debug",
+                "--target",
+                "04_sponza"
+            ],
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": {
+                "echo": true, "reveal": "always", "focus": false,
+                "panel": "shared", "showReuseMessage": true, "clear": false
+            },
+            "problemMatcher": [ "$msCompile" ]
+        },
+        {
+            "label": "Build im3d_sample",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "out/build/x64-debug",
+                "--target",
+                "im3d_sample"
+            ],
+            "group": { "kind": "build", "isDefault": false },
+            "presentation": {
+                "echo": true, "reveal": "always", "focus": false,
+                "panel": "shared", "showReuseMessage": true, "clear": false
+            },
+            "problemMatcher": [ "$msCompile" ]
         }
     ]
 }

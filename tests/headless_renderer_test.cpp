@@ -60,6 +60,8 @@ protected:
             return;
         }
 
+        std::filesystem::path sourceGoldenPath =
+            std::filesystem::path(OKAMI_SOURCE_DIR) / "tests" / "golden_images" / goldenName;
         std::cout << "Comparing:\n  rendered: " << renderedPath
                   << "\n   golden:  " << goldenPath << "\n";
 
@@ -94,7 +96,10 @@ protected:
         EXPECT_LE(differentPixels, maxAllowedDifferences)
             << "Too many different pixels: " << differentPixels
             << " out of " << totalPixels
-            << " (max allowed: " << maxAllowedDifferences << ")";
+            << " (max allowed: " << maxAllowedDifferences << ")\n"
+            << "  To update golden, run:\n"
+            << "    cp \"" << renderedPath.string() << "\" \""
+            << sourceGoldenPath.string() << "\"";
     }
 
     // Run a sample headlessly and compare frame 0 (the initial rendered frame,

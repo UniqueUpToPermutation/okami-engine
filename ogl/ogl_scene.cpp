@@ -2,6 +2,8 @@
 
 #include "camera.hpp"
 #include "transform.hpp"
+#include "../light.hpp"
+#include "../renderer.hpp"
 
 namespace okami {
     Error OGLSceneModule::RegisterImpl(InterfaceCollection& interfaces) {
@@ -51,14 +53,52 @@ namespace okami {
         };
 
         auto lighting = glsl::LightingGlobals{
-            .u_ambientLightColor = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f),
-            .u_directionalLightDirection = glm::vec4(glm::normalize(glm::vec3(-1.0f, -1.0f, -1.0f)), 0.0f),
-            .u_directionalLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)
+            .u_ambientLightColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
+            .u_lightCount = glm::uvec4(0, 0, 0, 0)
+        };
+
+        int lightIdx = 0;
+        registry.view<AmbientLightComponent>().each(
+            [&](auto /*entity*/, AmbientLightComponent const& light) {
+                lighting.u_ambientLightColor += glm::vec4(glm::vec3(light.m_color) * light.m_intensity, 0.0f);
+            });
+
+        registry.view<PointLightComponent>().each(
+            [&](auto /*entity*/, PointLightComponent const& light) {
+                if (lightIdx >= MAX_LIGHTS) return;
+                lighting.u_lights[lightIdx++] = glsl::Light{
+                    .u_direction      = glm::vec4(0.0f),
+                    .u_positionRadius = glm::vec4(light.m_position, light.m_range),
+                    .u_color          = glm::vec4(glm::vec3(light.m_color) * light.m_intensity, 1.0f),
+                    .u_type           = glm::uvec4(POINT_LIGHT, 0, 0, 0)
+                };
+            });
+        registry.view<DirectionalLightComponent>().each(
+            [&](auto /*entity*/, DirectionalLightComponent const& light) {
+                if (lightIdx >= MAX_LIGHTS) return;
+                lighting.u_lights[lightIdx++] = glsl::Light{
+                    .u_direction      = glm::vec4(glm::normalize(light.m_direction), 0.0f),
+                    .u_positionRadius = glm::vec4(0.0f),
+                    .u_color          = glm::vec4(glm::vec3(light.m_color) * light.m_intensity, 1.0f),
+                    .u_type           = glm::uvec4(DIRECTIONAL_LIGHT, 0, 0, 0)
+                };
+            });
+        lighting.u_lightCount.x = static_cast<unsigned int>(lightIdx);
+
+        // Default tonemap parameters; overridden by any PostProcessComponent in the registry.
+        PostProcessComponent pp;
+        registry.view<PostProcessComponent>().each(
+            [&](auto /*entity*/, PostProcessComponent const& comp) { pp = comp; });
+
+        auto tonemap = glsl::TonemapGlobals{
+            .u_tonemapABCD        = glm::vec4(pp.m_tonemapA, pp.m_tonemapB, pp.m_tonemapC, pp.m_tonemapD),
+            .u_tonemapEFExposureW = glm::vec4(pp.m_tonemapE, pp.m_tonemapF, pp.m_exposure, pp.m_whitePoint)
         };
 
         return glsl::SceneGlobals{
-            .u_camera = glslCamera,
-            .u_lighting = lighting
+            .u_camera   = glslCamera,
+            .u_lighting = lighting,
+            .u_tonemap  = tonemap
         };
     }
 

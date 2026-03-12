@@ -55,7 +55,7 @@
             "args": [],
             "cwd": "${workspaceFolder}/out/build/x64-debug/samples/01_hello_world/Debug",
             "console": "integratedTerminal",
-            "preLaunchTask": "Build All"
+            "preLaunchTask": "Build 01_hello_world"
         },
         {
             "name": "04_sponza (Debug)",
@@ -65,7 +65,7 @@
             "args": [],
             "cwd": "${workspaceFolder}/out/build/x64-debug/samples/04_sponza/Debug",
             "console": "integratedTerminal",
-            "preLaunchTask": "Build All"
+            "preLaunchTask": "Build 04_sponza"
         },
         {
             "name": "im3d_sample (Debug)",
@@ -75,7 +75,7 @@
             "args": [],
             "cwd": "${workspaceFolder}/out/build/x64-debug/samples/im3d/Debug",
             "console": "integratedTerminal",
-            "preLaunchTask": "Build All"
+            "preLaunchTask": "Build im3d_sample"
         }
     ]
 }

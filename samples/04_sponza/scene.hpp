@@ -8,6 +8,7 @@
 #include "camera_controllers.hpp"
 #include "ogl/ogl_renderer.hpp"
 #include "io.hpp"
+#include "light.hpp"
 
 #include <glm/gtc/quaternion.hpp>
 #include <glog/logging.h>
@@ -55,6 +56,22 @@ public:
         {
             auto skyEntity = en.CreateEntity();
             en.AddComponent(skyEntity, SkyComponent{});
+        }
+
+        // ── Lights ──────────────────────────────────────────────────────────
+        {
+            auto dirLightEntity = en.CreateEntity();
+            en.AddComponent(dirLightEntity, DirectionalLightComponent{
+                .m_direction = glm::normalize(glm::vec3(-0.5f, -1.0f, -0.5f)),
+                .m_color     = color::White,
+                .m_intensity = 2.0f
+            });
+
+            auto ambientLightEntity = en.CreateEntity();
+            en.AddComponent(ambientLightEntity, AmbientLightComponent{
+                .m_color     = color::White,
+                .m_intensity = 0.2f
+            });
         }
 
         // ── First-person camera ────────────────────────────────────────────

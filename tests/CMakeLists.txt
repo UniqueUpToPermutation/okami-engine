@@ -31,6 +31,12 @@ if (CMAKE_VERSION VERSION_GREATER 3.12)
     set_property(TARGET EngineTests PROPERTY CXX_STANDARD 23)
 endif()
 
+# Expose the source root so tests can construct paths into the source tree
+# (e.g. to print a copy command that targets the committed golden_images dir).
+target_compile_definitions(EngineTests PRIVATE
+    OKAMI_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+
 # Register tests with CTest
 add_test(NAME EngineUnitTests COMMAND EngineTests)
 

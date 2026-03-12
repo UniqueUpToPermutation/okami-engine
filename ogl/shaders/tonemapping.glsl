@@ -1,12 +1,25 @@
-// Whitescale tonemapping calculation, see http://filmicgames.com/archives/75
-// Also see http://blenderartists.org/forum/showthread.php?321110-Shaders-and-Skybox-madness
-const float A = 0.15; // Shoulder strength
-const float B = 0.50; // Linear strength
-const float C = 0.10; // Linear angle
-const float D = 0.20; // Toe strength
-const float E = 0.02; // Toe numerator
-const float F = 0.30; // Toe denominator
-vec3 Uncharted2Tonemap(vec3 W)
-{
-	return ((W * (A * W + C * B) + D * E) / (W * (A * W + B) + D * F)) - E / F;
+#pragma once
+#include "scene.glsl"
+
+// Uncharted 2 filmic tonemapping curve.
+// Reference: http://filmicgames.com/archives/75
+// Takes a linear HDR colour and the curve parameters from TonemapGlobals.
+vec3 Uncharted2Curve(vec3 x, TonemapGlobals t) {
+    float A = t.u_tonemapABCD.x;
+    float B = t.u_tonemapABCD.y;
+    float C = t.u_tonemapABCD.z;
+    float D = t.u_tonemapABCD.w;
+    float E = t.u_tonemapEFExposureW.x;
+    float F = t.u_tonemapEFExposureW.y;
+    return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
+}
+
+// Full Uncharted 2 tonemap: applies exposure, maps through the curve and
+// normalises so that the white point maps to 1.
+vec3 applyTonemap(vec3 color, TonemapGlobals t) {
+    float exposure  = t.u_tonemapEFExposureW.z;
+    float whitePoint = t.u_tonemapEFExposureW.w;
+    vec3  mapped    = Uncharted2Curve(color * exposure, t);
+    vec3  whiteScale = 1.0 / Uncharted2Curve(vec3(whitePoint), t);
+    return mapped * whiteScale;
 }

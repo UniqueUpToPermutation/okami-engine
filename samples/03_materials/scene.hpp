@@ -10,6 +10,7 @@
 #include "sky.hpp"
 #include "camera.hpp"
 #include "camera_controllers.hpp"
+#include "light.hpp"
 #include "ogl/ogl_renderer.hpp"
 
 namespace sample_materials {
@@ -55,6 +56,12 @@ public:
         ));
         en.AddComponent(cameraEntity, OrbitCameraControllerComponent{});
         en.SetActiveCamera(cameraEntity);
+
+        auto ambientLightEntity = en.CreateEntity();
+        en.AddComponent(ambientLightEntity, AmbientLightComponent{
+            .m_color     = color::White,
+            .m_intensity = 1.0f
+        });
     }
 };
 
