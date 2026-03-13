@@ -13,6 +13,9 @@ void OGLMaterial::Bind() const {
     if (m_program) {
         glUseProgram(m_program->get());
     }
+    for (auto const& setter : m_uniformSetters) {
+        setter();
+    }
     for (auto& tb : m_textureBindings) {
         // Lazily resolve the GL handle once the texture finishes loading.
         if (tb.m_texture == 0 && tb.m_handle && tb.m_handle->IsLoaded()) {
@@ -34,6 +37,7 @@ Error OGLMaterialManager::RegisterImpl(InterfaceCollection& interfaces) {
     interfaces.Register<IMaterialManager<DefaultMaterial>>(this);
     interfaces.Register<IMaterialManager<LambertMaterial>>(this);
     interfaces.Register<IMaterialManager<SkyDefaultMaterial>>(this);
+    interfaces.Register<IMaterialManager<SkyAtmosphereMaterial>>(this);
     return {};
 }
 
@@ -86,6 +90,14 @@ Error OGLMaterialManager::StartupImpl(InitContext const& context) {
             OGLRendererType::Sky,
             GetGLSLShaderPath("sky.vs"),
             GetGLSLShaderPath("sky_default.fs"),
+            setupSky,
+        },
+        // SkyAtmosphereMaterial – Preetham / Mie scattering atmosphere
+        {
+            typeid(SkyAtmosphereMaterial),
+            OGLRendererType::Sky,
+            GetGLSLShaderPath("sky.vs"),
+            GetGLSLShaderPath("sky_atmosphere.fs"),
             setupSky,
         },
     };
@@ -182,6 +194,48 @@ MaterialHandle OGLMaterialManager::CreateMaterial(SkyDefaultMaterial /*material*
         OGLRendererType::Sky,
         typeid(SkyDefaultMaterial),
         entry ? &entry->m_program : nullptr);
+}
+
+MaterialHandle OGLMaterialManager::CreateMaterial(SkyAtmosphereMaterial material) {
+    auto* entry = GetProgramEntry(typeid(SkyAtmosphereMaterial));
+    auto mat = std::make_shared<OGLMaterial>(
+        OGLRendererType::Sky,
+        typeid(SkyAtmosphereMaterial),
+        entry ? &entry->m_program : nullptr);
+
+    if (entry) {
+        GLuint prog = entry->m_program.get();
+
+        auto add1f = [&](const char* name, float value) {
+            GLint loc = glGetUniformLocation(prog, name);
+            if (loc != -1)
+                mat->m_uniformSetters.push_back([loc, value]() { glUniform1f(loc, value); });
+        };
+        auto add3f = [&](const char* name, glm::vec3 value) {
+            GLint loc = glGetUniformLocation(prog, name);
+            if (loc != -1)
+                mat->m_uniformSetters.push_back([loc, value]() { glUniform3f(loc, value.x, value.y, value.z); });
+        };
+
+        add1f("depolarizationFactor",        material.depolarizationFactor);
+        add1f("mieCoefficient",              material.mieCoefficient);
+        add1f("mieDirectionalG",             material.mieDirectionalG);
+        add3f("mieKCoefficient",             material.mieKCoefficient);
+        add1f("mieV",                        material.mieV);
+        add1f("mieZenithLength",             material.mieZenithLength);
+        add1f("numMolecules",                material.numMolecules);
+        add3f("primaries",                   material.primaries);
+        add1f("rayleigh",                    material.rayleigh);
+        add1f("rayleighZenithLength",        material.rayleighZenithLength);
+        add1f("refractiveIndex",             material.refractiveIndex);
+        add1f("sunAngularDiameterDegrees",   material.sunAngularDiameterDegrees);
+        add1f("sunIntensityFactor",          material.sunIntensityFactor);
+        add1f("sunIntensityFalloffSteepness",material.sunIntensityFalloffSteepness);
+        add3f("sunPosition",                 material.sunPosition);
+        add1f("turbidity",                   material.turbidity);
+    }
+
+    return mat;
 }
 
 MaterialHandle OGLMaterialManager::CreateDefaultMaterial(OGLRendererType renderer) {

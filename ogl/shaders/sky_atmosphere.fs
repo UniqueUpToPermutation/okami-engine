@@ -1,10 +1,16 @@
 #version 330 core
 #include "vs_outputs.glsl"
+#include "scene.glsl"
+#include "color.glsl"
+#include "tonemapping.glsl"
 
 in SKY_VS_OUT sky_vs_out;
 
+layout(std140) uniform SceneGlobalsBlock {
+    SceneGlobals sceneGlobals;
+};
+
 uniform float depolarizationFactor;
-uniform float luminance;
 uniform float mieCoefficient;
 uniform float mieDirectionalG;
 uniform vec3 mieKCoefficient;
@@ -19,7 +25,6 @@ uniform float sunAngularDiameterDegrees;
 uniform float sunIntensityFactor;
 uniform float sunIntensityFalloffSteepness;
 uniform vec3 sunPosition;
-uniform float tonemapWeighting;
 uniform float turbidity;
 
 const float PI = 3.141592653589793238462643383279502884197169;
@@ -89,11 +94,7 @@ void main()
 	texColor *= 0.04;
 	texColor += vec3(0.0, 0.001, 0.0025) * 0.3;
 	
-	// Tonemapping
-	vec3 whiteScale = 1.0 / Uncharted2Tonemap(vec3(tonemapWeighting));
-	vec3 curr = Uncharted2Tonemap((log2(2.0 / pow(luminance, 4.0))) * texColor);
-	vec3 color = curr * whiteScale;
-	vec3 retColor = pow(color, vec3(1.0 / (1.2 + (1.2 * sunfade))));
-
-	gl_FragColor = vec4(retColor, 1.0);
+	// Tonemapping + gamma correction
+	vec3 color = applyTonemap(texColor, sceneGlobals.u_tonemap);
+	gl_FragColor = vec4(linearToSRGB(color), 1.0);
 }

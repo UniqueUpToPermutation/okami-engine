@@ -40,6 +40,8 @@ public:
     void SetupScene(okami::Engine& en) override {
         using namespace okami;
 
+        auto lightDir = glm::normalize(glm::vec3(-0.5f, -1.0f, -0.5f));
+
         // ── Load GLTF scene prototype ──────────────────────────────────────
         auto gltfPath   = GetSampleAssetPath("sponza/Sponza.gltf");
         auto sceneResult = GltfScene::FromFile(gltfPath, GltfSceneLoadParams{
@@ -54,15 +56,21 @@ public:
 
         // ── Sky ────────────────────────────────────────────────────────────
         {
+            auto skyMaterial = en.CreateMaterial(SkyAtmosphereMaterial{
+                // Sun sitting low on the horizon towards positive X
+                .sunPosition = -lightDir * 15000.0f,
+                .turbidity   = 1.0f,
+            });
+
             auto skyEntity = en.CreateEntity();
-            en.AddComponent(skyEntity, SkyComponent{});
+            en.AddComponent(skyEntity, SkyComponent{ .m_skyMaterial = skyMaterial });
         }
 
         // ── Lights ──────────────────────────────────────────────────────────
         {
             auto dirLightEntity = en.CreateEntity();
             en.AddComponent(dirLightEntity, DirectionalLightComponent{
-                .m_direction = glm::normalize(glm::vec3(-0.5f, -1.0f, -0.5f)),
+                .m_direction = lightDir,
                 .m_color     = color::White,
                 .m_intensity = 2.0f
             });

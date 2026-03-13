@@ -6,6 +6,7 @@
 #include "../material.hpp"
 #include "../sky.hpp"
 
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
@@ -36,7 +37,9 @@ namespace okami {
         OGLRendererType              m_rendererType;
         std::type_index              m_type;
         GLProgram const*             m_program = nullptr; // non-owning – owned by OGLMaterialManager
-        mutable std::vector<OGLTextureBinding> m_textureBindings;
+        mutable std::vector<OGLTextureBinding>      m_textureBindings;
+        // Per-instance scalar/vector uniforms written every Bind() call.
+        std::vector<std::function<void()>>          m_uniformSetters;
 
         OGLMaterial(OGLRendererType rendererType,
                     std::type_index  type,
@@ -61,7 +64,8 @@ namespace okami {
         public EngineModule,
         public IMaterialManager<DefaultMaterial>,
         public IMaterialManager<LambertMaterial>,
-        public IMaterialManager<SkyDefaultMaterial> {
+        public IMaterialManager<SkyDefaultMaterial>,
+        public IMaterialManager<SkyAtmosphereMaterial> {
     private:
         struct ProgramEntry {
             GLProgram       m_program;
@@ -79,9 +83,10 @@ namespace okami {
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
 
-        MaterialHandle CreateMaterial(DefaultMaterial        material) override;
-        MaterialHandle CreateMaterial(LambertMaterial  material) override;
-        MaterialHandle CreateMaterial(SkyDefaultMaterial     material) override;
+        MaterialHandle CreateMaterial(DefaultMaterial          material) override;
+        MaterialHandle CreateMaterial(LambertMaterial           material) override;
+        MaterialHandle CreateMaterial(SkyDefaultMaterial        material) override;
+        MaterialHandle CreateMaterial(SkyAtmosphereMaterial     material) override;
 
         // Creates the default material for the given renderer type.
         MaterialHandle CreateDefaultMaterial(OGLRendererType renderer);
