@@ -42,10 +42,18 @@ struct TonemapGlobals {
     vec4 u_tonemapEFExposureW;  // (toeNum, toeDenom, exposure, whitePoint)
 };
 
+struct ShadowGlobals {
+    float u_shadowBiasBase;   // constant depth bias
+    float u_shadowBiasSlope;  // slope-scaled bias multiplier
+    float u_shadowBiasMax;    // clamp ceiling to prevent Peter-Panning
+    float u_shadowPad;        // padding to 16-byte alignment
+};
+
 struct SceneGlobals {
-    CameraGlobals u_camera;
+    CameraGlobals   u_camera;
     LightingGlobals u_lighting;
-    TonemapGlobals u_tonemap;
+    TonemapGlobals  u_tonemap;
+    ShadowGlobals   u_shadow;
 };
 
 #ifdef __cplusplus

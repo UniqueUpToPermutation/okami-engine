@@ -22,14 +22,21 @@ namespace okami {
 
         enum class BufferBindingPoints : GLint {
             SceneGlobals,
+            ShadowCamera,
             Count
         };
+
+        static constexpr GLint kShadowMapUnit = 2;
 
         // The fallback material used when a StaticMeshComponent has no material set.
         MaterialHandle m_defaultMaterial;
 
+        // Depth-only program compiled from static_mesh_depth.vs/fs.
+        GLProgram m_depthProgram;
+
         OGLGeometryManager*          m_geometryManager      = nullptr;
         IOGLSceneGlobalsProvider*    m_sceneGlobalsProvider = nullptr;
+        IOGLDepthPassProvider*       m_depthPassProvider    = nullptr;
 
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;

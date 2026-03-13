@@ -58,7 +58,7 @@ public:
         {
             auto skyMaterial = en.CreateMaterial(SkyAtmosphereMaterial{
                 // Sun sitting low on the horizon towards positive X
-                .sunPosition = -lightDir * 15000.0f,
+                .sunPosition = -lightDir,
                 .turbidity   = 1.0f,
             });
 
@@ -72,7 +72,8 @@ public:
             en.AddComponent(dirLightEntity, DirectionalLightComponent{
                 .m_direction = lightDir,
                 .m_color     = color::White,
-                .m_intensity = 2.0f
+                .m_intensity = 2.0f,
+                .b_castShadow = true
             });
 
             auto ambientLightEntity = en.CreateEntity();

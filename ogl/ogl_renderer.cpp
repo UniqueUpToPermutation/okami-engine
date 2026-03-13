@@ -5,6 +5,7 @@
 #include "ogl_sprite.hpp"
 #include "ogl_geometry.hpp"
 #include "ogl_static_mesh.hpp"
+#include "ogl_depth_pass.hpp"
 #include "ogl_im3d.hpp"
 #include "ogl_imgui.hpp"
 #include "ogl_brdf.hpp"
@@ -43,6 +44,7 @@ private:
     OGLIm3DRenderer* m_im3dRenderer = nullptr;
     OGLImguiRenderer* m_imguiRenderer = nullptr;
     OGLSkyRenderer* m_skyRenderer = nullptr;
+    OGLDepthPass* m_depthPass = nullptr;
 
     OGLBrdfProvider* m_brdfProvider = nullptr;
 
@@ -80,14 +82,60 @@ protected:
     Error Render(entt::registry const& registry) override {
         m_shaderCache.reset();
 
+        const entity_t activeCam = m_activeCamera.load(std::memory_order_relaxed);
+
+        // ── Shadow pass ──────────────────────────────────────────────────────
+        // Find the first shadow-casting directional light and run a depth pass.
+        {
+            auto* viewCam       = registry.try_get<Camera>(activeCam);
+            auto* viewTransform = registry.try_get<Transform>(activeCam);
+
+            if (viewCam && viewTransform) {
+                auto view = registry.view<DirectionalLightComponent>();
+                for (auto entity : view) {
+                    auto const& light = view.get<DirectionalLightComponent>(entity);
+                    if (!light.b_castShadow) continue;
+
+                    auto framebufferSize = m_glProvider->GetFramebufferSize();
+                    ShadowCascade cascade = ComputeShadowCascade(
+                        light, *viewCam, *viewTransform, framebufferSize, 20.0f,
+                        OGLDepthPass::kShadowMapSize);
+
+                    const glm::mat4 lightView =
+                        cascade.transform.Inverse().AsMatrix();
+                    const glm::mat4 lightProj =
+                        cascade.camera.GetProjectionMatrix(
+                            OGLDepthPass::kShadowMapSize,
+                            OGLDepthPass::kShadowMapSize,
+                            /*usingDirectX=*/false);
+                    const glm::mat4 lightVP = lightProj * lightView;
+
+                    glsl::CameraGlobals lightCamera{};
+                    lightCamera.u_view        = lightView;
+                    lightCamera.u_proj        = lightProj;
+                    lightCamera.u_viewProj    = lightVP;
+                    lightCamera.u_invView     = cascade.transform.AsMatrix();
+                    lightCamera.u_invProj     = glm::inverse(lightProj);
+                    lightCamera.u_invViewProj = glm::inverse(lightVP);
+
+                    m_depthPass->BeginDepthPass(lightCamera);
+
+                    OGLPass shadowPass{ .m_type = OGLPassType::Shadow };
+                    m_staticMeshRenderer->Pass(registry, shadowPass);
+
+                    m_depthPass->EndDepthPass();
+                    break; // single cascade for now
+                }
+            }
+        }
+
+        // ── Forward pass ─────────────────────────────────────────────────────
         glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
-        //glClearDepth(1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         OGLPass pass{};
 
-        m_sceneModule->UpdateSceneGlobals(
-            registry, m_activeCamera.load(std::memory_order_relaxed));
+        m_sceneModule->UpdateSceneGlobals(registry, activeCam);
 
         m_staticMeshRenderer->Pass(registry, pass);
         m_triangleRenderer->Pass(registry, pass);
@@ -118,6 +166,7 @@ public:
         m_im3dRenderer = CreateChild<OGLIm3DRenderer>();
         m_imguiRenderer = CreateChild<OGLImguiRenderer>();
         m_skyRenderer = CreateChild<OGLSkyRenderer>();
+        m_depthPass = CreateChild<OGLDepthPass>();
 
         // m_brdfProvider = CreateChild<OGLBrdfProvider>(/*debug = */ false);
     }

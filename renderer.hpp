@@ -139,6 +139,10 @@ namespace okami {
 		float m_tonemapF = 0.30f; // Toe denominator
 		float m_exposure  = 1.0f; // Pre-tonemap exposure multiplier
 		float m_whitePoint = 11.2f; // Scene white point
+		// Shadow bias
+		float m_shadowBiasBase  = 0.0005f;
+		float m_shadowBiasSlope = 0.005f;
+		float m_shadowBiasMax   = 0.02f;
 	};
 
 	struct RenderParams {

@@ -543,6 +543,14 @@ namespace okami {
         virtual UniformBuffer<glsl::SceneGlobals> const& GetSceneGlobalsBuffer() const = 0;
     };
 
+    // Provides access to the depth pass resources: camera UBO and shadow map texture.
+    class IOGLDepthPassProvider {
+    public:
+        virtual ~IOGLDepthPassProvider() = default;
+        virtual UniformBuffer<glsl::CameraGlobals> const& GetCameraGlobalsBuffer() const = 0;
+        virtual GLuint GetDepthTexture() const = 0;
+    };
+
     struct OGLPipelineState {
         // Depth Testing
         bool depthTestEnabled = false;

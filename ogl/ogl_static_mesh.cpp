@@ -1,5 +1,6 @@
 #include "ogl_static_mesh.hpp"
 
+#include "../paths.hpp"
 #include <glog/logging.h>
 
 using namespace okami;
@@ -14,6 +15,10 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
     m_sceneGlobalsProvider = context.m_interfaces.Query<IOGLSceneGlobalsProvider>();
     OKAMI_ERROR_RETURN_IF(!m_sceneGlobalsProvider,
         "IOGLSceneGlobalsProvider interface not available for OGLStaticMeshRenderer");
+
+    m_depthPassProvider = context.m_interfaces.Query<IOGLDepthPassProvider>();
+    OKAMI_ERROR_RETURN_IF(!m_depthPassProvider,
+        "IOGLDepthPassProvider interface not available for OGLStaticMeshRenderer");
 
     // Obtain the default material (DefaultMaterial) from the material manager.
     auto* matMgr = context.m_interfaces.Query<IMaterialManager<DefaultMaterial>>();
@@ -30,6 +35,26 @@ Error OGLStaticMeshRenderer::StartupImpl(InitContext const& context) {
     m_pipelineState.blendEnabled     = false;
     m_pipelineState.cullFaceEnabled  = true;
     m_pipelineState.depthMask        = true;
+
+    // Compile the depth-only program used for shadow passes.
+    {
+        auto* cache = context.m_interfaces.Query<IGLShaderCache>();
+        OKAMI_ERROR_RETURN_IF(!cache, "OGLStaticMeshRenderer: IGLShaderCache not available");
+        ProgramShaderPaths depthPaths;
+        depthPaths.m_vertex   = GetGLSLShaderPath("static_mesh_depth.vs");
+        depthPaths.m_fragment = GetGLSLShaderPath("static_mesh_depth.fs");
+        auto depthProg = CreateProgram(depthPaths, *cache);
+        if (!depthProg) {
+            LOG(ERROR) << "OGLStaticMeshRenderer: Failed to compile depth program: " << depthProg.error();
+            err += depthProg.error();
+        } else {
+            m_depthProgram = std::move(*depthProg);
+            glUseProgram(m_depthProgram.get());
+            err += AssignBufferBindingPoint(m_depthProgram, "CameraGlobalsBlock", 0);
+            glUseProgram(0);
+        }
+        OKAMI_ERROR_RETURN(err);
+    }
 
     LOG(INFO) << "OGL Static Mesh Renderer initialized successfully";
     return err;
@@ -101,7 +126,16 @@ Error OGLStaticMeshRenderer::Pass(entt::registry const& registry, OGLPass const&
 
     m_pipelineState.SetToGL();
     err += GET_GL_ERROR();
-    err += m_sceneGlobalsProvider->GetSceneGlobalsBuffer().Bind(BufferBindingPoints::SceneGlobals);
+
+    // For forward passes, bind the light-space camera UBO and shadow map once
+    // for all draw groups.
+    if (pass.m_type != OGLPassType::Shadow) {
+        err += m_depthPassProvider->GetCameraGlobalsBuffer().Bind(
+            static_cast<GLint>(BufferBindingPoints::ShadowCamera));
+        glActiveTexture(GL_TEXTURE0 + kShadowMapUnit);
+        glBindTexture(GL_TEXTURE_2D, m_depthPassProvider->GetDepthTexture());
+        err += GET_GL_ERROR();
+    }
 
     // Draw one instanced call per (geometry, material) group.
     size_t groupStart = 0;
@@ -149,9 +183,14 @@ Error OGLStaticMeshRenderer::Pass(entt::registry const& registry, OGLPass const&
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         err += GET_GL_ERROR();
 
-        mat->Bind();
-        err += GET_GL_ERROR();
-        err += m_sceneGlobalsProvider->GetSceneGlobalsBuffer().Bind(BufferBindingPoints::SceneGlobals);
+        if (pass.m_type == OGLPassType::Shadow) {
+            glUseProgram(m_depthProgram.get());
+            err += m_depthPassProvider->GetCameraGlobalsBuffer().Bind(0);
+        } else {
+            mat->Bind();
+            err += GET_GL_ERROR();
+            err += m_sceneGlobalsProvider->GetSceneGlobalsBuffer().Bind(BufferBindingPoints::SceneGlobals);
+        }
 
         auto const& desc = inst0.m_geometry->GetDesc();
         auto const& prim = desc.m_primitives[0];

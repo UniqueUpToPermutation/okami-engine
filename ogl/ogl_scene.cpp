@@ -98,7 +98,13 @@ namespace okami {
         return glsl::SceneGlobals{
             .u_camera   = glslCamera,
             .u_lighting = lighting,
-            .u_tonemap  = tonemap
+            .u_tonemap  = tonemap,
+            .u_shadow   = glsl::ShadowGlobals{
+                .u_shadowBiasBase  = pp.m_shadowBiasBase,
+                .u_shadowBiasSlope = pp.m_shadowBiasSlope,
+                .u_shadowBiasMax   = pp.m_shadowBiasMax,
+                .u_shadowPad       = 0.0f
+            }
         };
     }
 
