@@ -17,6 +17,8 @@
 //      // Inside main():
 //      float alpha = texture(u_diffuseMap, uv).a;
 //
+//  ── Screen-space variants (fast but swim when the camera moves) ──────────
+//
 //      // Option A – Bayer 4×4 (cheapest, 4-pixel tile):
 //      stochasticDiscardBayer4x4(alpha, gl_FragCoord.xy);
 //
@@ -28,6 +30,25 @@
 //
 //      // Option C with temporal animation (pass u_frameIndex as a uniform):
 //      stochasticDiscardIGN(alpha, gl_FragCoord.xy, u_frameIndex);
+//
+//  ── World-space variants (pattern anchored to geometry, no swimming) ─────
+//
+//  Pass the interpolated world-space fragment position (e.g. from a
+//  `in vec3 v_worldPos;` varying) and a cellSize that controls how large
+//  each dither cell is in world units.  Because the pattern is tied to the
+//  surface rather than the screen it does not move when the camera moves.
+//
+//      // Option A – Bayer 4×4 world-space:
+//      stochasticDiscardBayer4x4(alpha, v_worldPos, 0.05);
+//
+//      // Option B – Bayer 8×8 world-space:
+//      stochasticDiscardBayer8x8(alpha, v_worldPos, 0.05);
+//
+//      // Option C – IGN world-space (static):
+//      stochasticDiscardIGN(alpha, v_worldPos);
+//
+//      // Option C – IGN world-space with temporal animation:
+//      stochasticDiscardIGN(alpha, v_worldPos, u_frameIndex);
 //
 // ---------------------------------------------------------------------------
 
@@ -49,6 +70,14 @@ float bayerThreshold4x4(ivec2 pos) {
     return m[(pos.x & 3) + (pos.y & 3) * 4] / 16.0;
 }
 
+// World-space variant: dither cells are world-space cubes of side cellSize.
+// All three axes are mixed into the 2D index so the pattern is correct on
+// walls and ceilings as well as floors.  View-independent — no swimming.
+float bayerThreshold4x4(vec3 worldPos, float cellSize) {
+    ivec3 g = ivec3(floor(worldPos / cellSize));
+    return bayerThreshold4x4(ivec2(g.x ^ (g.y * 7), g.z ^ (g.y * 13)));
+}
+
 // Returns a threshold in [0, 1) for screen pixel at integer position pos.
 // Tile size: 8×8.
 float bayerThreshold8x8(ivec2 pos) {
@@ -64,6 +93,12 @@ float bayerThreshold8x8(ivec2 pos) {
         63.0, 31.0, 55.0, 23.0, 61.0, 29.0, 53.0, 21.0
     );
     return m[(pos.x & 7) + (pos.y & 7) * 8] / 64.0;
+}
+
+// World-space variant (see bayerThreshold4x4(vec3, float) for notes).
+float bayerThreshold8x8(vec3 worldPos, float cellSize) {
+    ivec3 g = ivec3(floor(worldPos / cellSize));
+    return bayerThreshold8x8(ivec2(g.x ^ (g.y * 7), g.z ^ (g.y * 13)));
 }
 
 
@@ -89,6 +124,23 @@ float ignThreshold(vec2 screenPos) {
 float ignThreshold(vec2 screenPos, int frameIndex) {
     screenPos += 5.588238 * float(frameIndex & 63);
     return ignThreshold(screenPos);
+}
+
+// World-space IGN: hashes the 3D world position so the threshold is anchored
+// to the surface and does not swim as the camera moves.  All three axes
+// contribute via distinct magic constants so there are no stripe artifacts
+// on walls or ceilings.
+float ignThreshold(vec3 worldPos) {
+    return fract(52.9829189 * fract(
+        worldPos.x * 0.06711056 +
+        worldPos.y * 0.00289374 +
+        worldPos.z * 0.00583715));
+}
+
+// Temporally-animated world-space variant.  Pair with TAA for best results.
+float ignThreshold(vec3 worldPos, int frameIndex) {
+    worldPos += 5.588238 * float(frameIndex & 63);
+    return ignThreshold(worldPos);
 }
 
 
@@ -153,5 +205,33 @@ void stochasticDiscardIGN(float alpha, vec2 screenPos) {
 // Discard if alpha is below the IGN threshold at this pixel (animated).
 void stochasticDiscardIGN(float alpha, vec2 screenPos, int frameIndex) {
     if (alpha < ignThreshold(screenPos, frameIndex))
+        discard;
+}
+
+// ---------------------------------------------------------------------------
+//  World-space discard helpers  (no swimming when the camera moves)
+// ---------------------------------------------------------------------------
+
+// Discard if alpha is below the Bayer 4×4 threshold at this world position.
+void stochasticDiscardBayer4x4(float alpha, vec3 worldPos, float cellSize) {
+    if (alpha < bayerThreshold4x4(worldPos, cellSize))
+        discard;
+}
+
+// Discard if alpha is below the Bayer 8×8 threshold at this world position.
+void stochasticDiscardBayer8x8(float alpha, vec3 worldPos, float cellSize) {
+    if (alpha < bayerThreshold8x8(worldPos, cellSize))
+        discard;
+}
+
+// Discard if alpha is below the IGN threshold at this world position (static).
+void stochasticDiscardIGN(float alpha, vec3 worldPos) {
+    if (alpha < ignThreshold(worldPos))
+        discard;
+}
+
+// Discard if alpha is below the IGN threshold at this world position (animated).
+void stochasticDiscardIGN(float alpha, vec3 worldPos, int frameIndex) {
+    if (alpha < ignThreshold(worldPos, frameIndex))
         discard;
 }

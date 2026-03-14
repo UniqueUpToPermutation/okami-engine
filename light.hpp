@@ -35,14 +35,22 @@ namespace okami {
 
     // Computes a shadow cascade that tightly fits the portion of the view
     // frustum up to shadowDistance world units from the player camera.
-    // shadowBehind controls how far behind the frustum the light camera
-    // is pulled back to capture occluders outside the view frustum.
+    // zNear / zFar are the view-space depth slice boundaries for this cascade
+    // (positive distances along the view -Z axis, i.e. the same convention as
+    // glm::perspective's nearZ/farZ).  Use them to carve out a sub-frustum
+    // for each CSM split.
+    //
+    // shadowBehind is a multiplier on the frustum bounding-sphere radius that
+    // controls how far behind the sphere the light camera is pulled back to
+    // capture occluders outside the view frustum.  0 = no extra coverage,
+    // 1 = one extra radius, 2 = two extra radii, etc.
     ShadowCascade ComputeShadowCascade(
         DirectionalLightComponent const& light,
         Camera                    const& viewCamera,
         Transform                 const& viewTransform,
         glm::ivec2                const& viewportSize,
-        float                            shadowDistance,
+        float                            zNear,
+        float                            zFar,
         int                              shadowMapSize,
-        float                            shadowBehind = 100.0f);
+        float                            shadowBehind = 1.0f);
 }

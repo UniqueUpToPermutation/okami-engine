@@ -98,7 +98,7 @@ protected:
 
                     auto framebufferSize = m_glProvider->GetFramebufferSize();
                     ShadowCascade cascade = ComputeShadowCascade(
-                        light, *viewCam, *viewTransform, framebufferSize, 20.0f,
+                        light, *viewCam, *viewTransform, framebufferSize, 0.0f, 10.0f,
                         OGLDepthPass::kShadowMapSize);
 
                     const glm::mat4 lightView =
