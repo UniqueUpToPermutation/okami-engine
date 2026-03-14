@@ -137,3 +137,23 @@ glm::mat4 Camera::GetProjectionMatrix(int width, int height, bool usingDirectX) 
 		[&](const auto& proj) { return proj.GetProjectionMatrix(width, height, usingDirectX); },
 		m_projection);
 }
+
+float Camera::NearDistance() const {
+	return std::visit([](auto const& proj) -> float {
+		using T = std::decay_t<decltype(proj)>;
+		if constexpr (std::is_same_v<T, NoProjection>)
+			return 0.0f;
+		else
+			return proj.m_nearZ;
+	}, m_projection);
+}
+
+float Camera::FarDistance() const {
+	return std::visit([](auto const& proj) -> float {
+		using T = std::decay_t<decltype(proj)>;
+		if constexpr (std::is_same_v<T, NoProjection>)
+			return 0.0f;
+		else
+			return proj.m_farZ;
+	}, m_projection);
+}

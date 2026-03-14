@@ -18,6 +18,7 @@
 #include "../light.hpp"
 
 #include <glog/logging.h>
+#include <cmath>
 
 #include <glad/gl.h>
 
@@ -85,7 +86,8 @@ protected:
         const entity_t activeCam = m_activeCamera.load(std::memory_order_relaxed);
 
         // ── Shadow pass ──────────────────────────────────────────────────────
-        // Find the first shadow-casting directional light and run a depth pass.
+        // Find the first shadow-casting directional light and render all cascades
+        // in a single draw call via a geometry shader.
         {
             auto* viewCam       = registry.try_get<Camera>(activeCam);
             auto* viewTransform = registry.try_get<Transform>(activeCam);
@@ -97,34 +99,47 @@ protected:
                     if (!light.b_castShadow) continue;
 
                     auto framebufferSize = m_glProvider->GetFramebufferSize();
-                    ShadowCascade cascade = ComputeShadowCascade(
-                        light, *viewCam, *viewTransform, framebufferSize, 0.0f, 10.0f,
-                        OGLDepthPass::kShadowMapSize);
 
-                    const glm::mat4 lightView =
-                        cascade.transform.Inverse().AsMatrix();
-                    const glm::mat4 lightProj =
-                        cascade.camera.GetProjectionMatrix(
+                    // Practical Split Scheme (PSSM): blend of uniform and logarithmic splits.
+                    static constexpr int   kN      = OGLDepthPass::kNumCascades;
+                    const float kNear   = viewCam->NearDistance();
+                    static constexpr float kFar    = 25.0f;
+                    static constexpr float kLambda = 0.5f;  // 0 = uniform, 1 = logarithmic
+
+                    float splits[kN + 1];
+                    splits[0] = kNear;
+                    for (int i = 1; i < kN; ++i) {
+                        const float t        = static_cast<float>(i) / kN;
+                        const float logSplit = kNear * std::pow(kFar / kNear, t);
+                        const float uniSplit = kNear + (kFar - kNear) * t;
+                        splits[i] = kLambda * logSplit + (1.0f - kLambda) * uniSplit;
+                    }
+                    splits[kN] = kFar;
+
+                    // Compute a tight-fitting orthographic light camera for each cascade.
+                    glsl::ShadowCascadesBlock cascadesBlock{};
+                    for (int i = 0; i < kN; ++i) {
+                        ShadowCascade cascade = ComputeShadowCascade(
+                            light, *viewCam, *viewTransform, framebufferSize,
+                            splits[i], splits[i + 1], OGLDepthPass::kShadowMapSize);
+
+                        const glm::mat4 lightView = cascade.transform.Inverse().AsMatrix();
+                        const glm::mat4 lightProj = cascade.camera.GetProjectionMatrix(
                             OGLDepthPass::kShadowMapSize,
                             OGLDepthPass::kShadowMapSize,
                             /*usingDirectX=*/false);
-                    const glm::mat4 lightVP = lightProj * lightView;
+                        cascadesBlock.u_cascadeViewProj[i] = lightProj * lightView;
+                    }
 
-                    glsl::CameraGlobals lightCamera{};
-                    lightCamera.u_view        = lightView;
-                    lightCamera.u_proj        = lightProj;
-                    lightCamera.u_viewProj    = lightVP;
-                    lightCamera.u_invView     = cascade.transform.AsMatrix();
-                    lightCamera.u_invProj     = glm::inverse(lightProj);
-                    lightCamera.u_invViewProj = glm::inverse(lightVP);
+                    const glm::vec4 cascadeSplits(splits[1], splits[2], splits[3], splits[4]);
 
-                    m_depthPass->BeginDepthPass(lightCamera);
+                    m_depthPass->BeginDepthPass(cascadesBlock, cascadeSplits);
 
                     OGLPass shadowPass{ .m_type = OGLPassType::Shadow };
                     m_staticMeshRenderer->Pass(registry, shadowPass);
 
                     m_depthPass->EndDepthPass();
-                    break; // single cascade for now
+                    break; // one directional light drives all cascades
                 }
             }
         }

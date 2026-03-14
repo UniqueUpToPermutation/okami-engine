@@ -19,6 +19,11 @@ namespace okami {
         auto ubo = UniformBuffer<glsl::SceneGlobals>::Create();
         OKAMI_ERROR_RETURN(ubo);
         m_sceneUBO = std::move(*ubo);
+
+        m_depthPassProvider = context.m_interfaces.Query<IOGLDepthPassProvider>();
+        OKAMI_ERROR_RETURN_IF(!m_depthPassProvider,
+            "IOGLDepthPassProvider interface not available for OGLSceneModule");
+
         return {};
     }
 
@@ -99,12 +104,19 @@ namespace okami {
             .u_camera   = glslCamera,
             .u_lighting = lighting,
             .u_tonemap  = tonemap,
-            .u_shadow   = glsl::ShadowGlobals{
-                .u_shadowBiasBase  = pp.m_shadowBiasBase,
-                .u_shadowBiasSlope = pp.m_shadowBiasSlope,
-                .u_shadowBiasMax   = pp.m_shadowBiasMax,
-                .u_shadowPad       = 0.0f
-            }
+            .u_shadow   = [&]() {
+                glsl::ShadowGlobals s{};
+                s.u_shadowBiasBase  = pp.m_shadowBiasBase;
+                s.u_shadowBiasSlope = pp.m_shadowBiasSlope;
+                s.u_shadowBiasMax   = pp.m_shadowBiasMax;
+                s.u_shadowPad       = 0.0f;
+                // Copy cascade VP matrices and split distances from the depth pass.
+                auto const& cascades = m_depthPassProvider->GetCurrentCascades();
+                for (int i = 0; i < NUM_SHADOW_CASCADES; ++i)
+                    s.u_cascadeViewProj[i] = cascades.u_cascadeViewProj[i];
+                s.u_cascadeSplits = m_depthPassProvider->GetCurrentCascadeSplits();
+                return s;
+            }()
         };
     }
 

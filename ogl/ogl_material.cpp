@@ -79,7 +79,6 @@ Error OGLMaterialManager::StartupImpl(InitContext const& context) {
             GetGLSLShaderPath("lambert.fs"),
             [setupStaticMesh](GLProgram const& prog) -> Error {
                 auto e = setupStaticMesh(prog);
-                e += AssignBufferBindingPoint(prog, "ShadowCameraBlock", 1);
                 e += AssignTextureBindingPoint(prog, "u_diffuseMap", 0);
                 e += AssignTextureBindingPoint(prog, "u_normalMap",  1);
                 e += AssignTextureBindingPoint(prog, "u_shadowMap",  2);

@@ -543,11 +543,16 @@ namespace okami {
         virtual UniformBuffer<glsl::SceneGlobals> const& GetSceneGlobalsBuffer() const = 0;
     };
 
-    // Provides access to the depth pass resources: camera UBO and shadow map texture.
+    // Provides access to the depth pass resources: cascade UBO and shadow map array texture.
     class IOGLDepthPassProvider {
     public:
         virtual ~IOGLDepthPassProvider() = default;
-        virtual UniformBuffer<glsl::CameraGlobals> const& GetCameraGlobalsBuffer() const = 0;
+        // UBO bound by the depth-pass geometry shader (one VP per cascade).
+        virtual UniformBuffer<glsl::ShadowCascadesBlock> const& GetCascadesBuffer() const = 0;
+        // Current cascade VP matrices written in BeginDepthPass (consumed by OGLSceneModule).
+        virtual glsl::ShadowCascadesBlock const& GetCurrentCascades() const = 0;
+        // View-space far split for each cascade (.x=split0 … .w=split3).
+        virtual glm::vec4 GetCurrentCascadeSplits() const = 0;
         virtual GLuint GetDepthTexture() const = 0;
     };
 

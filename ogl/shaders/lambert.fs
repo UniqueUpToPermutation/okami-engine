@@ -16,14 +16,10 @@ layout(std140) uniform SceneGlobalsBlock {
     SceneGlobals sceneGlobals;
 };
 
-layout(std140) uniform ShadowCameraBlock {
-    CameraGlobals shadowCamera;
-};
-
 uniform sampler2D u_diffuseMap;
 
-// Unit 2: shadow depth map from the directional light.
-uniform sampler2D u_shadowMap;
+// Unit 2: shadow depth map array (one layer per CSM cascade).
+uniform sampler2DArray u_shadowMap;
 
 out vec4 FragColor;
 
@@ -55,7 +51,7 @@ void main() {
         // Apply PCF shadow test to directional lights.
         float shadow = 1.0;
         if (sceneGlobals.u_lighting.u_lights[i].u_type.x == uint(DIRECTIONAL_LIGHT)) {
-            shadow = sampleShadow(u_shadowMap, shadowCamera, sceneGlobals, vs_out.position, N, inc.direction);
+            shadow = sampleShadowCSM(u_shadowMap, sceneGlobals, vs_out.position, N, inc.direction);
         }
 
         color += albedo * inc.radiance * nDotL * shadow;

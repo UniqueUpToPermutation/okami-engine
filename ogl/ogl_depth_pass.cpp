@@ -12,41 +12,42 @@ Error OGLDepthPass::RegisterImpl(InterfaceCollection& interfaces) {
 Error OGLDepthPass::StartupImpl(InitContext const& context) {
     Error err;
 
-    // Create the persistent shadow-pass UBO (camera matrices only).
+    // Create the cascade UBO (VP matrices for the depth-pass geometry shader).
     {
-        auto ubo = UniformBuffer<glsl::CameraGlobals>::Create();
+        auto ubo = UniformBuffer<glsl::ShadowCascadesBlock>::Create();
         if (!ubo) { err += ubo.error(); return err; }
-        m_shadowUBO = std::move(*ubo);
+        m_cascadesUBO = std::move(*ubo);
     }
 
-    // Create the shadow-map depth texture.
+    // Create the shadow-map depth texture array (one layer per cascade).
     {
         GLuint id;
         glGenTextures(1, &id);
         m_shadowMapTexture = GLTexture(id);
-        glBindTexture(GL_TEXTURE_2D, id);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
-                     kShadowMapSize, kShadowMapSize,
+        glBindTexture(GL_TEXTURE_2D_ARRAY, id);
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F,
+                     kShadowMapSize, kShadowMapSize, kNumCascades,
                      0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
         const float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-        glBindTexture(GL_TEXTURE_2D, 0);
+        glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, borderColor);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
         err += GET_GL_ERROR();
     }
 
-    // Create the FBO and attach the shadow map.
+    // Create a layered FBO and attach all cascade layers at once.
+    // The geometry shader uses gl_Layer to route each primitive to its cascade.
     {
         GLuint fboId;
         glGenFramebuffers(1, &fboId);
         m_shadowFBO = GLFramebuffer(fboId);
         glBindFramebuffer(GL_FRAMEBUFFER, fboId);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                               GL_TEXTURE_2D, m_shadowMapTexture.get(), 0);
-        // No colour attachment needed.
+        // glFramebufferTexture (GL 3.2+) attaches every layer, enabling layered rendering.
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                             m_shadowMapTexture.get(), 0);
         glDrawBuffer(GL_NONE);
         glReadBuffer(GL_NONE);
         const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -56,26 +57,33 @@ Error OGLDepthPass::StartupImpl(InitContext const& context) {
         err += GET_GL_ERROR();
     }
 
-    LOG(INFO) << "OGLDepthPass initialised (" << kShadowMapSize << "x" << kShadowMapSize << ")";
+    LOG(INFO) << "OGLDepthPass initialised ("
+              << kShadowMapSize << "x" << kShadowMapSize
+              << " x" << kNumCascades << " cascades)";
     return err;
 }
 
-Error OGLDepthPass::BeginDepthPass(glsl::CameraGlobals const& cameraGlobals) {
+Error OGLDepthPass::BeginDepthPass(glsl::ShadowCascadesBlock const& cascades,
+                                   glm::vec4 const& cascadeSplits) {
     Error err;
 
     // --- Save current FBO and viewport ---------------------------------------
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &m_prevFBO);
     glGetIntegerv(GL_VIEWPORT, m_prevViewport);
 
-    // --- Upload light-space camera data to the UBO ---------------------------
-    err += m_shadowUBO.Write(cameraGlobals);
+    // --- Store cascade data for OGLSceneModule to consume --------------------
+    m_currentCascades = cascades;
+    m_currentSplits   = cascadeSplits;
+
+    // --- Upload cascade VP matrices to the UBO (used by the GS) -------------
+    err += m_cascadesUBO.Write(cascades);
     OKAMI_ERROR_RETURN(err);
 
-    // --- Bind shadow FBO and prepare render state ----------------------------
+    // --- Bind layered shadow FBO and prepare render state --------------------
     glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO.get());
     glViewport(0, 0, kShadowMapSize, kShadowMapSize);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glCullFace(GL_FRONT);   // reduce peter-panning
+    glClear(GL_DEPTH_BUFFER_BIT);   // clears all layers in a layered FBO
+    glCullFace(GL_FRONT);           // reduce peter-panning
     err += GET_GL_ERROR();
 
     return err;

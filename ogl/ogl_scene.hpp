@@ -13,7 +13,8 @@ namespace okami {
         public IOGLSceneGlobalsProvider {
     private:
         UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
-        IGLProvider* m_glProvider = nullptr;
+        IGLProvider*             m_glProvider         = nullptr;
+        IOGLDepthPassProvider*   m_depthPassProvider  = nullptr;
 
     protected:
         Error RegisterImpl(InterfaceCollection& interfaces) override;

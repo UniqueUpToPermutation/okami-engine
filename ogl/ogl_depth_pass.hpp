@@ -7,31 +7,43 @@
 #include "shaders/scene.glsl"
 
 namespace okami {
-    // Owns the shadow-map depth texture and framebuffer.
+    // Owns the shadow-map depth texture array and layered framebuffer.
     // Call BeginDepthPass() before rendering depth modules, EndDepthPass() after.
-    // Implements IOGLDepthPassProvider so other modules can bind the light-space
-    // camera UBO and sample the shadow map texture.
+    // Implements IOGLDepthPassProvider so other modules can bind the cascade UBO
+    // and sample the shadow map array texture.
     class OGLDepthPass final :
         public EngineModule,
         public IOGLDepthPassProvider {
     public:
         static constexpr int kShadowMapSize = 2048;
+        static constexpr int kNumCascades   = NUM_SHADOW_CASCADES;
 
-        GLTexture     m_shadowMapTexture;
-        GLFramebuffer m_shadowFBO;
+        GLTexture     m_shadowMapTexture;   // GL_TEXTURE_2D_ARRAY, kNumCascades layers
+        GLFramebuffer m_shadowFBO;          // layered FBO (all cascade layers attached)
 
-        // Light-space camera UBO, written once per frame in BeginDepthPass.
-        UniformBuffer<glsl::CameraGlobals> m_shadowUBO;
+        // UBO written in BeginDepthPass, bound by the depth-pass geometry shader.
+        UniformBuffer<glsl::ShadowCascadesBlock> m_cascadesUBO;
+
+        // Last values written in BeginDepthPass, read by OGLSceneModule.
+        glsl::ShadowCascadesBlock m_currentCascades = {};
+        glm::vec4                 m_currentSplits   = {};
 
         // IOGLDepthPassProvider
-        UniformBuffer<glsl::CameraGlobals> const& GetCameraGlobalsBuffer() const override {
-            return m_shadowUBO;
+        UniformBuffer<glsl::ShadowCascadesBlock> const& GetCascadesBuffer() const override {
+            return m_cascadesUBO;
+        }
+        glsl::ShadowCascadesBlock const& GetCurrentCascades() const override {
+            return m_currentCascades;
+        }
+        glm::vec4 GetCurrentCascadeSplits() const override {
+            return m_currentSplits;
         }
         GLuint GetDepthTexture() const override { return m_shadowMapTexture.get(); }
 
-        // Saves current FBO/viewport, writes the light-space camera globals,
-        // binds the shadow FBO, sets the viewport, and clears the depth buffer.
-        Error BeginDepthPass(glsl::CameraGlobals const& cameraGlobals);
+        // Saves current FBO/viewport, uploads the cascade data, binds the layered
+        // shadow FBO, sets the viewport, and clears the depth buffer.
+        Error BeginDepthPass(glsl::ShadowCascadesBlock const& cascades,
+                             glm::vec4 const& cascadeSplits);
 
         // Restores FBO and viewport saved by BeginDepthPass.
         Error EndDepthPass();

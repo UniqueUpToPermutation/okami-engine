@@ -39,6 +39,11 @@ namespace okami {
 		Projection m_projection; // Projection type (perspective or orthographic)
 
 		glm::mat4 GetProjectionMatrix(int width, int height, bool usingDirectX) const;
+
+		// Returns the near plane distance (positive value).
+		float NearDistance() const;
+		// Returns the far plane distance (positive value).
+		float FarDistance() const;
 	
 		static Camera Identity();
 		static Camera Perspective(

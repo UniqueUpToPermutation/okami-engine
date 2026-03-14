@@ -22,7 +22,6 @@ namespace okami {
 
         enum class BufferBindingPoints : GLint {
             SceneGlobals,
-            ShadowCamera,
             Count
         };
 
