@@ -50,22 +50,22 @@ set_tests_properties(EngineUnitTests PROPERTIES
 # Post-build Steps
 #==============================================================================
 
-# Collect all files in config/ and samples/config/ directories
-file(GLOB CONFIG_FILES "${CMAKE_SOURCE_DIR}/config/*")
-file(GLOB SAMPLES_CONFIG_FILES "${CMAKE_SOURCE_DIR}/samples/config/*")
-list(APPEND ALL_CONFIG_FILES ${CONFIG_FILES} ${SAMPLES_CONFIG_FILES})
-
-# Copy config files for tests as well
-if(ALL_CONFIG_FILES)
-    add_custom_command(
-        TARGET EngineTests POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:EngineTests>/config
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${ALL_CONFIG_FILES}
-            $<TARGET_FILE_DIR:EngineTests>/config/
-        COMMENT "Copying config files to test output directory if newer"
-    )
-endif()
+# Copy config directories for tests if newer.
+# Using copy_directory_if_different so new files are picked up at build
+# time without requiring a CMake reconfigure.
+foreach(_config_dir
+    "${CMAKE_SOURCE_DIR}/config"
+    "${CMAKE_SOURCE_DIR}/samples/config")
+    if(EXISTS "${_config_dir}")
+        add_custom_command(
+            TARGET EngineTests POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                "${_config_dir}"
+                "$<TARGET_FILE_DIR:EngineTests>/config"
+            COMMENT "Copying ${_config_dir} to test output config/ if newer"
+        )
+    endif()
+endforeach()
 
 # Always create the golden_images directory for test output.
 # On first run, the headless renderer tests will auto-generate golden images

@@ -15,8 +15,8 @@ namespace okami {
         public EngineModule,
         public IOGLDepthPassProvider {
     public:
-        static constexpr int kShadowMapSize = 2048;
-        static constexpr int kNumCascades   = NUM_SHADOW_CASCADES;
+        static constexpr int kNumCascades = NUM_SHADOW_CASCADES;
+        int m_shadowMapSize = 2048; // set from RendererConfig at startup
 
         GLTexture     m_shadowMapTexture;   // GL_TEXTURE_2D_ARRAY, kNumCascades layers
         GLFramebuffer m_shadowFBO;          // layered FBO (all cascade layers attached)

@@ -4,6 +4,9 @@
 #include "transform.hpp"
 #include "../light.hpp"
 #include "../renderer.hpp"
+#include "../config.hpp"
+
+#include <glog/logging.h>
 
 namespace okami {
     Error OGLSceneModule::RegisterImpl(InterfaceCollection& interfaces) {
@@ -23,6 +26,8 @@ namespace okami {
         m_depthPassProvider = context.m_interfaces.Query<IOGLDepthPassProvider>();
         OKAMI_ERROR_RETURN_IF(!m_depthPassProvider,
             "IOGLDepthPassProvider interface not available for OGLSceneModule");
+
+        m_rendererConfig = ReadConfig<RendererConfig>(context.m_interfaces, LOG_WRAP(WARNING));
 
         return {};
     }
@@ -106,9 +111,9 @@ namespace okami {
             .u_tonemap  = tonemap,
             .u_shadow   = [&]() {
                 glsl::ShadowGlobals s{};
-                s.u_shadowBiasBase  = pp.m_shadowBiasBase;
-                s.u_shadowBiasSlope = pp.m_shadowBiasSlope;
-                s.u_shadowBiasMax   = pp.m_shadowBiasMax;
+                s.u_shadowBiasBase  = static_cast<float>(m_rendererConfig.m_shadowBiasBase);
+                s.u_shadowBiasSlope = static_cast<float>(m_rendererConfig.m_shadowBiasSlope);
+                s.u_shadowBiasMax   = static_cast<float>(m_rendererConfig.m_shadowBiasMax);
                 s.u_shadowPad       = 0.0f;
                 // Copy cascade VP matrices and split distances from the depth pass.
                 auto const& cascades = m_depthPassProvider->GetCurrentCascades();

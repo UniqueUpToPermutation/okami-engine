@@ -1,5 +1,7 @@
 #include "ogl_depth_pass.hpp"
 
+#include "../renderer.hpp"
+#include "../config.hpp"
 #include <glog/logging.h>
 
 using namespace okami;
@@ -11,6 +13,10 @@ Error OGLDepthPass::RegisterImpl(InterfaceCollection& interfaces) {
 
 Error OGLDepthPass::StartupImpl(InitContext const& context) {
     Error err;
+
+    // Read shadow map size from renderer config (falls back to 2048 if absent).
+    auto cfg = ReadConfig<RendererConfig>(context.m_interfaces, LOG_WRAP(WARNING));
+    m_shadowMapSize = cfg.m_shadowMapSize;
 
     // Create the cascade UBO (VP matrices for the depth-pass geometry shader).
     {
@@ -26,7 +32,7 @@ Error OGLDepthPass::StartupImpl(InitContext const& context) {
         m_shadowMapTexture = GLTexture(id);
         glBindTexture(GL_TEXTURE_2D_ARRAY, id);
         glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F,
-                     kShadowMapSize, kShadowMapSize, kNumCascades,
+                     m_shadowMapSize, m_shadowMapSize, kNumCascades,
                      0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -58,7 +64,7 @@ Error OGLDepthPass::StartupImpl(InitContext const& context) {
     }
 
     LOG(INFO) << "OGLDepthPass initialised ("
-              << kShadowMapSize << "x" << kShadowMapSize
+              << m_shadowMapSize << "x" << m_shadowMapSize
               << " x" << kNumCascades << " cascades)";
     return err;
 }
@@ -81,7 +87,7 @@ Error OGLDepthPass::BeginDepthPass(glsl::ShadowCascadesBlock const& cascades,
 
     // --- Bind layered shadow FBO and prepare render state --------------------
     glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO.get());
-    glViewport(0, 0, kShadowMapSize, kShadowMapSize);
+    glViewport(0, 0, m_shadowMapSize, m_shadowMapSize);
     glClear(GL_DEPTH_BUFFER_BIT);   // clears all layers in a layered FBO
     glCullFace(GL_FRONT);           // reduce peter-panning
     err += GET_GL_ERROR();

@@ -264,6 +264,7 @@ protected:
         }
 
         try {
+            OKAMI_LOG_INFO("Loading config from " + configPath.string());
             config = YAML::LoadFile(configPath.string());
 		}
 		catch (const YAML::Exception& e) {

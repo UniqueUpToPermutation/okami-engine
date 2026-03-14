@@ -1,7 +1,17 @@
 {
 "renderer": {
 	"bufferCount": 2,
-	"syncInterval": 1
+	"syncInterval": 1,
+
+	"m_shadowBiasBase": 0.0005,
+	"m_shadowBiasSlope": 0.005,
+	"m_shadowBiasMax": 0.002,
+
+	"m_shadowMapSize": 1024,  
+	"m_shadowFarDistance": 25.0,
+	"m_shadowCascadeLambda": 0.5,
+
+	"m_shadowBehind" : 1.0,
 },
 "window" : {
 	"backbufferWidth": 1920,

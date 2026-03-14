@@ -27,6 +27,18 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/samples/assets")
     )
 endif()
 
+# Copy samples/config/ to the binary samples/ directory if newer.
+# Sample executables sit under ${CMAKE_BINARY_DIR}/samples/<name>/ so
+# SearchForPath (walking up) will find the sibling config/ automatically.
+if(EXISTS "${CMAKE_SOURCE_DIR}/samples/config")
+    add_custom_target(CopySampleConfig ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+            "${CMAKE_SOURCE_DIR}/samples/config"
+            "${CMAKE_BINARY_DIR}/samples/config"
+        COMMENT "Copying samples/config/ to build directory if newer"
+    )
+endif()
+
 function(add_engine_sample TARGET_NAME)
     add_executable(${TARGET_NAME} ${ARGN})
     target_link_libraries(${TARGET_NAME} PRIVATE EngineLib)
@@ -38,6 +50,11 @@ function(add_engine_sample TARGET_NAME)
     # Wait for AssetBuilder to finish processing samples/assets/.
     if(TARGET BuildSampleAssets)
         add_dependencies(${TARGET_NAME} BuildSampleAssets)
+    endif()
+
+    # Ensure config/ is up-to-date before the sample runs.
+    if(TARGET CopySampleConfig)
+        add_dependencies(${TARGET_NAME} CopySampleConfig)
     endif()
 endfunction()
 

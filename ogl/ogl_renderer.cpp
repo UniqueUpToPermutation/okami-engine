@@ -74,6 +74,8 @@ protected:
 
         m_glProvider->SetSwapInterval(1);
 
+        m_config = ReadConfig<RendererConfig>(context.m_interfaces, LOG_WRAP(WARNING));
+
         return {};
     }
 
@@ -101,10 +103,10 @@ protected:
                     auto framebufferSize = m_glProvider->GetFramebufferSize();
 
                     // Practical Split Scheme (PSSM): blend of uniform and logarithmic splits.
-                    static constexpr int   kN      = OGLDepthPass::kNumCascades;
+                    static constexpr int kN = OGLDepthPass::kNumCascades;
                     const float kNear   = viewCam->NearDistance();
-                    static constexpr float kFar    = 25.0f;
-                    static constexpr float kLambda = 0.5f;  // 0 = uniform, 1 = logarithmic
+                    const float kFar    = static_cast<float>(m_config.m_shadowFarDistance);
+                    const float kLambda = static_cast<float>(m_config.m_shadowCascadeLambda);
 
                     float splits[kN + 1];
                     splits[0] = kNear;
@@ -121,12 +123,13 @@ protected:
                     for (int i = 0; i < kN; ++i) {
                         ShadowCascade cascade = ComputeShadowCascade(
                             light, *viewCam, *viewTransform, framebufferSize,
-                            splits[i], splits[i + 1], OGLDepthPass::kShadowMapSize);
+                            splits[i], splits[i + 1], m_depthPass->m_shadowMapSize,
+                            m_config.m_shadowBehind);
 
                         const glm::mat4 lightView = cascade.transform.Inverse().AsMatrix();
                         const glm::mat4 lightProj = cascade.camera.GetProjectionMatrix(
-                            OGLDepthPass::kShadowMapSize,
-                            OGLDepthPass::kShadowMapSize,
+                            m_depthPass->m_shadowMapSize,
+                            m_depthPass->m_shadowMapSize,
                             /*usingDirectX=*/false);
                         cascadesBlock.u_cascadeViewProj[i] = lightProj * lightView;
                     }
