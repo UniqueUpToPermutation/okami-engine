@@ -8,15 +8,20 @@ using namespace okami;
 
 Error OGLDepthPass::RegisterImpl(InterfaceCollection& interfaces) {
     interfaces.Register<IOGLDepthPassProvider>(this);
+    RegisterConfig<ShadowConfig>(interfaces, LOG_WRAP(WARNING));
     return {};
 }
 
 Error OGLDepthPass::StartupImpl(InitContext const& context) {
     Error err;
 
-    // Read shadow map size from renderer config (falls back to 2048 if absent).
-    auto cfg = ReadConfig<RendererConfig>(context.m_interfaces, LOG_WRAP(WARNING));
+    // Read shadow config from file (falls back to defaults if absent).
+    auto cfg = ReadConfig<ShadowConfig>(context.m_interfaces, LOG_WRAP(WARNING));
     m_shadowMapSize = cfg.m_shadowMapSize;
+
+    // Emplace initial ShadowConfig into registry ctx so other modules can
+    // read and modify it at runtime via UpdateCtxSignal<ShadowConfig>.
+    context.m_registry.ctx().emplace<ShadowConfig>(cfg);
 
     // Create the cascade UBO (VP matrices for the depth-pass geometry shader).
     {

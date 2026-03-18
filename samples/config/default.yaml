@@ -2,16 +2,20 @@
 "renderer": {
 	"bufferCount": 2,
 	"syncInterval": 1,
-
-	"m_shadowBiasBase": 0.0005,
-	"m_shadowBiasSlope": 0.005,
-	"m_shadowBiasMax": 0.002,
+},
+"shadow": {
+	"m_shadowBiasBase": 0.0001,
+	"m_shadowBiasSlope": 0.001,
+	"m_shadowBiasMax": 0.001,
 
 	"m_shadowMapSize": 1024,  
-	"m_shadowFarDistance": 25.0,
+	"m_shadowFarDistance": 20.0,
 	"m_shadowCascadeLambda": 0.5,
 
-	"m_shadowBehind" : 1.0,
+	"m_shadowBehind" : 10.0,
+},
+"renderDebug": {
+	"m_mode" : 0,
 },
 "window" : {
 	"backbufferWidth": 1920,

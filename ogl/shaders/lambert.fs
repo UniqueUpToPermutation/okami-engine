@@ -39,10 +39,12 @@ void main() {
 
     vec3 N = sampleNormalMap(vs_out.uv, vs_out.normal, vs_out.tangent);
 
-    // Ambient term
-    vec3 color = albedo * sceneGlobals.u_lighting.u_ambientLightColor.rgb;
+    // Accumulate ambient and direct contributions separately so debug views
+    // can inspect them individually.
+    vec3  ambientLight = sceneGlobals.u_lighting.u_ambientLightColor.rgb;
+    vec3  directLight  = vec3(0.0);
+    float shadowFactor = 1.0; // shadow value for the first directional light
 
-    // Lambertian direct lighting from all active lights
     uint lightCount = sceneGlobals.u_lighting.u_lightCount.x;
     for (uint i = 0u; i < lightCount; ++i) {
         LightIncidence inc  = getLightIncidence(sceneGlobals.u_lighting.u_lights[i], vs_out.position);
@@ -52,11 +54,30 @@ void main() {
         float shadow = 1.0;
         if (sceneGlobals.u_lighting.u_lights[i].u_type.x == uint(DIRECTIONAL_LIGHT)) {
             shadow = sampleShadowCSM(u_shadowMap, sceneGlobals, vs_out.position, N, inc.direction);
+            shadowFactor = shadow;
         }
 
-        color += albedo * inc.radiance * nDotL * shadow;
+        directLight += inc.radiance * nDotL * shadow;
     }
 
-    // Tonemap from HDR linear to [0, 1], then encode to sRGB for display.
-    FragColor = vec4(linearToSRGB(applyTonemap(color, sceneGlobals.u_tonemap)), 1.0);
+    vec3 color = albedo * (ambientLight + directLight);
+
+    // Debug visualization modes
+    uint debugMode = sceneGlobals.u_debug.x;
+    if (debugMode == DEBUG_MODE_ALBEDO) {
+        // Raw albedo in sRGB
+        FragColor = vec4(linearToSRGB(albedo), 1.0);
+    } else if (debugMode == DEBUG_MODE_NORMAL) {
+        // World-space normal remapped from [-1, 1] to [0, 1]
+        FragColor = vec4(N * 0.5 + 0.5, 1.0);
+    } else if (debugMode == DEBUG_MODE_LIGHTING) {
+        // Lighting contribution without albedo (tonemapped)
+        FragColor = vec4(linearToSRGB(applyTonemap(ambientLight + directLight, sceneGlobals.u_tonemap)), 1.0);
+    } else if (debugMode == DEBUG_MODE_SHADOW) {
+        // Shadow factor: white = fully lit, black = fully shadowed
+        FragColor = vec4(vec3(shadowFactor), 1.0);
+    } else {
+        // Full render (DEBUG_MODE_NONE)
+        FragColor = vec4(linearToSRGB(applyTonemap(color, sceneGlobals.u_tonemap)), 1.0);
+    }
 }

@@ -92,23 +92,18 @@ namespace okami {
 		Color m_color = color::White;
 	};
 
-	struct RendererConfig {
-		int bufferCount = 2;
-		int syncInterval = 1; // VSync enabled
+	struct ShadowConfig {
 		// Shadow bias
-		double m_shadowBiasBase  = 0.0002;
-		double m_shadowBiasSlope = 0.005;
+		double m_shadowBiasBase  = 0.0001;
+		double m_shadowBiasSlope = 0.001;
 		double m_shadowBiasMax   = 0.001;
 		// Cascaded shadow map
 		int    m_shadowMapSize       = 1024;   // texture resolution per cascade
 		double m_shadowFarDistance   = 20.0;   // max shadow distance (world units)
-		double m_shadowCascadeLambda = 0.75;    // PSSM blend: 0 = uniform, 1 = logarithmic
+		double m_shadowCascadeLambda = 0.5;   // PSSM blend: 0 = uniform, 1 = logarithmic
+		double m_shadowBehind        = 10.0;    // how far behind the camera to place the shadow frustum (world units)
 
-		double m_shadowBehind = 5.0; // how far behind the camera to place the shadow frustum (world units)
-
-		OKAMI_CONFIG(renderer) {
-			OKAMI_CONFIG_FIELD(bufferCount);
-			OKAMI_CONFIG_FIELD(syncInterval);
+		OKAMI_CONFIG(shadow) {
 			OKAMI_CONFIG_FIELD(m_shadowBiasBase);
 			OKAMI_CONFIG_FIELD(m_shadowBiasSlope);
 			OKAMI_CONFIG_FIELD(m_shadowBiasMax);
@@ -116,6 +111,25 @@ namespace okami {
 			OKAMI_CONFIG_FIELD(m_shadowFarDistance);
 			OKAMI_CONFIG_FIELD(m_shadowCascadeLambda);
 			OKAMI_CONFIG_FIELD(m_shadowBehind);
+		}
+	};
+
+	struct RendererConfig {
+		int bufferCount = 2;
+		int syncInterval = 1; // VSync enabled
+
+		OKAMI_CONFIG(renderer) {
+			OKAMI_CONFIG_FIELD(bufferCount);
+			OKAMI_CONFIG_FIELD(syncInterval);
+		}
+	};
+
+	// Runtime debug visualization mode stored in the registry ctx.
+	struct RenderDebugConfig {
+		int m_mode = 0; // 0 = none, 1 = albedo, 2 = normal, 3 = lighting, 4 = shadow
+
+		OKAMI_CONFIG(renderDebug) {
+			OKAMI_CONFIG_FIELD(m_mode);
 		}
 	};
 

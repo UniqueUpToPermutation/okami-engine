@@ -4,7 +4,6 @@
 #include "transform.hpp"
 #include "../light.hpp"
 #include "../renderer.hpp"
-#include "../config.hpp"
 
 #include <glog/logging.h>
 
@@ -26,8 +25,6 @@ namespace okami {
         m_depthPassProvider = context.m_interfaces.Query<IOGLDepthPassProvider>();
         OKAMI_ERROR_RETURN_IF(!m_depthPassProvider,
             "IOGLDepthPassProvider interface not available for OGLSceneModule");
-
-        m_rendererConfig = ReadConfig<RendererConfig>(context.m_interfaces, LOG_WRAP(WARNING));
 
         return {};
     }
@@ -110,22 +107,28 @@ namespace okami {
             .u_lighting = lighting,
             .u_tonemap  = tonemap,
             .u_shadow   = [&]() {
-                glsl::ShadowGlobals s{};
-                s.u_shadowBiasBase  = static_cast<float>(m_rendererConfig.m_shadowBiasBase);
-                s.u_shadowBiasSlope = static_cast<float>(m_rendererConfig.m_shadowBiasSlope);
-                s.u_shadowBiasMax   = static_cast<float>(m_rendererConfig.m_shadowBiasMax);
-                s.u_shadowPad       = 0.0f;
-                // Copy cascade VP matrices and split distances from the depth pass.
-                auto const& cascades = m_depthPassProvider->GetCurrentCascades();
-                for (int i = 0; i < NUM_SHADOW_CASCADES; ++i)
-                    s.u_cascadeViewProj[i] = cascades.u_cascadeViewProj[i];
-                s.u_cascadeSplits = m_depthPassProvider->GetCurrentCascadeSplits();
-                return s;
-            }()
-        };
-    }
-
-    void OGLSceneModule::SetSceneGlobals(glsl::SceneGlobals const& globals) {
-        m_sceneUBO.Write(globals);
-    }
+            glsl::ShadowGlobals s{};
+            static const ShadowConfig kDefaultShadow;
+            auto const& shadowCfg = registry.ctx().contains<ShadowConfig>()
+                ? registry.ctx().get<ShadowConfig>() : kDefaultShadow;
+            s.u_shadowBiasBase  = static_cast<float>(shadowCfg.m_shadowBiasBase);
+            s.u_shadowBiasSlope = static_cast<float>(shadowCfg.m_shadowBiasSlope);
+            s.u_shadowBiasMax   = static_cast<float>(shadowCfg.m_shadowBiasMax);
+            s.u_shadowPad       = 0.0f;
+            auto const& cascades = m_depthPassProvider->GetCurrentCascades();
+            for (int i = 0; i < NUM_SHADOW_CASCADES; ++i)
+                s.u_cascadeViewProj[i] = cascades.u_cascadeViewProj[i];
+            s.u_cascadeSplits = m_depthPassProvider->GetCurrentCascadeSplits();
+            return s;
+        }(),
+        .u_debug = [&]() {
+            auto const* dbgCfg = registry.ctx().find<RenderDebugConfig>();
+            return glm::uvec4(dbgCfg ? static_cast<uint32_t>(dbgCfg->m_mode) : 0u, 0u, 0u, 0u);
+        }()
+    };
 }
+
+void OGLSceneModule::SetSceneGlobals(glsl::SceneGlobals const& globals) {
+    m_sceneUBO.Write(globals);
+}
+} // namespace okami

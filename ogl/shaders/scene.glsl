@@ -8,6 +8,13 @@
 #define POINT_LIGHT 1
 #define SPOT_LIGHT 2
 
+// Debug visualization modes (sceneGlobals.u_debug.x)
+#define DEBUG_MODE_NONE     0u
+#define DEBUG_MODE_ALBEDO   1u
+#define DEBUG_MODE_NORMAL   2u
+#define DEBUG_MODE_LIGHTING 3u
+#define DEBUG_MODE_SHADOW   4u
+
 #ifdef __cplusplus
 namespace glsl {
 #endif
@@ -63,6 +70,7 @@ struct SceneGlobals {
     LightingGlobals u_lighting;
     TonemapGlobals  u_tonemap;
     ShadowGlobals   u_shadow;
+    uvec4           u_debug;  // .x = DEBUG_MODE_* constant
 };
 
 #ifdef __cplusplus

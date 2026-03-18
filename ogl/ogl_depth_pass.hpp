@@ -3,6 +3,7 @@
 #include "ogl_utils.hpp"
 
 #include "../module.hpp"
+#include "../renderer.hpp"
 
 #include "shaders/scene.glsl"
 
@@ -16,7 +17,7 @@ namespace okami {
         public IOGLDepthPassProvider {
     public:
         static constexpr int kNumCascades = NUM_SHADOW_CASCADES;
-        int m_shadowMapSize = 2048; // set from RendererConfig at startup
+        int m_shadowMapSize = 2048; // set from ShadowConfig at startup
 
         GLTexture     m_shadowMapTexture;   // GL_TEXTURE_2D_ARRAY, kNumCascades layers
         GLFramebuffer m_shadowFBO;          // layered FBO (all cascade layers attached)

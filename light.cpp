@@ -101,12 +101,10 @@ ShadowCascade okami::ComputeShadowCascade(
     const float snappedY  = std::floor(sphereCenterLS.y / texelSize) * texelSize;
 
     // ── 8. Position the light camera ─────────────────────────────────────────
-    // Pull back along the light direction by radius * (1 + shadowBehind) so
+    // Pull back along the light direction by radius + shadowBehind so
     // that near=0 sits comfortably behind all potential shadow casters.
-    // shadowBehind is a multiplier on sphereRadius: 0 = no extra, 1 = one
-    // extra radius behind the sphere, etc.
     const glm::vec3 lightCamLS(snappedX, snappedY,
-                                sphereCenterLS.z + sphereRadius * (1.0f + shadowBehind));
+                                sphereCenterLS.z + sphereRadius + shadowBehind);
 
     const float orthoNear = 0.0f;
     const float orthoFar  = sphereRadius * (2.0f + shadowBehind);

@@ -48,6 +48,20 @@ namespace okami
 		entity_t m_entity = kNullEntity;
 	};
 
+	// Signals for registry context variables (singleton per type, no entity).
+	template <typename T>
+	struct AddCtxSignal {
+		T m_value;
+	};
+
+	template <typename T>
+	struct UpdateCtxSignal {
+		T m_value;
+	};
+
+	template <typename T>
+	struct RemoveCtxSignal {};
+
     class IEntityManager {
     public:
         virtual entity_t CreateEntity() = 0;

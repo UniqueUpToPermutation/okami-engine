@@ -9,6 +9,7 @@
 #include "sky.hpp"
 #include "renderer.hpp"
 #include "camera_controllers.hpp"
+#include "entity_manager.hpp"
 
 using namespace okami;
 using namespace entt::literals;
@@ -51,6 +52,35 @@ protected:
     }
 };
 
+template <typename T>
+class DefaultCtxMergeModule final : public EngineModule {
+protected:
+    Error ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const& params) override {
+        auto& registry = params.m_registry;
+
+        bus.Handle<AddCtxSignal<T>>([&](AddCtxSignal<T> const& signal) {
+            if (!registry.ctx().contains<T>()) {
+                registry.ctx().emplace<T>(signal.m_value);
+            }
+        });
+
+        bus.Handle<UpdateCtxSignal<T>>([&](UpdateCtxSignal<T> const& signal) {
+            registry.ctx().erase<T>();
+            registry.ctx().emplace<T>(signal.m_value);
+        });
+
+        bus.Handle<RemoveCtxSignal<T>>([&](RemoveCtxSignal<T> const&) {
+            registry.ctx().erase<T>();
+        });
+
+        return {};
+    }
+
+    std::string GetName() const override {
+        return "CtxMergeModule (Default for " + std::string(entt::resolve<T>().info().name()) + ")";
+    }
+};
+
 class MetaDataModule final : public EngineModule {
 protected:
     template <typename ComponentT>
@@ -63,6 +93,16 @@ protected:
         
         return entt::meta_factory<ComponentT>().custom<MetaData>(std::move(metaData)).type(name);
     }
+
+        template <typename T>
+        auto RegisterCtx(entt::hashed_string name, MetaData metaData = MetaData::CtxDefault()) {
+            if (metaData.IsCtx()) {
+                if (metaData.m_ctxMetaData->NeedsDefaultHandler()) {
+                    CreateChild<DefaultCtxMergeModule<T>>();
+                }
+            }
+            return entt::meta_factory<T>().custom<MetaData>(std::move(metaData)).type(name);
+        }
 
     void Build() {
         entt::meta_reset();
@@ -86,6 +126,9 @@ protected:
         RegisterComponent<SpriteComponent>("Sprite"_hs);
         RegisterComponent<DummyTriangleComponent>("DummyTriangle"_hs);
         RegisterComponent<FirstPersonCameraControllerComponent>("FirstPersonCameraController"_hs);
+
+        RegisterCtx<ShadowConfig>("ShadowConfig"_hs);
+        RegisterCtx<RenderDebugConfig>("RenderDebugConfig"_hs);
     }
 
 public:

@@ -6,6 +6,7 @@
 #include "ogl_geometry.hpp"
 #include "ogl_static_mesh.hpp"
 #include "ogl_depth_pass.hpp"
+#include "ogl_debug.hpp"
 #include "ogl_im3d.hpp"
 #include "ogl_imgui.hpp"
 #include "ogl_brdf.hpp"
@@ -46,6 +47,7 @@ private:
     OGLImguiRenderer* m_imguiRenderer = nullptr;
     OGLSkyRenderer* m_skyRenderer = nullptr;
     OGLDepthPass* m_depthPass = nullptr;
+    OGLDebugModule* m_debugModule = nullptr;
 
     OGLBrdfProvider* m_brdfProvider = nullptr;
 
@@ -105,8 +107,13 @@ protected:
                     // Practical Split Scheme (PSSM): blend of uniform and logarithmic splits.
                     static constexpr int kN = OGLDepthPass::kNumCascades;
                     const float kNear   = viewCam->NearDistance();
-                    const float kFar    = static_cast<float>(m_config.m_shadowFarDistance);
-                    const float kLambda = static_cast<float>(m_config.m_shadowCascadeLambda);
+
+                    static const ShadowConfig kDefaultShadow;
+                    auto const& shadowCfg = registry.ctx().contains<ShadowConfig>()
+                        ? registry.ctx().get<ShadowConfig>() : kDefaultShadow;
+
+                    const float kFar    = static_cast<float>(shadowCfg.m_shadowFarDistance);
+                    const float kLambda = static_cast<float>(shadowCfg.m_shadowCascadeLambda);
 
                     float splits[kN + 1];
                     splits[0] = kNear;
@@ -124,7 +131,7 @@ protected:
                         ShadowCascade cascade = ComputeShadowCascade(
                             light, *viewCam, *viewTransform, framebufferSize,
                             splits[i], splits[i + 1], m_depthPass->m_shadowMapSize,
-                            m_config.m_shadowBehind);
+                            static_cast<float>(shadowCfg.m_shadowBehind));
 
                         const glm::mat4 lightView = cascade.transform.Inverse().AsMatrix();
                         const glm::mat4 lightProj = cascade.camera.GetProjectionMatrix(
@@ -185,6 +192,7 @@ public:
         m_imguiRenderer = CreateChild<OGLImguiRenderer>();
         m_skyRenderer = CreateChild<OGLSkyRenderer>();
         m_depthPass = CreateChild<OGLDepthPass>();
+        m_debugModule = CreateChild<OGLDebugModule>();
 
         // m_brdfProvider = CreateChild<OGLBrdfProvider>(/*debug = */ false);
     }
