@@ -8,6 +8,7 @@
 #include "lights.glsl"
 #include "normal.glsl"
 #include "shadow.glsl"
+#include "debug.glsl"
 
 // Input from vertex shader
 in MESH_VS_OUT vs_out;
@@ -62,22 +63,11 @@ void main() {
 
     vec3 color = albedo * (ambientLight + directLight);
 
-    // Debug visualization modes
-    uint debugMode = sceneGlobals.u_debug.x;
-    if (debugMode == DEBUG_MODE_ALBEDO) {
-        // Raw albedo in sRGB
-        FragColor = vec4(linearToSRGB(albedo), 1.0);
-    } else if (debugMode == DEBUG_MODE_NORMAL) {
-        // World-space normal remapped from [-1, 1] to [0, 1]
-        FragColor = vec4(N * 0.5 + 0.5, 1.0);
-    } else if (debugMode == DEBUG_MODE_LIGHTING) {
-        // Lighting contribution without albedo (tonemapped)
-        FragColor = vec4(linearToSRGB(applyTonemap(ambientLight + directLight, sceneGlobals.u_tonemap)), 1.0);
-    } else if (debugMode == DEBUG_MODE_SHADOW) {
-        // Shadow factor: white = fully lit, black = fully shadowed
-        FragColor = vec4(vec3(shadowFactor), 1.0);
-    } else {
-        // Full render (DEBUG_MODE_NONE)
-        FragColor = vec4(linearToSRGB(applyTonemap(color, sceneGlobals.u_tonemap)), 1.0);
-    }
+    FragColor = debugFragColor(
+        sceneGlobals.u_debug.x,
+        albedo, N,
+        ambientLight, directLight,
+        shadowFactor, color,
+        sceneGlobals.u_tonemap
+    );
 }
