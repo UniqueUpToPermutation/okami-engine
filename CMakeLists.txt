@@ -91,8 +91,8 @@ add_executable(AssetBuilder
     tools/geometry_processor.cpp
     lodepng.cpp
 )
-target_link_libraries(AssetBuilder PRIVATE KTX::ktx yaml-cpp::yaml-cpp)
-target_include_directories(AssetBuilder PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/tools ${TINYGLTF_INCLUDE_DIRS})
+target_link_libraries(AssetBuilder PRIVATE KTX::ktx yaml-cpp::yaml-cpp ozz_animation_offline ozz_animation ozz_base)
+target_include_directories(AssetBuilder PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/tools ${TINYGLTF_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/ozz/include)
 set_target_properties(AssetBuilder PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 
 #==============================================================================
@@ -215,6 +215,19 @@ endif()
 if (CMAKE_VERSION VERSION_GREATER 3.12)
     set_property(TARGET EngineLib PROPERTY CXX_STANDARD 23)
 endif()
+
+#==============================================================================
+# Ozz animation library (core libraries only — no samples, tests, FBX, or gltf tool)
+#==============================================================================
+set(ozz_build_fbx     OFF CACHE BOOL "" FORCE)
+set(ozz_build_gltf    OFF CACHE BOOL "" FORCE)
+set(ozz_build_tools   OFF CACHE BOOL "" FORCE)
+set(ozz_build_samples OFF CACHE BOOL "" FORCE)
+set(ozz_build_howtos  OFF CACHE BOOL "" FORCE)
+set(ozz_build_tests   OFF CACHE BOOL "" FORCE)
+set(ozz_build_data    OFF CACHE BOOL "" FORCE)
+set(ozz_build_msvc_rt_dll ON CACHE BOOL "" FORCE)
+add_subdirectory(ozz)
 
 add_subdirectory(tests)
 add_subdirectory(samples)

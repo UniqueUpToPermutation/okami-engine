@@ -3,13 +3,16 @@
 
 // Processes glTF / GLB geometry files:
 //   - copies the .gltf/.glb/.bin file to the output unchanged
-//   - for .gltf/.glb: parses the file and injects virtual config nodes into the
-//     ResourceGraph for every referenced texture, overriding linear_mips based
-//     on the texture's semantic role:
-//       albedo / emissive  → linear_mips: false  (sRGB-aware mip filtering)
-//       normal / metallic-roughness / occlusion → linear_mips: true (linear averaging)
-//     These virtual config nodes are wired as dependencies of the texture's
-//     source node so ResolveConfig() applies them with the highest precedence.
+//   - for .gltf/.glb: parses the file and:
+//       1. injects virtual config nodes into the ResourceGraph for every
+//          referenced texture, overriding linear_mips based on the texture's
+//          semantic role:
+//            albedo / emissive  → linear_mips: false  (sRGB-aware mip filtering)
+//            normal / metallic-roughness / occlusion → linear_mips: true
+//       2. if the file contains animations, emits additional output nodes:
+//            {stem}.skeleton.ozz              — runtime skeleton (ozz binary)
+//            {stem}.{anim_name}.animation.ozz — one per animation clip
+//          These are built using the ozz-animation offline pipeline.
 class GeometryProcessor : public AssetProcessor {
 public:
     explicit GeometryProcessor(bool quiet = false);
