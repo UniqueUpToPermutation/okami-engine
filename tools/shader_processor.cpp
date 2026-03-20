@@ -114,7 +114,7 @@ std::unordered_set<std::string> ShaderPreprocessor::ScanDependencies(
 
 ShaderAssetProcessor::ShaderAssetProcessor(
         const std::filesystem::path& baseDirectory, bool quiet)
-    : m_baseDirectory(baseDirectory), m_quiet(quiet), m_stack({ShaderProcessorParams{}}) {}
+    : m_baseDirectory(baseDirectory), m_quiet(quiet) {}
 
 bool ShaderAssetProcessor::CanProcess(
         const std::filesystem::path& inputPath) const {
@@ -126,13 +126,50 @@ bool ShaderAssetProcessor::CanProcess(
            ext == ".frag" || ext == ".wgsl";
 }
 
-std::filesystem::path ShaderAssetProcessor::OutputPath(
-        const std::filesystem::path& inputRelPath) const {
-    return inputRelPath;  // same path, no extension change
+void ShaderAssetProcessor::BuildNodes(ResourceGraph& graph,
+                                       NodeId inputNodeId,
+                                       const std::filesystem::path& inputRelPath) {
+    // Output keeps the same relative path (no extension change).
+    ResourceNode out;
+    out.outputFile    = inputRelPath;
+    out.processorType = TypeName();
+    NodeId outId = graph.AddNode(std::move(out));
+    graph.AddEdge(inputNodeId, outId);
+
+    // Scan transitive #include dependencies and wire each as a dependency of
+    // the output node so that editing any included file triggers a rebuild.
+    std::filesystem::path absInput = graph.InputRoot() / inputRelPath;
+    std::filesystem::path baseDir  = m_baseDirectory.empty()
+                                         ? absInput.parent_path()
+                                         : m_baseDirectory;
+    try {
+        ShaderPreprocessor scanner(baseDir);
+        for (const auto& depStr : scanner.ScanDependencies(absInput)) {
+            std::filesystem::path depAbs(depStr);
+            // Only wire deps that live inside the input tree.
+            auto relDep = std::filesystem::relative(depAbs, graph.InputRoot());
+            // relative() stays inside the tree when it doesn't start with "..".
+            if (relDep.empty() || relDep.native().find(
+                    std::filesystem::path("..").native()) == 0)
+                continue;
+
+            NodeId depId = graph.FindByInput(relDep);
+            if (depId == kInvalidNode) {
+                ResourceNode depNode;
+                depNode.inputFile = relDep;
+                depId = graph.AddNode(std::move(depNode));
+            }
+            graph.AddEdge(depId, outId);
+        }
+    } catch (...) {
+        // If scanning fails (missing include etc.) ignore — the error will
+        // surface properly when Process() is called during Build().
+    }
 }
 
-void ShaderAssetProcessor::Process(const std::filesystem::path& input,
-                                    const std::filesystem::path& output) {
+void ShaderAssetProcessor::Process(ResourceGraph& graph, ResourceNode& node) {
+    std::filesystem::path input  = graph.AbsoluteSourceInputPath(node);
+    std::filesystem::path output = graph.AbsoluteOutputPath(node);
     std::filesystem::path baseDir = m_baseDirectory.empty()
                                         ? input.parent_path()
                                         : m_baseDirectory;
@@ -141,44 +178,4 @@ void ShaderAssetProcessor::Process(const std::filesystem::path& input,
     if (!m_quiet)
         std::cout << "shader: " << input.filename().string()
                   << " -> " << output.filename().string() << "\n";
-}
-
-bool ShaderAssetProcessor::NeedsProcessing(
-        const std::filesystem::path& input,
-        const std::filesystem::path& output) const {
-    if (!std::filesystem::exists(output))
-        return true;
-    auto outputTime = std::filesystem::last_write_time(output);
-    if (std::filesystem::last_write_time(input) > outputTime)
-        return true;
-    // Check all transitive #include dependencies.
-    std::filesystem::path baseDir = m_baseDirectory.empty()
-                                        ? input.parent_path()
-                                        : m_baseDirectory;
-    try {
-        ShaderPreprocessor scanner(baseDir);
-        for (const auto& dep : scanner.ScanDependencies(input)) {
-            std::filesystem::path depPath(dep);
-            if (std::filesystem::exists(depPath) &&
-                std::filesystem::last_write_time(depPath) > outputTime)
-                return true;
-        }
-    } catch (...) {
-        // If scanning fails (e.g. missing include), force reprocessing so the
-        // error surfaces properly during Process().
-        return true;
-    }
-    return false;
-}
-
-void ShaderAssetProcessor::PushSettings(const YAML::Node& settings) {
-    ShaderProcessorParams top = m_stack.back();
-    // No fields yet - reserved for future options.
-    (void)settings;
-    m_stack.push_back(top);
-}
-
-void ShaderAssetProcessor::PopSettings() {
-    if (m_stack.size() > 1)
-        m_stack.pop_back();
 }

@@ -33,8 +33,8 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        ShaderAssetProcessor processor(baseDir);
-        processor.Process(input, output);
+        ShaderPreprocessor preprocessor(baseDir);
+        preprocessor.PreprocessFile(input, output);
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

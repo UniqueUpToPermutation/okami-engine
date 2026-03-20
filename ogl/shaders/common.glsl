@@ -33,7 +33,7 @@
         .m_frequency = type_t::__frequency, \
         .m_isNormalized = (type_t::__##member_name##_type == okami::AttributeType::Color) \
     }; \
-
+ 
 #define VERTEX_ARRAY_DEF_END() \
     return result; \
 }

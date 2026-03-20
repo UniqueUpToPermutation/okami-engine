@@ -34,12 +34,11 @@ int main(int argc, char* argv[]) {
     try {
         std::filesystem::path input(argv[1]);
         std::filesystem::path output(argv[2]);
-        std::filesystem::create_directories(output.parent_path());
 
         TextureProcessorParams params;
         params.linearMips = linear;
-        TextureProcessor processor(quiet, params);
-        processor.Process(input, output);
+        std::filesystem::create_directories(output.parent_path());
+        TextureProcessor::ConvertTexture(input, output, params);
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

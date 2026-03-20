@@ -105,8 +105,8 @@ static unsigned int CalculateMipLevels(unsigned int width, unsigned int height) 
 // TextureProcessor
 // ---------------------------------------------------------------------------
 
-TextureProcessor::TextureProcessor(bool quiet, TextureProcessorParams initialParams)
-    : m_quiet(quiet), m_stack({initialParams}) {}
+TextureProcessor::TextureProcessor(bool quiet)
+    : m_quiet(quiet) {}
 
 static std::string LowerExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
@@ -119,97 +119,38 @@ bool TextureProcessor::CanProcess(const std::filesystem::path& inputPath) const 
     return ext == ".png" || ext == ".jpg" || ext == ".jpeg";
 }
 
-std::filesystem::path TextureProcessor::OutputPath(
-        const std::filesystem::path& inputRelPath) const {
-    return std::filesystem::path(inputRelPath).replace_extension(".ktx2");
-}
-
-void TextureProcessor::PushSettings(const YAML::Node& settings) {
-    // Start from the current top so all existing values are inherited.
-    TextureProcessorParams top = m_stack.back();
-    if (settings && settings.IsMap()) {
-        if (settings["build_mips"])
-            top.buildMips   = settings["build_mips"].as<bool>();
-        if (settings["linear_mips"])
-            top.linearMips  = settings["linear_mips"].as<bool>();
-        if (settings["copy_source"])
-            top.copySource  = settings["copy_source"].as<bool>();
-    }
-    m_stack.push_back(top);
-}
-
-void TextureProcessor::PopSettings() {
-    if (m_stack.size() > 1)
-        m_stack.pop_back();
-}
-
-void TextureProcessor::SetVirtualOverride(const std::filesystem::path& absInputPath,
-                                          const YAML::Node& overrides) {
-    m_overrides[absInputPath] = overrides;
-}
-
-TextureProcessorParams TextureProcessor::EffectiveParams(
-        const std::filesystem::path& input) const {
-    TextureProcessorParams p = m_stack.back();
-    auto it = m_overrides.find(input);
-    if (it != m_overrides.end()) {
-        const YAML::Node& ovr = it->second;
-        if (ovr["build_mips"])  p.buildMips  = ovr["build_mips"].as<bool>();
-        if (ovr["linear_mips"]) p.linearMips = ovr["linear_mips"].as<bool>();
-        if (ovr["copy_source"]) p.copySource = ovr["copy_source"].as<bool>();
+TextureProcessorParams TextureProcessor::ParamsFromConfig(const YAML::Node& cfg) {
+    TextureProcessorParams p;
+    if (cfg && cfg.IsMap()) {
+        if (cfg["build_mips"])  p.buildMips  = cfg["build_mips"].as<bool>();
+        if (cfg["linear_mips"]) p.linearMips = cfg["linear_mips"].as<bool>();
+        if (cfg["copy_source"]) p.copySource = cfg["copy_source"].as<bool>();
     }
     return p;
 }
 
-std::filesystem::path TextureProcessor::SidecarPath(
-        const std::filesystem::path& output) {
-    return std::filesystem::path(output.string() + ".settings");
+void TextureProcessor::BuildNodes(ResourceGraph& graph, NodeId inputNodeId,
+                                   const std::filesystem::path& inputRelPath) {
+    ResourceNode out;
+    out.outputFile    = std::filesystem::path(inputRelPath).replace_extension(".ktx2");
+    out.processorType = TypeName();
+    NodeId outId = graph.AddNode(std::move(out));
+    graph.AddEdge(inputNodeId, outId);
 }
 
-void TextureProcessor::WriteSidecar(const std::filesystem::path& output,
-                                     const TextureProcessorParams& params) const {
-    YAML::Node n;
-    n["build_mips"]  = params.buildMips;
-    n["linear_mips"] = params.linearMips;
-    n["copy_source"] = params.copySource;
-    std::ofstream f(SidecarPath(output));
-    if (f.is_open())
-        f << n;
-}
-
-bool TextureProcessor::NeedsProcessing(const std::filesystem::path& input,
-                                        const std::filesystem::path& output) const {
-    if (!std::filesystem::exists(output))
-        return true;
-    if (std::filesystem::last_write_time(input) >
-        std::filesystem::last_write_time(output))
-        return true;
-
-    // Compare stored settings (sidecar) against current effective settings.
-    std::filesystem::path sidecar = SidecarPath(output);
-    if (!std::filesystem::exists(sidecar))
-        return true; // first build with new sidecar feature
-
-    try {
-        auto stored  = YAML::LoadFile(sidecar.string());
-        auto current = EffectiveParams(input);
-        if (stored["build_mips"].as<bool>(true)   != current.buildMips)  return true;
-        if (stored["linear_mips"].as<bool>(false)  != current.linearMips) return true;
-        if (stored["copy_source"].as<bool>(false)  != current.copySource) return true;
-    } catch (...) {
-        return true; // unreadable sidecar — rebuild to be safe
-    }
-    return false;
-}
-
-void TextureProcessor::Process(const std::filesystem::path& input,
-                                 const std::filesystem::path& output) {
+void TextureProcessor::Process(ResourceGraph& graph, ResourceNode& node) {
+    std::filesystem::path input  = graph.AbsoluteSourceInputPath(node);
+    std::filesystem::path output = graph.AbsoluteOutputPath(node);
     if (!m_quiet)
         std::cout << "texture: " << input.filename().string()
                   << " -> " << output.filename().string() << std::endl;
+    auto params = ParamsFromConfig(graph.ResolveConfig(node.id));
+    ConvertTexture(input, output, params);
+}
 
-    // Compute effective settings once: YAML stack + any virtual override for this file.
-    auto params = EffectiveParams(input);
+void TextureProcessor::ConvertTexture(const std::filesystem::path& input,
+                                       const std::filesystem::path& output,
+                                       const TextureProcessorParams& params) {
 
     int imgWidth = 0, imgHeight = 0, imgChannels = 0;
     unsigned char* imageData = stbi_load(input.string().c_str(),
@@ -221,10 +162,6 @@ void TextureProcessor::Process(const std::filesystem::path& input,
     unsigned int width  = static_cast<unsigned int>(imgWidth);
     unsigned int height = static_cast<unsigned int>(imgHeight);
     unsigned int numLevels = params.buildMips ? CalculateMipLevels(width, height) : 1;
-
-    if (!m_quiet)
-        std::cout << "  " << width << "x" << height
-                  << ", " << numLevels << " mip level(s)" << std::endl;
 
     ktxTextureCreateInfo createInfo = {};
     createInfo.vkFormat      = 37; // VK_FORMAT_R8G8B8A8_UNORM
@@ -295,7 +232,4 @@ void TextureProcessor::Process(const std::filesystem::path& input,
         std::filesystem::copy_file(input, sourceCopy,
                                    std::filesystem::copy_options::overwrite_existing);
     }
-
-    // Record the settings used so future runs can detect changes via NeedsProcessing.
-    WriteSidecar(output, params);
 }

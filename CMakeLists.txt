@@ -52,6 +52,7 @@ find_path(TINYGLTF_INCLUDE_DIRS "tiny_gltf.h")
 add_executable(png2ktx
     tools/png2ktx.cpp
     tools/texture_processor.cpp
+    tools/asset_graph.cpp
     lodepng.cpp
 )
 target_link_libraries(png2ktx PRIVATE KTX::ktx yaml-cpp::yaml-cpp)
@@ -66,6 +67,7 @@ set_target_properties(png2ktx PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED O
 add_executable(ShaderPreprocessor
     tools/shader_preprocessor.cpp
     tools/shader_processor.cpp
+    tools/asset_graph.cpp
 )
 set_target_properties(ShaderPreprocessor PROPERTIES
     CXX_STANDARD 17
@@ -83,6 +85,7 @@ target_link_libraries(ShaderPreprocessor PRIVATE yaml-cpp::yaml-cpp)
 # the input (checked at runtime, not at CMake configure time).
 add_executable(AssetBuilder
     tools/asset_builder.cpp
+    tools/asset_graph.cpp
     tools/texture_processor.cpp
     tools/shader_processor.cpp
     tools/geometry_processor.cpp
@@ -215,3 +218,4 @@ endif()
 
 add_subdirectory(tests)
 add_subdirectory(samples)
+add_subdirectory(tools/tests)

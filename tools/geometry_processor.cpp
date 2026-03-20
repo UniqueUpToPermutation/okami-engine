@@ -16,16 +16,12 @@ namespace fs = std::filesystem;
 
 // ---------------------------------------------------------------------------
 
-GeometryProcessor::GeometryProcessor(TextureProcessor& texProc, bool quiet)
-    : m_texProc(texProc), m_quiet(quiet) {}
+GeometryProcessor::GeometryProcessor(bool quiet)
+    : m_quiet(quiet) {}
 
 bool GeometryProcessor::CanProcess(const fs::path& inputPath) const {
     auto ext = inputPath.extension();
     return ext == ".glb" || ext == ".gltf" || ext == ".bin";
-}
-
-fs::path GeometryProcessor::OutputPath(const fs::path& inputRelPath) const {
-    return inputRelPath;
 }
 
 // ---------------------------------------------------------------------------
@@ -37,26 +33,23 @@ static std::string LowerExt(const fs::path& p) {
     return ext;
 }
 
-void GeometryProcessor::Process(const fs::path& input, const fs::path& output) {
-    // Copy the geometry file unchanged, then register texture overrides.
-    fs::copy_file(input, output, fs::copy_options::overwrite_existing);
-    if (!m_quiet)
-        std::cout << "geometry: " << input.filename().string()
-                  << " -> " << output.filename().string() << "\n";
+void GeometryProcessor::BuildNodes(ResourceGraph& graph,
+                                    NodeId inputNodeId,
+                                    const fs::path& inputRelPath) {
+    // One output node copying the file unchanged.
+    ResourceNode out;
+    out.outputFile    = inputRelPath;
+    out.processorType = TypeName();
+    NodeId outId = graph.AddNode(std::move(out));
+    graph.AddEdge(inputNodeId, outId);
 
-    // .bin files carry only raw vertex/index data — register nothing.
-    auto ext = LowerExt(input);
-    if (ext == ".gltf" || ext == ".glb")
-        RegisterOverrides(input);
-}
+    // .bin files carry only raw vertex/index data — nothing to parse.
+    if (LowerExt(inputRelPath) == ".bin")
+        return;
 
-void GeometryProcessor::RegisterOverrides(const fs::path& input) {
-    // Parse the GLTF and classify each referenced texture by semantic role,
-    // then register a virtual override on the TextureProcessor so that the
-    // texture pass uses the correct mip mode (sRGB-aware vs linear) for each file.
-    // This is separated from Process() so it can be called unconditionally in a
-    // pre-pass, even for GLTF files whose output copy is already up-to-date.
-    auto ext = LowerExt(input);
+    // Parse the GLTF/GLB to discover texture references and inject virtual
+    // config nodes that set linear_mips correctly for each texture.
+    fs::path absInput = graph.InputRoot() / inputRelPath;
 
     static constexpr auto kNoopLoader = [](
         tinygltf::Image*, const int, std::string*, std::string*,
@@ -67,22 +60,19 @@ void GeometryProcessor::RegisterOverrides(const fs::path& input) {
 
     tinygltf::Model model;
     std::string err, warn;
-    bool ok = (ext == ".glb")
-        ? loader.LoadBinaryFromFile(&model, &err, &warn, input.string())
-        : loader.LoadASCIIFromFile(&model, &err, &warn, input.string());
+    bool ok = (LowerExt(inputRelPath) == ".glb")
+        ? loader.LoadBinaryFromFile(&model, &err, &warn, absInput.string())
+        : loader.LoadASCIIFromFile(&model, &err, &warn, absInput.string());
 
     if (!ok || !err.empty()) {
         std::cerr << "Warning [geometry]: could not parse "
-                  << input.filename() << " for texture classification: " << err << "\n";
+                  << absInput.filename()
+                  << " for texture classification: " << err << "\n";
         return;
     }
 
-    fs::path inBase = input.parent_path();
-
-    // Classify each image index by its semantic role.
-    // An image may be referenced from multiple material slots; if it appears as
-    // both sRGB (albedo/emissive) and linear (normal/metallic-roughness), linear
-    // wins to prevent incorrect gamma-decoding of non-colour data.
+    // Classify each image index by semantic role.
+    // linear wins if the image appears in both roles.
     std::unordered_set<int> srgbImages, linearImages;
 
     auto resolveImg = [&](int texIdx) -> int {
@@ -92,7 +82,7 @@ void GeometryProcessor::RegisterOverrides(const fs::path& input) {
         return src;
     };
 
-    for (auto const& mat : model.materials) {
+    for (const auto& mat : model.materials) {
         if (int i = resolveImg(mat.pbrMetallicRoughness.baseColorTexture.index); i >= 0)
             srgbImages.insert(i);
         if (int i = resolveImg(mat.emissiveTexture.index); i >= 0)
@@ -105,25 +95,56 @@ void GeometryProcessor::RegisterOverrides(const fs::path& input) {
             linearImages.insert(i);
     }
 
-    // Register a virtual override for every texture referenced by this GLTF.
-    // We set linear_mips explicitly for both roles so a directory-wide
-    // texture.yaml with linear_mips:true doesn't corrupt albedo mips.
+    // Wire a virtual config node for each texture, overriding linear_mips.
+    fs::path absInputDir = absInput.parent_path();
     for (int i = 0; i < static_cast<int>(model.images.size()); ++i) {
         const auto& img = model.images[i];
-        if (img.uri.empty())
-            continue; // embedded (base64) image — not in the file pipeline
+        if (img.uri.empty()) continue; // embedded image — not in the file pipeline
 
-        fs::path texIn = inBase / img.uri;
-        if (!fs::exists(texIn))
-            continue;
+        fs::path absTexture = absInputDir / img.uri;
+        std::error_code ec;
+        fs::path relTexture = fs::relative(absTexture, graph.InputRoot(), ec);
+        if (ec || relTexture.empty()) continue;
 
-        // linear wins if the image appears in both roles
+        NodeId texSrcId = graph.FindByInput(relTexture);
+        if (texSrcId == kInvalidNode) continue; // texture not in graph
+
         bool useLinear = linearImages.count(i) > 0;
 
-        YAML::Node ovr;
-        ovr["linear_mips"] = useLinear;
-        m_texProc.SetVirtualOverride(texIn, ovr);
+        YAML::Node cfg;
+        cfg["linear_mips"] = useLinear;
+
+        // Give the virtual config node a deterministic synthetic path so
+        // LoadCache can match it across runs.  The ".virtual.yaml" suffix
+        // makes it explicit that this file does not exist on disk.
+        fs::path cfgVirtualPath = relTexture.parent_path()
+            / (relTexture.filename().string() + ".virtual.yaml");
+
+        // Reuse an existing config node for this texture if one already exists
+        // (e.g. recreated by LoadCache+BuildNodes on second run).
+        NodeId cfgId = graph.FindByOutput(cfgVirtualPath);
+        if (cfgId == kInvalidNode) {
+            ResourceNode cfgNode;
+            cfgNode.outputFile = cfgVirtualPath;
+            cfgNode.config     = cfg;
+            cfgId = graph.AddNode(std::move(cfgNode));
+        } else {
+            graph.GetNode(cfgId).config = cfg;
+        }
+        // Wire the GLB source as a dep of the config node so that changes to
+        // the GLB (which may reclassify textures as linear/sRGB) advance the
+        // config node's timestamp, making any downstream texture output stale.
+        graph.AddEdge(inputNodeId, cfgId);
+        graph.AddEdge(cfgId, texSrcId);
     }
 }
 
+void GeometryProcessor::Process(ResourceGraph& graph, ResourceNode& node) {
+    fs::path input  = graph.AbsoluteSourceInputPath(node);
+    fs::path output = graph.AbsoluteOutputPath(node);
+    fs::copy_file(input, output, fs::copy_options::overwrite_existing);
+    if (!m_quiet)
+        std::cout << "geometry: " << input.filename().string()
+                  << " -> " << output.filename().string() << "\n";
+}
 

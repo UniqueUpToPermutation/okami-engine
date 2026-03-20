@@ -38,14 +38,11 @@ private:
 // AssetProcessor subclass
 // ---------------------------------------------------------------------------
 
-// Per-asset settings for the shader preprocessor.
-// Currently empty, but exists for forward-compatibility with future options.
-struct ShaderProcessorParams {
-    // reserved for future options
-};
-
 // Runs the shader preprocessor on GLSL / WGSL files.
 // Handled extensions: .glsl .vs .fs .gs .ts .vert .frag .wgsl
+//
+// BuildNodes() also scans #include dependencies and wires them as graph edges
+// so that a stale header causes all shaders that include it to be rebuilt.
 class ShaderAssetProcessor : public AssetProcessor {
 public:
     // baseDirectory: fallback directory used when an #include cannot be
@@ -55,26 +52,22 @@ public:
         const std::filesystem::path& baseDirectory = {},
         bool quiet = false);
 
+    std::string TypeName() const override { return "shader"; }
+
     bool CanProcess(const std::filesystem::path& inputPath) const override;
 
-    // Keeps the same extension (output shader has the same name as input).
-    std::filesystem::path OutputPath(
-        const std::filesystem::path& inputRelPath) const override;
+    // Creates one output node (same relative path) and wires the input edge.
+    // Also scans transitive #include dependencies and adds each discovered
+    // file as an additional dependency edge of the output node.
+    void BuildNodes(ResourceGraph&               graph,
+                    NodeId                       inputNodeId,
+                    const std::filesystem::path& inputRelPath) override;
 
-    void Process(const std::filesystem::path& input,
-                 const std::filesystem::path& output) override;
-
-    // Pushes a new settings frame derived from the current top.
-    void PushSettings(const YAML::Node& settings) override;
-    void PopSettings() override;
-
-    bool NeedsProcessing(const std::filesystem::path& input,
-                         const std::filesystem::path& output) const override;
+    void Process(ResourceGraph& graph, ResourceNode& node) override;
 
     std::string SettingsFileName() const override { return "shader.yaml"; }
 
 private:
     std::filesystem::path m_baseDirectory;
-    bool m_quiet;
-    std::vector<ShaderProcessorParams> m_stack;
+    bool                  m_quiet;
 };
