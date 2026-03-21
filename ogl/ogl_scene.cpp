@@ -124,11 +124,17 @@ namespace okami {
         .u_debug = [&]() {
             auto const* dbgCfg = registry.ctx().find<RenderDebugConfig>();
             return glm::uvec4(dbgCfg ? static_cast<uint32_t>(dbgCfg->m_mode) : 0u, 0u, 0u, 0u);
-        }()
-    };
-}
+        }(),
+        .u_frameIndex = glm::uvec4(m_frameIndex, 0u, 0u, 0u)
+        };
+    }
 
-void OGLSceneModule::SetSceneGlobals(glsl::SceneGlobals const& globals) {
-    m_sceneUBO.Write(globals);
-}
+    Error OGLSceneModule::ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const& params) {
+        m_frameIndex++;
+        return {};
+    }
+
+    void OGLSceneModule::SetSceneGlobals(glsl::SceneGlobals const& globals) {
+        m_sceneUBO.Write(globals);
+    }
 } // namespace okami

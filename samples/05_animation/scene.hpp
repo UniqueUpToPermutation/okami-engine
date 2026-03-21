@@ -13,13 +13,13 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glog/logging.h>
 
-namespace sample_sponza {
+namespace sample_drone {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sample
 // ─────────────────────────────────────────────────────────────────────────────
 
-class SponzaSample : public okami::Sample {
+class DroneSample : public okami::Sample {
 public:
     // When true, texture URIs from the GLTF are rewritten to .ktx2.
     bool m_useKtx2 = true;
@@ -43,7 +43,7 @@ public:
         auto lightDir = glm::normalize(glm::vec3(-0.5f, -1.0f, -0.5f));
 
         // ── Load GLTF scene prototype ──────────────────────────────────────
-        auto gltfPath   = GetSampleAssetPath("sponza/Sponza.gltf");
+        auto gltfPath   = GetSampleAssetPath("drone/scene.gltf");
         auto sceneResult = GltfScene::FromFile(gltfPath);
         if (!sceneResult) {
             LOG(ERROR) << "[Sponza] " << sceneResult.error();
@@ -82,15 +82,12 @@ public:
         }
 
         // ── First-person camera ────────────────────────────────────────────
-        glm::quat initRot =
-            glm::angleAxis(glm::pi<float>() / 2.0f, glm::vec3(0.0f, 1.0f, 0.0f)) *
-            glm::angleAxis(0.0f, glm::vec3(1.0f, 0.0f, 0.0f));
 
         auto cameraEntity = en.CreateEntity();
         en.AddComponent(cameraEntity,
             Camera::Perspective(glm::half_pi<float>(), 0.1f, 1000.0f));
         en.AddComponent(cameraEntity,
-            Transform(glm::vec3(0.0f, 1.8f, 0.0f), initRot, 1.0f));
+            Transform(glm::vec3(0.0f, -0.5f, 1.5f)));
         en.AddComponent(cameraEntity, FirstPersonCameraControllerComponent{
             .m_moveSpeed       = 10.0f,
             .m_lookSensitivity = 0.002f,
@@ -99,5 +96,5 @@ public:
     }
 };
 
-} // namespace sample_sponza
+} // namespace sample_drone
 

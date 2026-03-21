@@ -249,8 +249,6 @@ Expected<GltfScene> GltfScene::FromFile(
                 auto const& img = model.images[imgIdx];
                 if (!img.uri.empty()) {
                     std::filesystem::path texPath = basePath / img.uri;
-                    if (params.m_useKtx2)
-                        texPath.replace_extension(".ktx2");
                     def.m_colorTexturePath = std::move(texPath);
                 }
             }
@@ -268,8 +266,6 @@ Expected<GltfScene> GltfScene::FromFile(
                 auto const& img = model.images[imgIdx];
                 if (!img.uri.empty()) {
                     std::filesystem::path texPath = basePath / img.uri;
-                    if (params.m_useKtx2)
-                        texPath.replace_extension(".ktx2");
                     def.m_normalTexturePath = std::move(texPath);
                 }
             }

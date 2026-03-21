@@ -9,6 +9,7 @@
 #include "../samples/02_zoo/scene.hpp"
 #include "../samples/03_materials/scene.hpp"
 #include "../samples/04_sponza/scene.hpp"
+#include "../samples/05_animation/scene.hpp"
 #include "../samples/im3d/scene.hpp"
 #include "../samples/imgui/scene.hpp"
 
@@ -157,6 +158,15 @@ TEST_F(HeadlessRendererTest, Materials) {
 
 TEST_F(HeadlessRendererTest, Sponza) {
     RunHeadlessSample<sample_sponza::SponzaSample>("sponza", "sponza.png");
+}
+
+
+// ---------------------------------------------------------------------------
+// Sample 05 – Drone
+// ---------------------------------------------------------------------------
+
+TEST_F(HeadlessRendererTest, Drone) {
+    RunHeadlessSample<sample_drone::DroneSample>("drone", "drone.png");
 }
 
 

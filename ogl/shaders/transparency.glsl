@@ -121,8 +121,8 @@ float ignThreshold(vec2 screenPos) {
 
 // Temporally-animated variant.  Advance frameIndex every frame (wraps every
 // 64 frames).  Pair with TAA or a temporal filter for best results.
-float ignThreshold(vec2 screenPos, int frameIndex) {
-    screenPos += 5.588238 * float(frameIndex & 63);
+float ignThreshold(vec2 screenPos, uint frameIndex) {
+    screenPos += 5.588238 * float(frameIndex & 63u);
     return ignThreshold(screenPos);
 }
 
@@ -130,17 +130,14 @@ float ignThreshold(vec2 screenPos, int frameIndex) {
 // to the surface and does not swim as the camera moves.  All three axes
 // contribute via distinct magic constants so there are no stripe artifacts
 // on walls or ceilings.
-float ignThreshold(vec3 worldPos) {
-    return fract(52.9829189 * fract(
-        worldPos.x * 0.06711056 +
-        worldPos.y * 0.00289374 +
-        worldPos.z * 0.00583715));
-}
-
-// Temporally-animated world-space variant.  Pair with TAA for best results.
-float ignThreshold(vec3 worldPos, int frameIndex) {
-    worldPos += 5.588238 * float(frameIndex & 63);
-    return ignThreshold(worldPos);
+float ignThreshold(vec3 worldPos, float cellSize) {
+    ivec3 g = ivec3(floor(worldPos / cellSize));
+    // Combine all three axes with coprime multipliers to break symmetry
+    vec2 p = vec2(
+        float(g.x ^ (g.y * 127) ^ (g.z * 311)),
+        float(g.z ^ (g.y * 7)   ^ (g.x * 1049))
+    );
+    return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
 
 
@@ -203,7 +200,7 @@ void stochasticDiscardIGN(float alpha, vec2 screenPos) {
 }
 
 // Discard if alpha is below the IGN threshold at this pixel (animated).
-void stochasticDiscardIGN(float alpha, vec2 screenPos, int frameIndex) {
+void stochasticDiscardIGN(float alpha, vec2 screenPos, uint frameIndex) {
     if (alpha < ignThreshold(screenPos, frameIndex))
         discard;
 }
@@ -225,13 +222,14 @@ void stochasticDiscardBayer8x8(float alpha, vec3 worldPos, float cellSize) {
 }
 
 // Discard if alpha is below the IGN threshold at this world position (static).
-void stochasticDiscardIGN(float alpha, vec3 worldPos) {
-    if (alpha < ignThreshold(worldPos))
+void stochasticDiscardIGN(float alpha, vec3 worldPos, float cellSize) {
+    if (alpha < ignThreshold(worldPos, cellSize))
         discard;
 }
 
-// Discard if alpha is below the IGN threshold at this world position (animated).
-void stochasticDiscardIGN(float alpha, vec3 worldPos, int frameIndex) {
-    if (alpha < ignThreshold(worldPos, frameIndex))
+
+// Discard if alpha is below the IGN threshold at this world position
+void discardIfTransparent(float alpha) {
+    if (alpha < 0.5)
         discard;
 }

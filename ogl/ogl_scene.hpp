@@ -15,12 +15,15 @@ namespace okami {
         UniformBuffer<glsl::SceneGlobals> m_sceneUBO;
         IGLProvider*             m_glProvider        = nullptr;
         IOGLDepthPassProvider*   m_depthPassProvider = nullptr;
+        uint32_t m_frameIndex = 0;
 
     protected:
         Error RegisterImpl(InterfaceCollection& interfaces) override;
         Error StartupImpl(InitContext const& context) override;
 
     public:
+        Error ReceiveMessagesImpl(MessageBus& bus, RecieveMessagesParams const& params) override;
+
         UniformBuffer<glsl::SceneGlobals> const& GetSceneGlobalsBuffer() const override;
 
         glsl::SceneGlobals GetSceneGlobals(entt::registry const& registry, entity_t activeCamera);

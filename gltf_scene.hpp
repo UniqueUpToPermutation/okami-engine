@@ -15,9 +15,6 @@ namespace okami {
     // ─────────────────────────────────────────────────────────────────────────
 
     struct GltfSceneLoadParams {
-        // When true, texture URIs found in the GLTF are rewritten to use the
-        // pre-converted KTX2 files produced by png2ktx.
-        bool m_useKtx2 = true;
     };
 
     // ─────────────────────────────────────────────────────────────────────────

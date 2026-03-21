@@ -71,6 +71,7 @@ struct SceneGlobals {
     TonemapGlobals  u_tonemap;
     ShadowGlobals   u_shadow;
     uvec4           u_debug;  // .x = DEBUG_MODE_* constant
+    uvec4           u_frameIndex; // .x = current frame index for temporal effects
 };
 
 #ifdef __cplusplus

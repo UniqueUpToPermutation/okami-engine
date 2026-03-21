@@ -4,7 +4,7 @@
 #include "scene.glsl"
 #include "color.glsl"
 #include "tonemapping.glsl"
-#include "stochastic_transparency.glsl"
+#include "transparency.glsl"
 #include "lights.glsl"
 #include "normal.glsl"
 #include "shadow.glsl"
@@ -33,7 +33,7 @@ void main() {
     float alpha = alphaCoveragePreserved(u_diffuseMap, vs_out.uv, 0.5);
 
     // Stochastic transparency: discard fragments based on the corrected alpha.
-    stochasticDiscardIGN(alpha, vs_out.position);
+    discardIfTransparent(alpha);
 
     // Decode sRGB albedo to linear light before shading.
     vec3 albedo = sRGBToLinear(diffuseSample.rgb);
