@@ -22,6 +22,8 @@ std::string_view okami::AttributeTypeToString(AttributeType type) {
         case AttributeType::Color: return "Color";
         case AttributeType::Tangent: return "Tangent";
         case AttributeType::Bitangent: return "Bitangent";
+        case AttributeType::Joints:    return "Joints";
+        case AttributeType::Weights:   return "Weights";
         default: return "Unknown";
     }
 }
@@ -32,8 +34,10 @@ AccessorType okami::GetAccessorType(AttributeType type) {
         case AttributeType::Normal: return AccessorType::Vec3;
         case AttributeType::TexCoord: return AccessorType::Vec2;
         case AttributeType::Color: return AccessorType::Vec4;
-        case AttributeType::Tangent: return AccessorType::Vec4;
+        case AttributeType::Tangent:   return AccessorType::Vec4;
         case AttributeType::Bitangent: return AccessorType::Vec3;
+        case AttributeType::Joints:    return AccessorType::Vec4;
+        case AttributeType::Weights:   return AccessorType::Vec4;
         default: throw std::runtime_error("Not implemented!");
     }
 }
@@ -44,8 +48,10 @@ AccessorComponentType okami::GetComponentType(AttributeType type) {
         case AttributeType::Normal: return AccessorComponentType::Float;
         case AttributeType::TexCoord: return AccessorComponentType::Float;
         case AttributeType::Color: return AccessorComponentType::Float;
-        case AttributeType::Tangent: return AccessorComponentType::Float;
+        case AttributeType::Tangent:   return AccessorComponentType::Float;
         case AttributeType::Bitangent: return AccessorComponentType::Float;
+        case AttributeType::Joints:    return AccessorComponentType::Float;
+        case AttributeType::Weights:   return AccessorComponentType::Float;
         default: throw std::runtime_error("Not implemented!");
     }
 }
@@ -145,6 +151,20 @@ void okami::GenerateDefaultAttributeData(
             for (auto& val : dst) {
                 val = {0.0f, 1.0f, 0.0f};
             }
+            break;
+        }
+        case AttributeType::Joints: {
+            // Default: all weight on joint 0
+            std::span<glm::vec4> dst(reinterpret_cast<glm::vec4*>(buffer.data()),
+                buffer.size() / sizeof(glm::vec4));
+            for (auto& val : dst) { val = {0.0f, 0.0f, 0.0f, 0.0f}; }
+            break;
+        }
+        case AttributeType::Weights: {
+            // Default: full weight on joint 0
+            std::span<glm::vec4> dst(reinterpret_cast<glm::vec4*>(buffer.data()),
+                buffer.size() / sizeof(glm::vec4));
+            for (auto& val : dst) { val = {1.0f, 0.0f, 0.0f, 0.0f}; }
             break;
         }
         default:

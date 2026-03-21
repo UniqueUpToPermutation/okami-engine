@@ -2,6 +2,7 @@
 
 #include "shaders/common.glsl"
 #include "shaders/static_mesh.glsl"
+#include "shaders/skinned_mesh.glsl"
 
 #include <glog/logging.h>
 
@@ -40,6 +41,8 @@ static Error UploadToGL(OGLGeometry& out, Geometry&& data) {
             switch (primitive.m_type) {
                 case okami::MeshType::Static:
                     return glsl::__get_vs_input_infoStaticMeshVertex();
+                case okami::MeshType::Skinned:
+                    return glsl::__get_vs_input_infoSkinnedMeshVertex();
                 default: return {};
             }
         }();

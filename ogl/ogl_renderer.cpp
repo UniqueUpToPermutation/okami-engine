@@ -5,6 +5,7 @@
 #include "ogl_sprite.hpp"
 #include "ogl_geometry.hpp"
 #include "ogl_static_mesh.hpp"
+#include "ogl_skinned_mesh.hpp"
 #include "ogl_depth_pass.hpp"
 #include "ogl_debug.hpp"
 #include "ogl_im3d.hpp"
@@ -43,6 +44,7 @@ private:
     OGLSpriteRenderer* m_spriteRenderer = nullptr;
 
     OGLStaticMeshRenderer* m_staticMeshRenderer = nullptr;
+    OGLSkinnedMeshRenderer* m_skinnedMeshRenderer = nullptr;
     OGLIm3DRenderer* m_im3dRenderer = nullptr;
     OGLImguiRenderer* m_imguiRenderer = nullptr;
     OGLSkyRenderer* m_skyRenderer = nullptr;
@@ -147,6 +149,7 @@ protected:
 
                     OGLPass shadowPass{ .m_type = OGLPassType::Shadow };
                     m_staticMeshRenderer->Pass(registry, shadowPass);
+                    m_skinnedMeshRenderer->Pass(registry, shadowPass);
 
                     m_depthPass->EndDepthPass();
                     break; // one directional light drives all cascades
@@ -163,6 +166,7 @@ protected:
         m_sceneModule->UpdateSceneGlobals(registry, activeCam);
 
         m_staticMeshRenderer->Pass(registry, pass);
+        m_skinnedMeshRenderer->Pass(registry, pass);
         m_triangleRenderer->Pass(registry, pass);
         m_spriteRenderer->Pass(registry, pass);
         m_im3dRenderer->Pass(registry, pass);
@@ -188,6 +192,7 @@ public:
         m_triangleRenderer = CreateChild<OGLTriangleRenderer>();
         m_spriteRenderer = CreateChild<OGLSpriteRenderer>();
         m_staticMeshRenderer = CreateChild<OGLStaticMeshRenderer>(m_geometryManager);
+        m_skinnedMeshRenderer = CreateChild<OGLSkinnedMeshRenderer>(m_geometryManager);
         m_im3dRenderer = CreateChild<OGLIm3DRenderer>();
         m_imguiRenderer = CreateChild<OGLImguiRenderer>();
         m_skyRenderer = CreateChild<OGLSkyRenderer>();

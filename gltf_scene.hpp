@@ -2,10 +2,16 @@
 
 #include "renderer.hpp"   // StaticMeshComponent, Engine, texture/geometry/material headers
 #include "transform.hpp"  // Transform
+#include "animation.hpp"  // AnimationPlayerComponent, SkinnedMeshComponent, SkinData
+
+#include <ozz/animation/runtime/animation.h>
+#include <ozz/animation/runtime/skeleton.h>
 
 #include <filesystem>
 #include <vector>
+#include <memory>
 
+#include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
 namespace okami {
@@ -41,11 +47,32 @@ namespace okami {
         int       m_materialIndex = -1;  // index into GltfSceneDesc::m_materials; -1 = none
     };
 
+    // Skin data captured from one GLTF skin block.
+    struct GltfSkinDef {
+        std::string              m_name;
+        std::shared_ptr<SkinData> m_skinData; // inverse bind matrices + joint names
+    };
+
+    // One skinned mesh primitive: like GltfSceneMeshInstance but with a skin reference.
+    struct GltfSkinnedMeshInstance {
+        Transform m_worldTransform;
+        Geometry  m_geometry;
+        int       m_materialIndex = -1;
+        int       m_skinIndex     = -1; // index into GltfSceneDesc::m_skins
+    };
+
     // The complete scene prototype.  Produced by GltfScene::FromFile() and
     // consumed (moved) by SpawnGltfScene().
     struct GltfSceneDesc {
-        std::vector<GltfSceneMeshInstance> m_meshInstances;
-        std::vector<GltfSceneMaterialDef>  m_materials;
+        std::vector<GltfSceneMeshInstance>    m_meshInstances;
+        std::vector<GltfSkinnedMeshInstance>  m_skinnedMeshInstances;
+        std::vector<GltfSceneMaterialDef>     m_materials;
+        std::vector<GltfSkinDef>              m_skins;
+
+        // Ozz runtime assets loaded from .skeleton.ozz / .animation.ozz alongside the GLTF.
+        // May be null/empty when the GLTF has no animations or the archives were not found.
+        std::shared_ptr<ozz::animation::Skeleton>                m_skeleton;
+        std::vector<std::shared_ptr<ozz::animation::Animation>>  m_animations;
     };
 
     // ─────────────────────────────────────────────────────────────────────────

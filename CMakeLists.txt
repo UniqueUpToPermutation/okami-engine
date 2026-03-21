@@ -186,6 +186,8 @@ target_link_libraries(EngineLib PUBLIC
         ${TMXLITE_LIBRARY}
         unofficial::im3d::im3d
         EnTT::EnTT
+        ozz_animation
+        ozz_base
 )
 
 target_compile_definitions(EngineLib PUBLIC ENTT_USE_ATOMIC=1)
@@ -202,6 +204,7 @@ endif()
 # Set include directories for the library
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR})
 target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/ogl)
+target_include_directories(EngineLib PUBLIC ${CMAKE_SOURCE_DIR}/ozz/include)
 target_include_directories(EngineLib PRIVATE ${TINYGLTF_INCLUDE_DIRS})
 target_include_directories(EngineLib PUBLIC ${TMXLITE_INCLUDE_DIR})
 target_compile_definitions(EngineLib PRIVATE NOMINMAX)

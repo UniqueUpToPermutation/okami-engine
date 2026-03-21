@@ -22,14 +22,14 @@ namespace okami {
 		Color,
 		Tangent,
 		Bitangent,
+		Joints,   // JOINTS_0  – stored as vec4 (float casts of joint indices)
+		Weights,  // WEIGHTS_0 – stored as vec4 (blend weights)
 		Unknown
-		// Add more attribute types as needed
 	};
 
-	std::string_view AttributeTypeToString(AttributeType type);
-
 	enum class MeshType {
-		Static
+		Static,
+		Skinned
 	};
 
     enum class AccessorType {
@@ -57,6 +57,7 @@ namespace okami {
 	AccessorComponentType GetComponentType(AttributeType type);
 	uint32_t GetSize(AccessorType type, AccessorComponentType componentType);
 	uint32_t GetSize(AttributeType type);
+	std::string_view AttributeTypeToString(AttributeType type);
 
 	struct IndexInfo {
 		AccessorComponentType m_type;
@@ -90,6 +91,10 @@ namespace okami {
                 return std::is_same_v<T, glm::vec4>;
             case AttributeType::Bitangent:
                 return std::is_same_v<T, glm::vec3>;
+            case AttributeType::Joints:
+                return std::is_same_v<T, glm::vec4>;
+            case AttributeType::Weights:
+                return std::is_same_v<T, glm::vec4>;
             default:
                 return false;
         }

@@ -10,6 +10,7 @@
 #include "renderer.hpp"
 #include "camera_controllers.hpp"
 #include "entity_manager.hpp"
+#include "animation.hpp"
 
 using namespace okami;
 using namespace entt::literals;
@@ -121,6 +122,9 @@ protected:
         RegisterComponent<DirectionalLightComponent>("DirectionalLight"_hs);
         RegisterComponent<SkyComponent>("Sky"_hs);
         RegisterComponent<StaticMeshComponent>("StaticMesh"_hs);
+        RegisterComponent<SkinnedMeshComponent>("SkinnedMesh"_hs);
+        RegisterComponent<SkeletonComponent>("Skeleton"_hs);
+        RegisterComponent<SkeletonStateComponent>("SkeletonState"_hs);
 
         RegisterComponent<OrbitCameraControllerComponent>("OrbitCameraController"_hs);
         RegisterComponent<SpriteComponent>("Sprite"_hs);

@@ -183,13 +183,13 @@ float alphaCoveragePreserved(sampler2D tex, vec2 uv) {
 
 // Discard if alpha is below the Bayer 4×4 threshold at this pixel.
 void stochasticDiscardBayer4x4(float alpha, vec2 screenPos) {
-    if (alpha < bayerThreshold4x4(ivec2(screenPos)))
+    if (alpha <= bayerThreshold4x4(ivec2(screenPos)))
         discard;
 }
 
 // Discard if alpha is below the Bayer 8×8 threshold at this pixel.
 void stochasticDiscardBayer8x8(float alpha, vec2 screenPos) {
-    if (alpha < bayerThreshold8x8(ivec2(screenPos)))
+    if (alpha <= bayerThreshold8x8(ivec2(screenPos)))
         discard;
 }
 
@@ -211,13 +211,13 @@ void stochasticDiscardIGN(float alpha, vec2 screenPos, uint frameIndex) {
 
 // Discard if alpha is below the Bayer 4×4 threshold at this world position.
 void stochasticDiscardBayer4x4(float alpha, vec3 worldPos, float cellSize) {
-    if (alpha < bayerThreshold4x4(worldPos, cellSize))
+    if (alpha <= bayerThreshold4x4(worldPos, cellSize))
         discard;
 }
 
 // Discard if alpha is below the Bayer 8×8 threshold at this world position.
 void stochasticDiscardBayer8x8(float alpha, vec3 worldPos, float cellSize) {
-    if (alpha < bayerThreshold8x8(worldPos, cellSize))
+    if (alpha <= bayerThreshold8x8(worldPos, cellSize))
         discard;
 }
 

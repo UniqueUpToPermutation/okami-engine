@@ -9,6 +9,7 @@
 #include "ogl/ogl_renderer.hpp"
 #include "io.hpp"
 #include "light.hpp"
+#include "animation.hpp"
 
 #include <glm/gtc/quaternion.hpp>
 #include <glog/logging.h>
@@ -35,6 +36,7 @@ public:
         }
         en.CreateModule<okami::OGLRendererFactory>({}, okami::RendererParams{});
         en.CreateModule<okami::CameraControllerModuleFactory>();
+        en.CreateModule<okami::AnimationSystemModuleFactory>();
     }
 
     void SetupScene(okami::Engine& en) override {

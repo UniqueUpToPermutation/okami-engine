@@ -33,7 +33,7 @@ void main() {
     float alpha = alphaCoveragePreserved(u_diffuseMap, vs_out.uv, 0.5);
 
     // Stochastic transparency: discard fragments based on the corrected alpha.
-    discardIfTransparent(alpha);
+    stochasticDiscardBayer8x8(alpha, gl_FragCoord.xy);
 
     // Decode sRGB albedo to linear light before shading.
     vec3 albedo = sRGBToLinear(diffuseSample.rgb);
