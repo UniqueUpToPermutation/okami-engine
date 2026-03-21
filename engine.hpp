@@ -53,7 +53,8 @@ namespace okami {
 		void Run(RunParams params = {});
 		void Shutdown();
 
-        entity_t CreateEntity(entity_t parent = kNullEntity);
+        entity_t CreateEntity(entity_t parent = kNullEntity,
+            std::string_view name = {});
         void RemoveEntity(entity_t entity);
         void SetActiveCamera(entity_t e);
 

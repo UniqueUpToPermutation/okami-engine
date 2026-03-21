@@ -37,17 +37,17 @@ public:
         material.m_colorTexture = textureHandle;
         auto materialHandle = en.CreateMaterial(material);
 
-        auto boxEntity = en.CreateEntity();
+        auto boxEntity = en.CreateEntity(kNullEntity, "Box");
         en.AddComponent(boxEntity, StaticMeshComponent{
             .m_geometry = geometryHandle,
             .m_material = materialHandle,
         });
         en.AddComponent(boxEntity, Transform::Identity());
 
-        auto skyEntity = en.CreateEntity();
+        auto skyEntity = en.CreateEntity(kNullEntity, "Sky");
         en.AddComponent(skyEntity, SkyComponent{});
 
-        auto cameraEntity = en.CreateEntity();
+        auto cameraEntity = en.CreateEntity(kNullEntity, "Camera");
         en.AddComponent(cameraEntity, Camera::Perspective(glm::half_pi<float>(), 0.1f, 50.0f));
         en.AddComponent(cameraEntity, Transform::LookAt(
             glm::vec3(2.0f, 2.0f, 2.0f),
@@ -57,7 +57,7 @@ public:
         en.AddComponent(cameraEntity, OrbitCameraControllerComponent{});
         en.SetActiveCamera(cameraEntity);
 
-        auto ambientLightEntity = en.CreateEntity();
+        auto ambientLightEntity = en.CreateEntity(kNullEntity, "Ambient Light");
         en.AddComponent(ambientLightEntity, AmbientLightComponent{
             .m_color     = color::White,
             .m_intensity = 1.0f

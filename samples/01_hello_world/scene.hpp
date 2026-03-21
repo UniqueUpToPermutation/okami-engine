@@ -26,7 +26,7 @@ public:
 
         auto geometryHandle = en.LoadGeometry(GetSampleAssetPath("box.glb"));
 
-        m_cameraEntity = en.CreateEntity();
+        m_cameraEntity = en.CreateEntity(kNullEntity, "Camera");
         en.AddComponent(m_cameraEntity, Camera::Orthographic(3.0f, -3.0f, 3.0f));
         en.AddComponent(m_cameraEntity, Transform::LookAt(
             glm::vec3(1.0f, 1.0f, 1.0f),
@@ -35,7 +35,7 @@ public:
         ));
         en.SetActiveCamera(m_cameraEntity);
 
-        auto meshEntity = en.CreateEntity();
+        auto meshEntity = en.CreateEntity(kNullEntity, "Mesh");
         en.AddComponent(meshEntity, StaticMeshComponent{ geometryHandle });
         en.AddComponent(meshEntity, Transform::Scale(0.25f));
 

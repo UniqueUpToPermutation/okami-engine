@@ -21,8 +21,16 @@ namespace okami
 
 	using entity_t = entt::entity;
 	constexpr entity_t kNullEntity = entt::null;
+	
+	struct NameComponent {
+		std::string m_name;
+	};
 
 	struct EntityRemoveMessage {
+		entity_t m_entity = kNullEntity;
+	};
+
+	struct EntityCreatedSignal {
 		entity_t m_entity = kNullEntity;
 	};
 
@@ -62,15 +70,30 @@ namespace okami
 	template <typename T>
 	struct RemoveCtxSignal {};
 
-    class IEntityManager {
-    public:
-        virtual entity_t CreateEntity() = 0;
+	struct EntityTreeComponent {
+		entity_t m_parent = kNullEntity;
+		entity_t m_firstChild = kNullEntity;
+		entity_t m_nextSibling = kNullEntity;
+		entity_t m_prevSibling = kNullEntity;
+		entity_t m_lastChild = kNullEntity;
+	};
 
-		inline entity_t CreateEntity(Out<EntityParentChangeSignal> port, entity_t parent) {
+	struct EntityManagerCtx {
+		entity_t m_rootEntity = kNullEntity;
+	};
+
+    class IEntityManager {
+	private:
+		virtual entity_t CreateEntity() = 0;
+
+    public:
+		inline entity_t CreateEntity(
+			Out<EntityCreatedSignal> createdPort,
+			Out<EntityParentChangeSignal> parentPort, 
+			entity_t parent = kNullEntity) {
 			auto entity = CreateEntity();
-			if (parent != kNullEntity) {
-				port.Send(EntityParentChangeSignal{entity, parent});
-			}
+			createdPort.Send(EntityCreatedSignal{entity});
+			parentPort.Send(EntityParentChangeSignal{entity, parent});
 			return entity;
 		}
 

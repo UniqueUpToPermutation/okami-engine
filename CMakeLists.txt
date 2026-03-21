@@ -174,7 +174,9 @@ set(ENGINE_LIB_SOURCES ${_FILTERED_LIB_SOURCES})
 
 add_library(EngineLib STATIC ${ENGINE_LIB_SOURCES})
 
-
+if(MSVC)
+    target_compile_options(EngineLib PRIVATE /bigobj)
+endif()
 
 # Link libraries for engine library
 target_link_libraries(EngineLib PUBLIC

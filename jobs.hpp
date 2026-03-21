@@ -94,19 +94,20 @@ namespace okami {
         }
 
         inline void HandleNoLock(std::invocable<T const&> auto&& handler) {
-            std::shared_lock lock(m_mutex);
             for (const auto& message : m_messages) {
                 handler(message);
             }
         }
 
+        inline void HandleReadSpanNoLock(std::invocable<std::span<T const>> auto&& handler) {
+            handler(std::span<T const>(m_messages.data(), m_messages.size()));
+        }
+
         inline void HandlePipeNoLock(std::invocable<std::span<T>> auto&& handler) {
-            std::shared_lock lock(m_mutex);
             handler(std::span<T>(m_messages.data(), m_messages.size()));
         }
 
         inline void HandlePipeSingleNoLock(std::invocable<T&> auto&& handler) {
-            std::shared_lock lock(m_mutex);
             if (!m_messages.empty()) {
                 handler(m_messages[0]);
             }
@@ -118,12 +119,12 @@ namespace okami {
         }
 
         inline void HandlePipe(std::invocable<std::span<T>> auto&& handler) {
-            std::shared_lock lock(m_mutex);
+            std::unique_lock lock(m_mutex);
             HandlePipeNoLock(std::move(handler));
         }
 
         inline void HandlePipeSingle(std::invocable<T&> auto&& handler) {
-            std::shared_lock lock(m_mutex);
+            std::unique_lock lock(m_mutex);
             HandlePipeSingleNoLock(std::move(handler));
         }
 
@@ -147,6 +148,10 @@ namespace okami {
 
         inline void Handle(std::invocable<T const&> auto&& handler) {
             m_port->HandleNoLock(std::move(handler));
+        }
+
+        inline void Read(std::invocable<std::span<T const>> auto&& handler) {
+            m_port->HandleReadSpanNoLock(std::move(handler));
         }
 
         T const& operator*() const {

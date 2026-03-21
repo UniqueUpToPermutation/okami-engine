@@ -60,13 +60,13 @@ public:
                 .turbidity   = 1.0f,
             });
 
-            auto skyEntity = en.CreateEntity();
+            auto skyEntity = en.CreateEntity(kNullEntity, "Sky");
             en.AddComponent(skyEntity, SkyComponent{ .m_skyMaterial = skyMaterial });
         }
 
         // ── Lights ──────────────────────────────────────────────────────────
         {
-            auto dirLightEntity = en.CreateEntity();
+            auto dirLightEntity = en.CreateEntity(kNullEntity, "Directional Light");
             en.AddComponent(dirLightEntity, DirectionalLightComponent{
                 .m_direction = lightDir,
                 .m_color     = color::White,
@@ -74,7 +74,7 @@ public:
                 .b_castShadow = true
             });
 
-            auto ambientLightEntity = en.CreateEntity();
+            auto ambientLightEntity = en.CreateEntity(kNullEntity, "Ambient Light");
             en.AddComponent(ambientLightEntity, AmbientLightComponent{
                 .m_color     = color::White,
                 .m_intensity = 0.2f
@@ -86,7 +86,7 @@ public:
             glm::angleAxis(glm::pi<float>() / 2.0f, glm::vec3(0.0f, 1.0f, 0.0f)) *
             glm::angleAxis(0.0f, glm::vec3(1.0f, 0.0f, 0.0f));
 
-        auto cameraEntity = en.CreateEntity();
+        auto cameraEntity = en.CreateEntity(kNullEntity, "Camera");
         en.AddComponent(cameraEntity,
             Camera::Perspective(glm::half_pi<float>(), 0.1f, 1000.0f));
         en.AddComponent(cameraEntity,

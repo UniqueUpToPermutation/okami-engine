@@ -46,10 +46,17 @@ Engine::Engine(EngineParams params) :
 	CreateModule(GltfSceneIOModuleFactory{});
 }
 
-entity_t Engine::CreateEntity(entity_t parent) {
+entity_t Engine::CreateEntity(entity_t parent, std::string_view name) {
     if (m_entityManager) {
-		auto port = m_messages.GetPortOut<EntityParentChangeSignal>();
-        return m_entityManager->CreateEntity(port, parent);
+		auto entityCreatePort = m_messages.GetPortOut<EntityCreatedSignal>();
+		auto entityParentChanged = m_messages.GetPortOut<EntityParentChangeSignal>();
+        auto entity = m_entityManager->CreateEntity(entityCreatePort, entityParentChanged, parent);
+
+		if (name.length() > 0) {
+			m_messages.Send(AddComponentSignal<NameComponent>{.m_entity = entity, .m_component = NameComponent{std::string(name)}});
+		}
+
+		return entity;
     } else {
         throw std::runtime_error("No IEntityManager available in Engine. Call Startup first!");
     }

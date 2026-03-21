@@ -170,8 +170,8 @@ protected:
         m_triangleRenderer->Pass(registry, pass);
         m_spriteRenderer->Pass(registry, pass);
         m_im3dRenderer->Pass(registry, pass);
-        m_imguiRenderer->Pass(registry, pass);
         m_skyRenderer->Pass(registry, pass);
+        m_imguiRenderer->Pass(registry, pass);
         m_glProvider->SwapBuffers();
 
         return {};
