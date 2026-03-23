@@ -6,7 +6,7 @@
 
 namespace okami {
     struct EditorPropertiesCtx {
-        bool b_showEditor = false;
+        bool b_showEditor = true;
     };
 
     // A lightweight scene inspector that renders two ImGui windows:
@@ -14,6 +14,6 @@ namespace okami {
     //   "Inspector" — lists components on the selected entity by name,
     //                 with expanded detail for known component types.
     struct EditorModuleFactory {
-        std::unique_ptr<EngineModule> operator()() const;
+        std::unique_ptr<EngineModule> operator()(EditorPropertiesCtx const& ctx) const;
     };
 } // namespace okami

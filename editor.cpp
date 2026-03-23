@@ -38,6 +38,7 @@ std::string_view StripNamespace(std::string_view name) {
 // ---------------------------------------------------------------------------
 
 class EditorModule final : public EngineModule {
+    EditorPropertiesCtx m_initialCtx;
     entt::entity m_selectedEntity = entt::null;
     bool m_showScene     = false;
     bool m_showInspector = false;
@@ -318,6 +319,11 @@ class EditorModule final : public EngineModule {
     }
 
 public:
+    Error StartupImpl(InitContext const& con) override {
+        auto& ctx = con.m_registry.ctx().emplace<EditorPropertiesCtx>(m_initialCtx);
+        return {};
+    }
+
     Error BuildGraphImpl(JobGraph& graph, BuildGraphParams const& params) override {
         graph.AddMessageNode(
             [this, &registry = params.m_registry](
@@ -336,10 +342,12 @@ public:
     }
 
     std::string GetName() const override { return "Editor"; }
+
+    EditorModule(EditorPropertiesCtx const& ctx = {}) : m_initialCtx(ctx) {}
 };
 
 // ---------------------------------------------------------------------------
 
-std::unique_ptr<EngineModule> EditorModuleFactory::operator()() const {
-    return std::make_unique<EditorModule>();
+std::unique_ptr<EngineModule> EditorModuleFactory::operator()(EditorPropertiesCtx const& ctx) const {
+    return std::make_unique<EditorModule>(ctx);
 }

@@ -9,25 +9,29 @@ namespace okami {
 
 void InstallEditorModules(Engine& en) {
     en.CreateModule<ImGuiModuleFactory>();
-    en.CreateModule<EditorModuleFactory>();
+    en.CreateModule<EditorModuleFactory>({}, EditorPropertiesCtx{ .b_showEditor = false });
+
+    auto const& registry = en.GetRegistry();
 
     // Script: initialise EditorPropertiesCtx on the first frame, then toggle
     // b_showEditor whenever the tilde / grave-accent key is pressed.
     en.AddScript(
-        [visible = false](
-            JobContext&,
+        [&registry](
+            JobContext& con,
             In<KeyMessage>                              keys,
             Out<AddCtxSignal<EditorPropertiesCtx>>      addCtx,
             Out<UpdateCtxSignal<EditorPropertiesCtx>>   updateCtx) mutable -> Error
         {
-            // Seed the ctx on every frame; DefaultCtxMergeModule ignores it
-            // once the ctx already exists.
-            addCtx.Send(AddCtxSignal<EditorPropertiesCtx>{ EditorPropertiesCtx{ visible } });
+            auto editorCtx = registry.ctx().get<EditorPropertiesCtx>();
 
             keys.Handle([&](KeyMessage const& msg) {
+                if (msg.m_captureId != kNoCaptureId) {
+                    return; // Already captured
+                }
+
                 if (msg.m_key == Key::GraveAccent && msg.m_action == Action::Press) {
-                    visible = !visible;
-                    updateCtx.Send(UpdateCtxSignal<EditorPropertiesCtx>{ EditorPropertiesCtx{ visible } });
+                    editorCtx.b_showEditor = !editorCtx.b_showEditor;
+                    updateCtx.Send(UpdateCtxSignal<EditorPropertiesCtx>{ editorCtx });
                 }
             });
 
