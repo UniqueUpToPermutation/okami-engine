@@ -10,8 +10,6 @@
 #include "io.hpp"
 #include "light.hpp"
 #include "animation.hpp"
-#include "editor.hpp"
-#include "imgui.hpp"
 
 #include <glm/gtc/quaternion.hpp>
 #include <glog/logging.h>
@@ -36,11 +34,9 @@ public:
         } else {
             en.CreateModule<okami::GLFWModuleFactory>();
         }
-        en.CreateModule<okami::ImGuiModuleFactory>();
         en.CreateModule<okami::OGLRendererFactory>({}, okami::RendererParams{});
         en.CreateModule<okami::CameraControllerModuleFactory>();
         en.CreateModule<okami::AnimationSystemModuleFactory>();
-        en.CreateModule<okami::EditorModuleFactory>();
     }
 
     void SetupScene(okami::Engine& en) override {
@@ -56,7 +52,8 @@ public:
             return;
         }
 
-        SpawnGltfScene(en, std::move(sceneResult->m_data));
+        SpawnGltfScene(en, std::move(sceneResult->m_data),
+            Transform::Identity(), gltfPath.stem().string());
 
         // ── Sky ────────────────────────────────────────────────────────────
         {

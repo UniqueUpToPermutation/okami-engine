@@ -12,6 +12,7 @@
 #include "entity_manager.hpp"
 #include "entity_tree_view.hpp"
 #include "animation.hpp"
+#include "editor.hpp"
 
 using namespace okami;
 using namespace entt::literals;
@@ -302,6 +303,10 @@ protected:
 
     void Build() {
         entt::meta_reset();
+        
+        g_registeredComponents.clear();
+        g_registeredCtxs.clear();
+        g_ctxGetters.clear();
 
         entt::meta_factory<glm::vec3>()
             .type("vec3"_hs)
@@ -454,6 +459,12 @@ protected:
 
         entt::meta_factory<RenderDebugConfig>()
             .data<&RenderDebugConfig::m_mode>("mode"_hs).custom<FieldMeta>(FieldMeta{"Mode"});
+
+        RegisterCtx<EditorPropertiesCtx>("EditorProperties"_hs, MetaData{
+            .m_ctxMetaData = CtxMetaData{
+                .b_showInEditor = false,
+            }
+        });
     }
 
     Error BuildGraphImpl(JobGraph& graph, BuildGraphParams const& params) override {

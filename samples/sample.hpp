@@ -25,6 +25,11 @@ public:
     virtual size_t GetTestFrameCount() const { return 1; }
 };
 
+// Adds ImGui + Editor modules and a tilde-key toggle script so that any
+// sample built with RunSample can bring up the editor by pressing `~`.
+// Implemented in sample.cpp (compiled into every sample executable).
+void InstallEditorModules(Engine& en);
+
 // ---------------------------------------------------------------------------
 // Driver function used by each sample's main.cpp.
 //
@@ -34,6 +39,8 @@ template <typename TSample>
 int RunSample() {
     TSample sample;
     Engine en;
+
+    InstallEditorModules(en);
     sample.SetupModules(en);
 
     Error err = en.Startup();

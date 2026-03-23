@@ -323,6 +323,9 @@ public:
             [this, &registry = params.m_registry](
                 JobContext&, Pipe<ImGuiContextObject>) -> Error
             {
+                auto* ctx = registry.ctx().find<EditorPropertiesCtx>();
+                if (!ctx || !ctx->b_showEditor) return {};
+
                 DrawMainMenuBar();
                 DrawEntityList(registry);
                 DrawInspector(registry);

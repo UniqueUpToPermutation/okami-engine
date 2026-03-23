@@ -118,6 +118,7 @@ namespace okami {
     void SpawnGltfScene(
         Engine&          en,
         GltfSceneDesc&&  proto,
-        Transform const& root = Transform::Identity());
+        Transform const& root  = Transform::Identity(),
+        std::string_view name  = "GltfScene");
 
 } // namespace okami

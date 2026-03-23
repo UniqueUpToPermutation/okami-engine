@@ -5,6 +5,10 @@
 #include <memory>
 
 namespace okami {
+    struct EditorPropertiesCtx {
+        bool b_showEditor = false;
+    };
+
     // A lightweight scene inspector that renders two ImGui windows:
     //   "Scene"    — lists all alive entities; click to select one.
     //   "Inspector" — lists components on the selected entity by name,

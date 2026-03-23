@@ -429,7 +429,10 @@ Expected<GltfScene> GltfScene::FromFile(
 // SpawnGltfScene
 // ─────────────────────────────────────────────────────────────────────────────
 
-void SpawnGltfScene(Engine& en, GltfSceneDesc&& proto, Transform const& root) {
+void SpawnGltfScene(Engine& en, GltfSceneDesc&& proto, Transform const& root, std::string_view name) {
+    // Create the root entity that all scene nodes will be children of.
+    entity_t rootEntity = en.CreateEntity(kNullEntity, name);
+    en.AddComponent(rootEntity, root);
     // Build one material handle per GLTF material.
     // Materials with a resolvable texture path use LambertMaterial;
     // those without fall back to DefaultMaterial.
@@ -472,7 +475,7 @@ void SpawnGltfScene(Engine& en, GltfSceneDesc&& proto, Transform const& root) {
             matH = materials[inst.m_materialIndex];
 
         auto world  = root * inst.m_worldTransform;
-        auto entity = en.CreateEntity();
+        auto entity = en.CreateEntity(rootEntity);
         en.AddComponent(entity, StaticMeshComponent{geoH, matH});
         en.AddComponent(entity, world);
     }
@@ -501,7 +504,7 @@ void SpawnGltfScene(Engine& en, GltfSceneDesc&& proto, Transform const& root) {
             ssc.m_time = 0.0f;
         }
 
-        skeletonEntity = en.CreateEntity();
+        skeletonEntity = en.CreateEntity(rootEntity);
         en.AddComponent(skeletonEntity, std::move(sc));
         en.AddComponent(skeletonEntity, std::move(ssc));
         en.AddComponent(skeletonEntity, Transform::Identity());
@@ -542,7 +545,7 @@ void SpawnGltfScene(Engine& en, GltfSceneDesc&& proto, Transform const& root) {
             skinData = proto.m_skins[inst.m_skinIndex].m_skinData;
 
         auto world  = root * inst.m_worldTransform;
-        auto entity = en.CreateEntity();
+        auto entity = en.CreateEntity(rootEntity);
         en.AddComponent(entity, SkinnedMeshComponent{geoH, matH, skinData, skeletonEntity});
         en.AddComponent(entity, world);
     }

@@ -50,7 +50,8 @@ public:
             return;
         }
 
-        SpawnGltfScene(en, std::move(sceneResult->m_data));
+        SpawnGltfScene(en, std::move(sceneResult->m_data),
+            Transform::Identity(), gltfPath.stem().string());
 
         // ── Sky ────────────────────────────────────────────────────────────
         {

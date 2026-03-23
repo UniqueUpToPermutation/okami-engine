@@ -39,8 +39,10 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/samples/config")
     )
 endif()
 
+set(SAMPLE_COMMON_SRC "${CMAKE_CURRENT_LIST_DIR}/sample.cpp")
+
 function(add_engine_sample TARGET_NAME)
-    add_executable(${TARGET_NAME} ${ARGN})
+    add_executable(${TARGET_NAME} ${ARGN} ${SAMPLE_COMMON_SRC})
     target_link_libraries(${TARGET_NAME} PRIVATE EngineLib)
 
     if(CMAKE_VERSION VERSION_GREATER 3.12)
