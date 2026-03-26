@@ -330,34 +330,48 @@ protected:
 
         RegisterComponent<Camera>("Camera"_hs);
 
-        RegisterComponent<Transform>("Transform"_hs);
+        RegisterComponent<Transform>("Transform"_hs, MetaData{
+            .m_componentMetaData = ComponentMetaData{
+                .m_displayName = "Transform",
+                .b_writeable = true,
+            }
+        });
 
         RegisterComponent<EntityTreeComponent>("EntityTree"_hs, MetaData{
             .m_componentMetaData = ComponentMetaData{
-                .b_showInEditor = false,
                 .m_displayName = "Entity Tree",
+                .b_showInEditor = false,
             }
         });
 
         RegisterComponent<AmbientLightComponent>("AmbientLight"_hs, MetaData{
             .m_componentMetaData = ComponentMetaData{
                 .m_displayName = "Ambient Light",
+                .b_writeable = true,
             }
         });
 
         entt::meta_factory<AmbientLightComponent>()
-            .data<&AmbientLightComponent::m_color>("color"_hs).custom<FieldMeta>(FieldMeta{"Color"})
-            .data<&AmbientLightComponent::m_intensity>("intensity"_hs).custom<FieldMeta>(FieldMeta{"Intensity"});
+            .data<&AmbientLightComponent::m_color>("color"_hs).custom<FieldMeta>(FieldMeta{
+                .m_displayName = "Color",
+                .m_hint = FieldHint::Color})
+            .data<&AmbientLightComponent::m_intensity>("intensity"_hs).custom<FieldMeta>(FieldMeta{
+                .m_displayName = "Intensity"});
 
         RegisterComponent<DirectionalLightComponent>("DirectionalLight"_hs, MetaData{
             .m_componentMetaData = ComponentMetaData{
                 .m_displayName = "Directional Light",
+                .b_writeable = true,
             }
         });
         
         entt::meta_factory<DirectionalLightComponent>()
-            .data<&DirectionalLightComponent::m_direction>("direction"_hs).custom<FieldMeta>(FieldMeta{"Direction"})
-            .data<&DirectionalLightComponent::m_color>("color"_hs).custom<FieldMeta>(FieldMeta{"Color"})
+            .data<&DirectionalLightComponent::m_direction>("direction"_hs).custom<FieldMeta>(FieldMeta{
+                .m_displayName = "Direction",
+                .m_hint = FieldHint::Direction})
+            .data<&DirectionalLightComponent::m_color>("color"_hs).custom<FieldMeta>(FieldMeta{
+                .m_displayName = "Color",
+                .m_hint = FieldHint::Color})
             .data<&DirectionalLightComponent::m_intensity>("intensity"_hs).custom<FieldMeta>(FieldMeta{"Intensity"})
             .data<&DirectionalLightComponent::b_castShadow>("castShadow"_hs).custom<FieldMeta>(FieldMeta{"Cast Shadow"});
 
@@ -396,6 +410,7 @@ protected:
         RegisterComponent<OrbitCameraControllerComponent>("OrbitCameraController"_hs, MetaData{
             .m_componentMetaData = ComponentMetaData{
                 .m_displayName = "Orbit Camera Controller",
+                .b_writeable = true,
             }
         });
 
@@ -410,6 +425,7 @@ protected:
         RegisterComponent<SpriteComponent>("Sprite"_hs, MetaData{
             .m_componentMetaData = ComponentMetaData{
                 .m_displayName = "Sprite",
+                .b_writeable = true,
             }
         });
 
@@ -422,13 +438,14 @@ protected:
         RegisterComponent<FirstPersonCameraControllerComponent>("FirstPersonCameraController"_hs, MetaData{
             .m_componentMetaData = ComponentMetaData{
                 .m_displayName = "First Person Camera Controller",
+                .b_writeable = true,
             }
         });
 
         RegisterComponent<NameComponent>("Name"_hs, MetaData{
             .m_componentMetaData = ComponentMetaData{
-                .b_showInEditor = false,
                 .m_displayName = "Name",
+                .b_showInEditor = false,
             }
         });
 
@@ -439,6 +456,7 @@ protected:
         RegisterCtx<ShadowConfig>("ShadowConfig"_hs, MetaData{
             .m_ctxMetaData = CtxMetaData{
                 .m_displayName = "Shadow Config",
+                .b_writeable = true,
             }
         });
 
@@ -454,6 +472,7 @@ protected:
         RegisterCtx<RenderDebugConfig>("RenderDebugConfig"_hs, MetaData{
             .m_ctxMetaData = CtxMetaData{
                 .m_displayName = "Render Debug Config",
+                .b_writeable = true,
             }
         });
 

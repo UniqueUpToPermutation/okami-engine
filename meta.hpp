@@ -41,14 +41,16 @@ namespace okami {
 	};
 
     struct ComponentMetaData {
+        std::string_view m_displayName; // Optional human-readable name for editor display
+
         bool b_defaultAddHandler = true;
         bool b_defaultRemoveHandler = true;
         bool b_defaultUpdateHandler = true;
         bool b_allowMetaConversion = true; // Whether this component can be automatically converted to/from meta_any for editor messages
         
         bool b_showInEditor = true; // Whether this component should be shown in the editor's context window
-        std::string_view m_displayName; // Optional human-readable name for editor display
-
+        bool b_writeable = false; // Whether the editor should allow editing this component's fields
+    
         inline bool NeedsDefaultHandler() const {
             return b_defaultAddHandler || 
                 b_defaultRemoveHandler || 
@@ -58,13 +60,15 @@ namespace okami {
     };
 
     struct CtxMetaData {
+        std::string_view m_displayName; // Optional human-readable name for editor display
+
         bool b_defaultAddHandler = true;
         bool b_defaultRemoveHandler = true;
         bool b_defaultUpdateHandler = true;
         bool b_allowMetaConversion = true; // Whether this ctx can be automatically converted to/from meta_any for editor messages
         
         bool b_showInEditor = true; // Whether this ctx variable should be shown in the editor's context window
-        std::string_view m_displayName; // Optional human-readable name for editor display
+        bool b_writeable = false; // Whether the editor should allow editing this ctx variable's fields
         
         inline bool NeedsDefaultHandler() const {
             return b_defaultAddHandler || 
@@ -106,11 +110,20 @@ namespace okami {
         }
     };
 
+    // Controls how a field is rendered in the editor, overriding the default widget for its type.
+    enum class FieldHint {
+        Default,    // Use the standard widget for the field's type
+        Color,      // vec3/vec4: show a colour picker (linear RGB / RGBA)
+        Direction,  // vec3: show a normalised direction widget (SliderFloat3 clamped to unit sphere)
+    };
+
     // Attached to individual data fields via meta_factory::data().custom<FieldMeta>().
     // Provides a human-readable display name for the inspector.
     struct FieldMeta {
         const char* m_displayName = nullptr;
         bool b_showInEditor = true; // Whether this field should be shown in the editor's inspector when its parent component/ctx is selected
+        std::optional<bool> b_writeable; // Per-field override for writability; if unset, inherits from parent component/ctx
+        FieldHint m_hint = FieldHint::Default; // Override the default widget for this field's type
     };
 
     // Function pointer type used to retrieve a ctx variable as meta_any.
