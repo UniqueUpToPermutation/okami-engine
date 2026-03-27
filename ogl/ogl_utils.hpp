@@ -205,6 +205,7 @@ namespace okami {
 
     Expected<GLProgram> CreateProgram(ProgramShaders const& shaders);
     Expected<GLProgram> CreateProgram(ProgramShaderPaths const& shaderPaths, IGLShaderCache& cache);
+    Expected<GLProgram> CreateProgram(ProgramShaderPaths const& shaderPaths);
 
     GLint GetUniformLocation(GLProgram const& program, const char* name, Error& error);
     Error GetGlError();

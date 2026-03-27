@@ -5,7 +5,7 @@
 
 #include "ogl_utils.hpp"
 
-#include "shaders/im3d.glsl"
+#include "shaders/im3d_interface.glsl"
 #include "ogl_scene.hpp"
 
 namespace okami {
@@ -16,7 +16,9 @@ namespace okami {
         IIm3dProvider* m_dataProvider;
 
         OGLPipelineState m_pipelineState;
-        GLProgram m_program;
+        GLProgram m_programPoints;
+        GLProgram m_programLines;
+        GLProgram m_programTriangles;
 
         UploadVertexBuffer<glsl::Im3dVertex> m_vertexBuffer; // Instance buffer for sprite data
         IOGLSceneGlobalsProvider* m_sceneGlobalsProvider = nullptr;

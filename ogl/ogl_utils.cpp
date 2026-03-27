@@ -160,6 +160,42 @@ Expected<GLProgram> okami::CreateProgram(ProgramShaders const& shaders) {
     return GLProgram(programId);
 }
 
+Expected<GLProgram> okami::CreateProgram(ProgramShaderPaths const& shaderPaths) {
+    auto vertShader = LoadShader(GL_VERTEX_SHADER, shaderPaths.m_vertex);
+    if (!vertShader) return std::unexpected(vertShader.error());
+
+    std::optional<GLShader> fragShader, geomShader, tessControlShader, tessEvalShader;
+
+    if (shaderPaths.m_fragment) {
+        auto s = LoadShader(GL_FRAGMENT_SHADER, *shaderPaths.m_fragment);
+        if (!s) return std::unexpected(s.error());
+        fragShader = std::move(*s);
+    }
+    if (shaderPaths.m_geometry) {
+        auto s = LoadShader(GL_GEOMETRY_SHADER, *shaderPaths.m_geometry);
+        if (!s) return std::unexpected(s.error());
+        geomShader = std::move(*s);
+    }
+    if (shaderPaths.m_tessControl) {
+        auto s = LoadShader(GL_TESS_CONTROL_SHADER, *shaderPaths.m_tessControl);
+        if (!s) return std::unexpected(s.error());
+        tessControlShader = std::move(*s);
+    }
+    if (shaderPaths.m_tessEval) {
+        auto s = LoadShader(GL_TESS_EVALUATION_SHADER, *shaderPaths.m_tessEval);
+        if (!s) return std::unexpected(s.error());
+        tessEvalShader = std::move(*s);
+    }
+
+    return CreateProgram(ProgramShaders{
+        .m_vertex      = *vertShader,
+        .m_fragment    = fragShader    ? &*fragShader    : nullptr,
+        .m_geometry    = geomShader    ? &*geomShader    : nullptr,
+        .m_tessControl = tessControlShader ? &*tessControlShader : nullptr,
+        .m_tessEval    = tessEvalShader    ? &*tessEvalShader    : nullptr
+    });
+}
+
 Expected<GLProgram> okami::CreateProgram(ProgramShaderPaths const& shaderPaths, IGLShaderCache& cache) {
     GLShader* vertex = nullptr;
     GLShader* fragment = nullptr;

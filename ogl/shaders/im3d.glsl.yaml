@@ -1,0 +1,52 @@
+{
+  "targets": {
+    "points.vs": {
+      "defines": {
+        "VERTEX_SHADER": null,
+        "POINTS": null
+      }
+    },
+    "points.gs": {
+      "defines": {
+        "GEOMETRY_SHADER": null,
+        "POINTS": null
+      }
+    },
+    "points.fs" : {
+      "defines": {
+        "FRAGMENT_SHADER": null,
+        "POINTS": null
+      }
+    },
+    "lines.vs": {
+      "defines": {
+        "VERTEX_SHADER": null,
+        "LINES": null
+      }
+    },
+    "lines.gs": {
+      "defines": {
+        "GEOMETRY_SHADER": null,
+        "LINES": null
+      }
+    },
+    "lines.fs": {
+      "defines": {
+        "FRAGMENT_SHADER": null,
+        "LINES": null
+      }
+    },
+    "triangles.vs": {
+      "defines": {
+        "VERTEX_SHADER": null,
+        "TRIANGLES": null
+      }
+    },
+    "triangles.fs": {
+      "defines": {
+        "FRAGMENT_SHADER": null,
+        "TRIANGLES": null
+      }
+    }
+  }
+}

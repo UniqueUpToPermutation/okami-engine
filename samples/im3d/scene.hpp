@@ -42,9 +42,9 @@ public:
             im3dc->end();
 
             im3dc->begin(Im3d::PrimitiveMode_Points);
-            im3dc->vertex(Im3d::Vec3(0.25f, -0.75f, 0.0f), 1.0, Im3d::Color_Red);
-            im3dc->vertex(Im3d::Vec3(0.5f, -0.25f, 0.0f), 1.0, Im3d::Color_Blue);
-            im3dc->vertex(Im3d::Vec3(0.75f, -0.75f, 0.0f), 1.0, Im3d::Color_Green);
+            im3dc->vertex(Im3d::Vec3(0.25f, -0.75f, 0.0f), 5.0, Im3d::Color_Red);
+            im3dc->vertex(Im3d::Vec3(0.5f, -0.25f, 0.0f), 10.0, Im3d::Color_Blue);
+            im3dc->vertex(Im3d::Vec3(0.75f, -0.75f, 0.0f), 50.0, Im3d::Color_Green);
             im3dc->end();
 
             return {};

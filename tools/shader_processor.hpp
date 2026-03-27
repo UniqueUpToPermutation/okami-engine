@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 // Resolves #include directives in GLSL / WGSL shader files and writes the
 // fully inlined result to an output file.  Used both as a library by
@@ -12,10 +13,14 @@ public:
     explicit ShaderPreprocessor(const std::filesystem::path& baseDirectory);
 
     // Process 'inputFile' and write the result to 'outputFile'.
+    // If 'defines' is non-empty, each entry is emitted as a '#define' line
+    // immediately after the '#version' directive (or before all content if
+    // no '#version' is present).  Format: "NAME" or "NAME VALUE".
     // Creates the output directory if it does not exist.
     // Throws std::runtime_error on failure.
-    void PreprocessFile(const std::filesystem::path& inputFile,
-                        const std::filesystem::path& outputFile);
+    void PreprocessFile(const std::filesystem::path&    inputFile,
+                        const std::filesystem::path&    outputFile,
+                        const std::vector<std::string>& defines = {});
 
     // Collect the transitive set of files #included by 'inputFile' (not
     // including the file itself).  Does not write any output.
@@ -56,9 +61,11 @@ public:
 
     bool CanProcess(const std::filesystem::path& inputPath) const override;
 
-    // Creates one output node (same relative path) and wires the input edge.
+    // Creates one output node per target defined in the resolved 'shader.yaml'
+    // config (naming convention: stem.TARGET.ext).  If no targets are defined,
+    // falls back to producing a single output with the same relative path.
     // Also scans transitive #include dependencies and adds each discovered
-    // file as an additional dependency edge of the output node.
+    // file as an additional dependency edge of every output node.
     void BuildNodes(ResourceGraph&               graph,
                     NodeId                       inputNodeId,
                     const std::filesystem::path& inputRelPath) override;
