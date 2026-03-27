@@ -15,7 +15,6 @@ public:
         } else {
             en.CreateModule<okami::GLFWModuleFactory>();
         }
-        en.CreateModule<okami::Im3dModuleFactory>();
         en.CreateModule<okami::OGLRendererFactory>({}, okami::RendererParams{});
     }
 

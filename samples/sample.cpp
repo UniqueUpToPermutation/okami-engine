@@ -2,12 +2,14 @@
 
 #include "editor.hpp"
 #include "imgui.hpp"
+#include "im3d.hpp"
 #include "input.hpp"
 #include "entity_manager.hpp"
 
 namespace okami {
 
 void InstallEditorModules(Engine& en) {
+    en.CreateModule<Im3dModuleFactory>();
     en.CreateModule<ImGuiModuleFactory>();
     en.CreateModule<EditorModuleFactory>({}, EditorPropertiesCtx{ .b_showEditor = false });
 
