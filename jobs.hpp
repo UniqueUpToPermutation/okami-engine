@@ -216,6 +216,14 @@ namespace okami {
         T* operator->()  {
             return &m_port->m_messages.front();
         }
+
+        bool IsEmpty() const {
+            return m_port->m_messages.empty();
+        }
+
+        operator bool() const {
+            return !IsEmpty();
+        }
     };
 
     template <typename T>

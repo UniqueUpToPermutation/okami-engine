@@ -30,10 +30,12 @@ public:
             bool middleDown = false;
             double deltaX = 0.0, deltaY = 0.0;
             if (io) {
-                leftDown = io->m_mouse.IsButtonPressed(MouseButton::Left);
-                middleDown = io->m_mouse.IsButtonPressed(MouseButton::Middle);
-                deltaX = io->m_mouse.m_deltaX;
-                deltaY = io->m_mouse.m_deltaY;
+                if (!io->m_mouse.IsCaptured()) {
+                    leftDown = io->m_mouse.IsButtonPressed(MouseButton::Left);
+                    middleDown = io->m_mouse.IsButtonPressed(MouseButton::Middle);
+                    deltaX = io->m_mouse.m_deltaX;
+                    deltaY = io->m_mouse.m_deltaY;
+                }
             }
 
             registry.view<OrbitCameraControllerComponent const, Transform const, Camera const>().each(
@@ -138,13 +140,18 @@ public:
             bool wDown = false, aDown = false, sDown = false, dDown = false;
 
             if (io) {
-                rightDown = io->m_mouse.IsButtonPressed(MouseButton::Right);
-                deltaX    = io->m_mouse.m_deltaX;
-                deltaY    = io->m_mouse.m_deltaY;
-                wDown     = io->m_keyboard.IsKeyPressed(Key::W);
-                aDown     = io->m_keyboard.IsKeyPressed(Key::A);
-                sDown     = io->m_keyboard.IsKeyPressed(Key::S);
-                dDown     = io->m_keyboard.IsKeyPressed(Key::D);
+                if (!io->m_mouse.IsCaptured()) {
+                    rightDown = io->m_mouse.IsButtonPressed(MouseButton::Right);
+                    deltaX    = io->m_mouse.m_deltaX;
+                    deltaY    = io->m_mouse.m_deltaY;
+                }
+                
+                if (!io->m_keyboard.IsCaptured()) {
+                    wDown     = io->m_keyboard.IsKeyPressed(Key::W);
+                    aDown     = io->m_keyboard.IsKeyPressed(Key::A);
+                    sDown     = io->m_keyboard.IsKeyPressed(Key::S);
+                    dDown     = io->m_keyboard.IsKeyPressed(Key::D);
+                }
             }
 
             registry.view<FirstPersonCameraControllerComponent const, Transform const, Camera const>().each(

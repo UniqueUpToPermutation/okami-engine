@@ -154,29 +154,49 @@ namespace okami {
         Key m_key;
         Action m_action;
         int m_captureId = kNoCaptureId;
+
+        inline bool IsCaptured() const {
+            return m_captureId != kNoCaptureId;
+        }
     };
 
     struct MouseButtonMessage {
         MouseButton m_button;
         Action m_action;
         int m_captureId = kNoCaptureId;
+
+        inline bool IsCaptured() const {
+            return m_captureId != kNoCaptureId;
+        }
     };
 
     struct MousePosMessage {
         double m_x;
         double m_y;
         int m_captureId = kNoCaptureId;
+
+        inline bool IsCaptured() const {
+            return m_captureId != kNoCaptureId;
+        }
     };
 
     struct ScrollMessage {
         double m_xOffset;
         double m_yOffset;
         int m_captureId = kNoCaptureId;
+
+        inline bool IsCaptured() const {
+            return m_captureId != kNoCaptureId;
+        }
     };
 
     struct CharMessage {
         uint32_t m_char;
         int m_captureId = kNoCaptureId;
+
+        inline bool IsCaptured() const {
+            return m_captureId != kNoCaptureId;
+        }
     };
 
     enum class CursorType {
@@ -203,6 +223,7 @@ namespace okami {
 
     struct KeyboardState {
         std::array<bool, kKeyCount> m_keyStates{};
+        int m_captureId = kNoCaptureId;
 
         inline bool IsKeyPressed(Key key) const {
             int idx = static_cast<int>(key);
@@ -215,6 +236,10 @@ namespace okami {
         inline bool IsKeyReleased(Key key) const {
             return !IsKeyPressed(key);
         }
+
+        inline bool IsCaptured() const {
+            return m_captureId != kNoCaptureId;
+        }
     };
 
     struct MouseState {
@@ -223,6 +248,7 @@ namespace okami {
         double m_cursorY = 0.0;
         double m_deltaX = 0.0;
         double m_deltaY = 0.0;
+        int m_captureId = kNoCaptureId;
 
         inline bool IsButtonPressed(MouseButton button) const {
             auto it = m_buttonStates.find(button);
@@ -232,6 +258,10 @@ namespace okami {
         inline bool IsButtonReleased(MouseButton button) const {
             auto it = m_buttonStates.find(button);
             return it == m_buttonStates.end() || !it->second;
+        }
+
+        inline bool IsCaptured() const {
+            return m_captureId != kNoCaptureId;
         }
     };
 

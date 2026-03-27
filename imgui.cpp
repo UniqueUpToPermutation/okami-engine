@@ -119,8 +119,8 @@ protected:
         // Node to start a new ImGui frame
         graph.AddMessageNode([id = GetId(), &lastScaleFactor = m_lastScaleFactor](JobContext& jobContext,
             In<Time> time,
-            In<IOState> io,
             In<DisplayState> display,
+            Pipe<IOState, kImGuiInputPriority> io,
             Pipe<KeyMessage, kImGuiInputPriority> keyMessages,
             Pipe<MouseButtonMessage, kImGuiInputPriority> mouseMessages,
             Pipe<MousePosMessage> mousePosMessages,
@@ -213,36 +213,48 @@ protected:
                 // Capture input messages if not captured by others
                 if (imgui_io.WantCaptureKeyboard) {
                     keyMessages.Handle([id](KeyMessage& msg) {
-                        if (msg.m_captureId != kNoCaptureId) {
+                        if (msg.IsCaptured()) {
                             return; // Already captured
                         }
                         msg.m_captureId = id;   
                     });
+                    io.Handle([id](IOState& io) {
+                        if (io.m_keyboard.IsCaptured()) {
+                            return; // Already captured
+                        }
+                        io.m_keyboard.m_captureId = id;   
+                    });
                 }
                 if (imgui_io.WantCaptureMouse) {
                     mouseMessages.Handle([id](MouseButtonMessage& msg) {
-                        if (msg.m_captureId != kNoCaptureId) {
+                        if (msg.IsCaptured()) {
                             return; // Already captured
                         }
                         msg.m_captureId = id;   
                     });
                     mousePosMessages.Handle([id](MousePosMessage& msg) {
-                        if (msg.m_captureId != kNoCaptureId) {
+                        if (msg.IsCaptured()) {
                             return; // Already captured
                         }
                         msg.m_captureId = id;   
                     });
                     scrollMessages.Handle([id](ScrollMessage& msg) {
-                        if (msg.m_captureId != kNoCaptureId) {
+                        if (msg.IsCaptured()) {
                             return; // Already captured
                         }
                         msg.m_captureId = id;   
                     });
                     charMessages.Handle([id](CharMessage& msg) {
-                        if (msg.m_captureId != kNoCaptureId) {
+                        if (msg.IsCaptured()) {
                             return; // Already captured
                         }
                         msg.m_captureId = id;   
+                    });
+                    io.Handle([id](IOState& io) {
+                        if (io.m_mouse.IsCaptured()) {
+                            return; // Already captured
+                        }
+                        io.m_mouse.m_captureId = id;   
                     });
                 }
 
