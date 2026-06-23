@@ -48,6 +48,16 @@
             "preLaunchTask": "Build Tests"
         },
         {
+            "name": "CMake Target (Debug)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "cwd": "${command:cmake.launchTargetDirectory}",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build All"
+        },
+        {
             "name": "01_hello_world (Debug)",
             "type": "cppvsdbg",
             "request": "launch",
@@ -57,25 +67,5 @@
             "console": "integratedTerminal",
             "preLaunchTask": "Build 01_hello_world"
         },
-        {
-            "name": "04_sponza (Debug)",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/out/build/x64-debug/samples/04_sponza/Debug/04_sponza.exe",
-            "args": [],
-            "cwd": "${workspaceFolder}/out/build/x64-debug/samples/04_sponza/Debug",
-            "console": "integratedTerminal",
-            "preLaunchTask": "Build 04_sponza"
-        },
-        {
-            "name": "im3d_sample (Debug)",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/out/build/x64-debug/samples/im3d/Debug/im3d_sample.exe",
-            "args": [],
-            "cwd": "${workspaceFolder}/out/build/x64-debug/samples/im3d/Debug",
-            "console": "integratedTerminal",
-            "preLaunchTask": "Build im3d_sample"
-        }
     ]
 }

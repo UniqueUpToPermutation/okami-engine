@@ -76,14 +76,14 @@ Error OGLIm3DRenderer::Pass(entt::registry const& registry, OGLPass const& pass)
         return {};
     }
 
-    auto const& im3dData = m_dataProvider->GetIm3dContext();
-    if (!im3dData.m_context) {
+    auto const& im3dData = m_dataProvider->GetIm3dData();
+    if (im3dData.getDrawListCount() == 0) {
         return {};
     }
 
     size_t vertexCount = 0;
-    for (uint32_t i = 0; i < im3dData->getDrawListCount(); ++i) {
-        auto const& drawCall = im3dData->getDrawLists()[i];
+    for (uint32_t i = 0; i < im3dData.getDrawListCount(); ++i) {
+        auto const& drawCall = im3dData.getDrawLists()[i];
         vertexCount += drawCall.m_vertexCount;
     }
 
@@ -100,8 +100,8 @@ Error OGLIm3DRenderer::Pass(entt::registry const& registry, OGLPass const& pass)
         OKAMI_ERROR_RETURN_IF(!map, "Failed to map vertex buffer");
 
         size_t offset = 0;
-        for (uint32_t i = 0; i < im3dData->getDrawListCount(); ++i) {
-            auto const& drawCall = im3dData->getDrawLists()[i];
+        for (uint32_t i = 0; i < im3dData.getDrawListCount(); ++i) {
+            auto const& drawCall = im3dData.getDrawLists()[i];
             std::memcpy(map->Data() + offset, drawCall.m_vertexData, drawCall.m_vertexCount * sizeof(glsl::Im3dVertex));
             offset += drawCall.m_vertexCount;
         }
@@ -115,8 +115,8 @@ Error OGLIm3DRenderer::Pass(entt::registry const& registry, OGLPass const& pass)
     m_pipelineState.SetToGL();
 
     GLint currentVertex = 0;
-    for (uint32_t i = 0; i < im3dData->getDrawListCount(); ++i) {
-        auto const& drawCall = im3dData->getDrawLists()[i];
+    for (uint32_t i = 0; i < im3dData.getDrawListCount(); ++i) {
+        auto const& drawCall = im3dData.getDrawLists()[i];
 
         GLProgram* prog = nullptr;
         GLint primitiveType = GL_POINTS;

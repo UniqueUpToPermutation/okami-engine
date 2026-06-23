@@ -12,8 +12,11 @@ namespace okami {
     };
 
     struct Im3dData {
-        std::vector<Im3d::VertexData> m_data;
-        std::vector<Im3d::DrawList> m_drawLists;
+        std::vector<Im3d::VertexData> m_data;      // owned vertex data
+        std::vector<Im3d::DrawList>   m_drawLists;  // point into m_data
+
+        uint32_t getDrawListCount() const { return static_cast<uint32_t>(m_drawLists.size()); }
+        Im3d::DrawList const* getDrawLists() const { return m_drawLists.data(); }
 
         inline void Clear() {
             m_data.clear();
@@ -22,7 +25,7 @@ namespace okami {
     };
 
     struct Im3dContext {
-        std::unique_ptr<Im3d::Context> m_context;
+        std::shared_ptr<Im3d::Context> m_context;
 
         inline Im3d::Context* operator->() {
             return m_context.get();
@@ -36,6 +39,6 @@ namespace okami {
     class IIm3dProvider {
     public:
         // Thread-safe
-        virtual Im3dContext const& GetIm3dContext() const = 0;
+        virtual Im3dData const& GetIm3dData() const = 0;
     };
 }

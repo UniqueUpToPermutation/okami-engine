@@ -3,9 +3,7 @@
 #include "imgui.hpp"
 #include "im3d.hpp"
 #include "meta.hpp"
-#include "renderer.hpp"
 #include "transform.hpp"
-#include "input.hpp"
 #include "entity_tree_view.hpp"
 
 #include <entt/meta/resolve.hpp>
@@ -46,7 +44,6 @@ class EditorModule final : public EngineModule {
     bool m_showScene     = false;
     bool m_showInspector = false;
     bool m_showContext   = false;
-    IRenderModule* m_renderModule = nullptr;
 
     // Draw one node and its subtree recursively.
     void DrawEntityNode(EntityTreeView const& tree,
@@ -455,7 +452,6 @@ class EditorModule final : public EngineModule {
 public:
     Error StartupImpl(InitContext const& con) override {
         auto& ctx = con.m_registry.ctx().emplace<EditorPropertiesCtx>(m_initialCtx);
-        m_renderModule = con.m_interfaces.Query<IRenderModule>();
         return {};
     }
 
@@ -465,8 +461,6 @@ public:
                 JobContext&,
                 Pipe<ImGuiContextObject>,
                 Pipe<Im3dContext> im3d,
-                In<IOState> ioState,
-                In<DisplayState> display,
                 Out<UpdateComponentMetaSignal> updateComponent,
                 Out<UpdateCtxMetaSignal> updateCtx) -> Error
             {
@@ -478,49 +472,13 @@ public:
                 DrawInspector(registry, updateComponent);
                 DrawContextWindow(registry, updateCtx);
 
-                // Im3d transform gizmo for the selected entity
+                // Im3d transform gizmo for the selected entity.
+                // AppData + NewFrame() are handled by the Im3d module's graph node (Out<Im3dContext>)
+                // which runs before this Pipe<Im3dContext> node via job graph ordering.
                 if (im3d && m_selectedEntity != kNullEntity && registry.valid(m_selectedEntity)) {
+                    Im3d::SetContext(*im3d->m_context);
                     auto* t = registry.try_get<Transform>(m_selectedEntity);
                     if (t) {
-                        auto& appData = (*im3d)->getAppData();
-
-                        // Fill cursor ray using the active camera + current mouse position
-                        if (m_renderModule && ioState && display->m_framebufferSize.x > 0) {
-                            entity_t activeCam = m_renderModule->GetActiveCamera();
-                            auto* camPtr = (activeCam != kNullEntity) ? registry.try_get<Camera>(activeCam) : nullptr;
-                            auto* txPtr  = (activeCam != kNullEntity) ? registry.try_get<Transform>(activeCam) : nullptr;
-                            if (camPtr && txPtr) {
-                                float mx = (float)ioState->m_mouse.m_cursorX;
-                                float my = (float)ioState->m_mouse.m_cursorY;
-                                float vw = (float)display->m_framebufferSize.x;
-                                float vh = (float)display->m_framebufferSize.y;
-
-                                glm::mat4 projMatrix = camPtr->GetProjectionMatrix(
-                                    display->m_framebufferSize.x, display->m_framebufferSize.y, false);
-                                glm::mat4 viewMatrix = txPtr->Inverse().AsMatrix();
-
-                                glm::vec4 ndcRay  = glm::vec4(2.0f * mx / vw - 1.0f, 1.0f - 2.0f * my / vh, -1.0f, 1.0f);
-                                glm::vec4 viewRay = glm::inverse(projMatrix) * ndcRay;
-                                viewRay = glm::vec4(viewRay.x, viewRay.y, -1.0f, 0.0f);
-                                glm::vec3 worldRay = glm::normalize(glm::vec3(glm::inverse(viewMatrix) * viewRay));
-
-                                glm::vec3 pos = txPtr->m_position;
-                                appData.m_cursorRayOrigin    = Im3d::Vec3(pos.x, pos.y, pos.z);
-                                appData.m_cursorRayDirection = Im3d::Vec3(worldRay.x, worldRay.y, worldRay.z);
-                            }
-                        }
-
-                        // Forward key/mouse states (only when ImGui isn't capturing input)
-                        if (ioState && !ImGui::GetIO().WantCaptureMouse) {
-                            appData.m_keyDown[Im3d::Mouse_Left]              = ioState->m_mouse.IsButtonPressed(MouseButton::Left);
-                            appData.m_keyDown[Im3d::Action_GizmoTranslation] = ioState->m_keyboard.IsKeyPressed(Key::T);
-                            appData.m_keyDown[Im3d::Action_GizmoRotation]    = ioState->m_keyboard.IsKeyPressed(Key::R);
-                            appData.m_keyDown[Im3d::Action_GizmoScale]       = ioState->m_keyboard.IsKeyPressed(Key::S);
-                            appData.m_keyDown[Im3d::Action_GizmoLocal]       = ioState->m_keyboard.IsKeyPressed(Key::L);
-                        }
-
-                        Im3d::SetContext(*im3d->m_context);
-
                         glm::mat4 mat = t->AsMatrix();
                         if (Im3d::Gizmo("SelectedEntity", &mat[0][0])) {
                             // Decompose the modified matrix back into position, rotation, scale
@@ -548,6 +506,7 @@ public:
                         }
                     }
                 }
+
 
                 return {};
             });
